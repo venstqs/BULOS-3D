@@ -1,0 +1,134 @@
+@import "tailwindcss";
+@import "cesium/Build/Cesium/Widgets/widgets.css";
+
+/* Bulos 3D — soft aqua glass theme (after the Aqua World maintenance app):
+   periwinkle-to-sky backdrop, frosted white cards with generous radius,
+   royal-blue primary, soft status pills. */
+@theme {
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: "Sora", "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", monospace;
+
+  --color-page: #e6eeff;
+  --color-panel: #ffffff;
+  --color-panel-2: #f3f7ff;
+  --color-line: #e3e9f7;
+  --color-axis: #c9d3ea;
+  --color-ink: #16204a;
+  --color-ink-2: #46517c;
+  --color-muted: #7c86a9;
+
+  --color-civic: #2f5be7;          /* primary (royal blue) */
+  --color-civic-dark: #2346c4;
+  --color-sky: #4fa8f5;
+  --color-advisory: #f2c200;
+
+  /* status (reserved) */
+  --color-good: #12a150;
+  --color-warning: #fab219;
+  --color-serious: #ec835a;
+  --color-critical: #d03b3b;
+}
+
+html, body, #root { min-height: 100%; }
+body {
+  margin: 0;
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  background:
+    radial-gradient(900px 600px at 0% 0%, #d7deff 0%, transparent 60%),
+    radial-gradient(900px 700px at 100% 100%, #bfe0ff 0%, transparent 60%),
+    linear-gradient(135deg, #e3e9ff 0%, #d6e6ff 50%, #cfe6fb 100%);
+  background-attachment: fixed;
+}
+
+.tabular { font-variant-numeric: tabular-nums; }
+.font-display { font-family: var(--font-display); letter-spacing: -0.01em; }
+
+/* frosted card: the basic unit of every page */
+.glass, .section {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 22px;
+  box-shadow: 0 12px 32px rgba(47, 91, 231, 0.10);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.tile { background: #ffffff; border-radius: 16px; box-shadow: 0 2px 10px rgba(47, 91, 231, 0.06); }
+.icon-tile {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 42px; height: 42px; border-radius: 13px; color: #fff;
+  background: linear-gradient(160deg, #4f7cff, #2f5be7);
+  box-shadow: 0 6px 14px rgba(47, 91, 231, 0.30);
+}
+.pill { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 2px 10px; font-size: 11.5px; font-weight: 600; }
+.pill-good { background: #e3f6ea; color: #157a3e; }
+.pill-blue { background: #e7edff; color: #2f5be7; }
+.pill-amber { background: #fff3cf; color: #7a5600; }
+.pill-red { background: #fde6e6; color: #a32626; }
+.pill-grey { background: #eef1f8; color: #46517c; }
+.btn-primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border-radius: 12px; padding: 9px 16px; font-weight: 600; font-size: 13px; color: #fff;
+  background: linear-gradient(180deg, #4f7cff, #2f5be7);
+  box-shadow: 0 6px 16px rgba(47, 91, 231, 0.28);
+}
+.btn-primary:hover { background: linear-gradient(180deg, #4572fa, #2346c4); }
+.btn-primary:disabled { opacity: 0.45; box-shadow: none; }
+.btn-ghost { border-radius: 12px; padding: 8px 14px; font-weight: 600; font-size: 13px; color: var(--color-ink-2); background: #fff; border: 1px solid var(--color-line); }
+.btn-ghost:hover { color: var(--color-ink); border-color: var(--color-axis); }
+.link { color: var(--color-civic); font-weight: 600; font-size: 12.5px; }
+.link:hover { text-decoration: underline; }
+
+.section-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding: 16px 20px 10px;
+}
+.section-head h2 { font-family: var(--font-display); font-size: 15.5px; font-weight: 600; margin: 0; }
+.section-body { padding: 6px 20px 18px; }
+
+/* tables */
+.data { width: 100%; border-collapse: collapse; font-size: 13px; }
+.data th { text-align: left; font-weight: 600; color: var(--color-muted); font-size: 12px; padding: 9px 12px; border-bottom: 1px solid var(--color-line); }
+.data td { padding: 10px 12px; border-bottom: 1px solid var(--color-line); vertical-align: top; }
+.data tr:last-child td { border-bottom: 0; }
+.data .num { font-family: var(--font-mono); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.card { background: var(--color-panel-2); border: 1px solid var(--color-line); border-radius: 14px; }
+.eyebrow { font-size: 12px; color: var(--color-muted); }
+
+input[type="text"], input[type="datetime-local"], select, textarea {
+  border: 1px solid var(--color-line); border-radius: 10px; background: #fff; padding: 8px 10px; font-size: 13px; color: var(--color-ink);
+}
+:focus-visible { outline: 2px solid var(--color-civic); outline-offset: 2px; }
+
+.cesium-viewer-bottom { opacity: 0.8; transform: scale(0.85); transform-origin: left bottom; }
+.cesium-widget-credits { font-size: 10px; }
+
+@keyframes flow-dash { to { stroke-dashoffset: -40; } }
+.river-flow { stroke-dasharray: 2 18; animation: flow-dash 1.6s linear infinite; }
+@keyframes beacon { 0%, 100% { opacity: 1 } 50% { opacity: 0.25 } }
+.beacon { animation: beacon 1s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .river-flow, .beacon { animation: none; } }
+
+/* ---------------------------------------------------------------- Home layout
+   ≥1536px : left | main | right        (three columns, like the reference)
+   1100-1535: left cards as a row on top, then main | right
+   <1100   : one column                                                       */
+.home-grid { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); grid-template-areas: "main" "left" "right"; }
+.home-left { grid-area: left; display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); align-items: stretch; }
+.home-main { grid-area: main; display: grid; gap: 20px; align-content: start; min-width: 0; }
+.home-right { grid-area: right; display: grid; gap: 20px; align-content: start; min-width: 0; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.home-brand { display: none; }
+@media (min-width: 1100px) {
+  .home-grid { grid-template-columns: minmax(0, 1fr) 360px; grid-template-areas: "left left" "main right"; }
+  .home-left { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .home-right { grid-template-columns: minmax(0, 1fr); }
+}
+@media (min-width: 1536px) {
+  .home-grid { grid-template-columns: 300px minmax(0, 1fr) 360px; grid-template-areas: "left main right"; }
+  .home-left { grid-template-columns: minmax(0, 1fr); align-content: start; align-items: start; }
+  .home-brand { display: block; }
+}
+.home-left > *, .home-right > *, .home-main > * { min-width: 0; }

@@ -1,0 +1,10 @@
+fastapi>=0.110
+uvicorn>=0.29
+pydantic>=2.6
+numpy>=1.26
+sqlalchemy>=2.0
+# optional
+# paho-mqtt>=2.0          # MQTT bridge (ChirpStack MQTT integration)
+# psycopg[binary]>=3.1    # PostgreSQL / TimescaleDB storage
+# celery>=5.3 redis>=5    # optional background forecast worker (BULOS_CELERY=1)
+# pillow>=10              # only for backend/tools/fetch_dem.py

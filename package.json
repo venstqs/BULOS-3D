@@ -1,0 +1,33 @@
+{
+  "name": "bulos-3d",
+  "private": true,
+  "version": "3.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node scripts/start.mjs",
+    "postinstall": "node scripts/copy-cesium.mjs",
+    "dev": "vite",
+    "build": "node scripts/copy-cesium.mjs && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "backend": "python -m uvicorn backend.main:app --port 8000"
+  },
+  "dependencies": {
+    "@react-three/drei": "^10.7.9",
+    "@react-three/fiber": "^9.8.2",
+    "cesium": "^1.146.0",
+    "lucide-react": "^1.61.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "oxlint": "^1.88.0",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.4"
+  }
+}
