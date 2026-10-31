@@ -84,6 +84,9 @@ runs the FastAPI data server on port 8000 (API docs at http://127.0.0.1:8000/doc
 For development with hot reload use `npm run backend` and `npm run dev` in two terminals. Dev mode serves the
 3D libraries unbundled (around 50 MB), so the first load there is much slower.
 
+**Mobile app (Expo Go):** see [`mobile/README.md`](mobile/README.md). In short, run `npm run start:lan` here,
+then `npm start` in `mobile/`, and scan the QR code with Expo Go on the same Wi-Fi.
+
 Run the tests with `python -m pytest tests -q`. They cover the DEM drainage, payload codec, risk, interlock, forecast
 lead time, transit calibration, biofouling, monsoon behaviour, reserve escalation, and every ingest API.
 

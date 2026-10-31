@@ -29,5 +29,5 @@ __pycache__/
 *.pyc
 .pytest_cache/
 _archive/
-backend/data/bulos.db
+backend/data/bulos.db*
 .env

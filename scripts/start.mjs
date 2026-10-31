@@ -5,7 +5,14 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
 
+import { networkInterfaces } from 'node:os';
+
 const isWin = process.platform === 'win32';
+// --lan: listen on the Wi-Fi network so the Bulos 3D mobile app (Expo Go) can connect.
+const lan = process.argv.includes('--lan');
+const host = lan ? '0.0.0.0' : '127.0.0.1';
+const lanIp = Object.values(networkInterfaces()).flat()
+  .find((i) => i && i.family === 'IPv4' && !i.internal && /^(192\.168|10\.|172\.(1[6-9]|2\d|3[01]))/.test(i.address))?.address;
 const python = process.env.PYTHON ?? (isWin ? 'python' : 'python3');
 const children = [];
 
@@ -47,14 +54,14 @@ async function waitFor(url, label, seconds = 60) {
 }
 
 console.log('Starting the Bulos 3D data server…');
-run(python, ['-m', 'uvicorn', 'backend.main:app', '--port', '8000', '--host', '127.0.0.1'], 'data server');
+run(python, ['-m', 'uvicorn', 'backend.main:app', '--port', '8000', '--host', host], 'data server');
 
 console.log('Building the website (about 10–30 s)…');
 const build = spawnSync('npm run build', { stdio: 'inherit', shell: true });
 if (build.status !== 0) { console.error('Website build failed.'); shutdown(1); }
 
 if (!(await waitFor('http://127.0.0.1:8000/api/health', 'The data server'))) shutdown(1);
-run('npx', ['vite', 'preview', '--port', '5173', '--strictPort'], 'website');
+run('npx', ['vite', 'preview', '--port', '5173', '--strictPort', '--host', host], 'website');
 if (await waitFor('http://127.0.0.1:5173/', 'The website', 30)) {
   console.log('\n  Bulos 3D is running:  http://127.0.0.1:5173\n  Press Ctrl+C to stop.\n');
 }

@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export const API = import.meta.env.VITE_API ?? 'http://127.0.0.1:8000';
+// Data server address: ?api=… (used by the mobile app's embedded views), then VITE_API,
+// then port 8000 on whatever host served this page (works on 127.0.0.1 and over Wi-Fi).
+export const API = new URLSearchParams(window.location.search).get('api')
+  ?? import.meta.env.VITE_API
+  ?? `${window.location.protocol}//${window.location.hostname || '127.0.0.1'}:8000`;
 const TIMEOUT_MS = 8000;
 
 export async function get(path) {

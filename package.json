@@ -10,7 +10,8 @@
     "build": "node scripts/copy-cesium.mjs && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "backend": "python -m uvicorn backend.main:app --port 8000"
+    "backend": "python -m uvicorn backend.main:app --port 8000",
+    "start:lan": "node scripts/start.mjs --lan"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",

@@ -234,6 +234,19 @@ function Site({ st }) {
   );
 }
 
+/** The isometric 3D site model; also embedded by the mobile app (?embed=site). */
+export function SiteScene({ st, zoom = 54 }) {
+  return (
+    <Canvas shadows>
+      <OrthographicCamera makeDefault position={[10, 9, 10]} zoom={zoom} />
+      <ambientLight intensity={0.6} />
+      <directionalLight position={[6, 10, 4]} intensity={1.6} castShadow />
+      <Site st={st} />
+      <OrbitControls enablePan={false} minZoom={20} maxZoom={140} maxPolarAngle={Math.PI / 2.3} target={[0, 0.8, 0]} />
+    </Canvas>
+  );
+}
+
 export default function AssetInspector({ st, onClose }) {
   if (!st) return null;
   const status = stationStatus(st);
@@ -241,13 +254,7 @@ export default function AssetInspector({ st, onClose }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#14212b]/50 p-6" onClick={onClose}>
       <div className="flex h-[78vh] w-[min(1200px,94vw)] overflow-hidden rounded-lg border border-line bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="relative flex-1 bg-[#eef2f0]">
-          <Canvas shadows>
-            <OrthographicCamera makeDefault position={[10, 9, 10]} zoom={54} />
-            <ambientLight intensity={0.6} />
-            <directionalLight position={[6, 10, 4]} intensity={1.6} castShadow />
-            <Site st={st} />
-            <OrbitControls enablePan={false} minZoom={35} maxZoom={140} maxPolarAngle={Math.PI / 2.3} target={[0, 0.8, 0]} />
-          </Canvas>
+          <SiteScene st={st} />
           <div className="absolute left-3 top-3 text-[11px] text-muted">Isometric diagnostic view · drag to orbit · scroll to zoom</div>
         </div>
         <aside className="w-80 shrink-0 overflow-y-auto border-l border-line p-4 text-xs">
