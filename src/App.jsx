@@ -56,7 +56,7 @@ export default function App() {
   const [page, setPage] = useState(deepLink ? 'points' : 'home');
   const [selectedId, setSelectedId] = useState(deepLink ?? 'KS-03');
   const [inspectId, setInspectId] = useState(deepLink);
-  const [layers, setLayers] = useState({ heatmap: true, particles: true, streams: true, catchment: true });
+  const [layers, setLayers] = useState({ heatmap: true, flood: false, particles: true, streams: true, pipes: true, columns: true, catchment: true });
   const [dialog, setDialog] = useState(null);           // { kind, arg }
   const [toast, setToast] = useState(null);
   // Lite mode: no 3D map (for slow PCs or a crashing graphics driver). Remembered in this browser.
@@ -108,8 +108,8 @@ export default function App() {
     <ErrorBoundary label="The 3D map" compact onDisable={() => setLite(true)}>
       <Suspense fallback={<div className="flex h-full items-center justify-center bg-panel-2 text-sm text-muted">Loading the 3D map…</div>}>
         {/* click a water point: isometric 3D site view; double-click: its details page */}
-        <CesiumScene staticData={staticData} live={live} heatmap={heatmap} selectedId={selectedId}
-                     onSelect={onInspect} onInspect={openPoint} layers={layers} />
+        <CesiumScene staticData={staticData} live={live} forecast={forecast} heatmap={heatmap} selectedId={selectedId}
+                     onSelect={onInspect} onInspect={openPoint} layers={layers} setLayers={setLayers} />
       </Suspense>
     </ErrorBoundary>
   );

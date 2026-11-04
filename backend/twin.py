@@ -477,6 +477,10 @@ class Twin:
         wet = np.log1p(T.acc[rr, cc]) / np.log1p(T.acc.max())
         steep = np.clip(T.slope_deg[rr, cc] / 30, 0, 1)
         self._runoff_potential = np.clip(0.5 * wet + 0.5 * steep, 0, 1)
+        # Height above the nearest river point: low ground beside the channel floods first.
+        # A terrain screening estimate from the 90 m DEM, not an official hazard map.
+        hand = np.clip(T.elev[rr, cc] - self.ch.z[self._near_cell], 0, None)
+        self._flood_potential = np.clip(1 - hand / 8.0, 0, 1) * np.exp(-self._near_dist / 1500)
 
     HEAT_INDICES = ("risk", "turbidity", "ph", "tds", "bio")
 
@@ -497,9 +501,11 @@ class Twin:
 
     def risk_grid(self, index="risk"):
         """uint8 hazard raster over the DEM grid (0 = none / outside catchment), base64."""
-        if index not in self.HEAT_INDICES:
-            raise ValueError(f"index must be one of {self.HEAT_INDICES}")
+        if index not in (*self.HEAT_INDICES, "flood"):
+            raise ValueError(f"index must be one of {self.HEAT_INDICES} or flood")
         T = self.terrain
+        if index == "flood":                       # brightens as rain falls on the catchment
+            return self._grid(index, self._flood_potential * (0.55 + 0.45 * np.clip(self.runoff_rain / 40, 0, 1)))
         creek = [st for st in self.stations.values() if not st.aquifer]
         if index == "risk":
             chan = 1 - (1 - np.clip(self.tr.c[TURB] / 40, 0, 1) * 0.7) * (1 - np.clip(self.tr.c[ORP] / 200, 0, 1) * 0.8) \
@@ -522,6 +528,10 @@ class Twin:
                 continue
             d = np.hypot((lat - st.lat) * T.dy / T.step, (lon - st.lon) * T.dx / T.step)
             val = np.maximum(val, self._station_hazard(st, index) * np.exp(-(d / 250) ** 2))
+        return self._grid(index, val)
+
+    def _grid(self, index, val):
+        T = self.terrain
         grid = np.zeros((T.nrows, T.ncols), np.uint8)
         grid[self._grid_idx] = np.clip(val * 254 + 1, 1, 255).astype(np.uint8)
         return dict(index=index, north=T.north, south=T.south, west=T.west, east=T.east,

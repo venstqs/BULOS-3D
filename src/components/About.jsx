@@ -3,6 +3,7 @@ import {
   ServerCog, Users, Waves, Wrench,
 } from 'lucide-react';
 import { usePoll } from '../api';
+import TwinLoop from './TwinLoop';
 
 const FEATURES = [
   {
@@ -109,6 +110,8 @@ export default function AboutPage({ live, staticData, go }) {
           </p>
         </div>
       </Card>
+
+      <TwinLoop live={live} />
 
       <div className="grid gap-5 md:grid-cols-2">
         <Card>

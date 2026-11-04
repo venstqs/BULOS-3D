@@ -137,9 +137,6 @@ export default function Home({
         <section className="glass grid gap-2 p-2 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
           <div className="relative aspect-square w-full overflow-hidden rounded-[18px] bg-panel-2">
             {map}
-            <span className={`pill absolute left-3 top-3 shadow-sm ${advisory ? 'pill-amber' : 'pill-good'}`}>
-              <span className={`h-2 w-2 rounded-full ${advisory ? 'bg-[#e0a800]' : 'bg-good'}`} />{advisory ? 'Advisory' : 'Healthy'}
-            </span>
           </div>
           <PointPanel st={st} live={live} forecast={forecast} onSelectPoint={onSelectPoint} onOpenPoint={onOpenPoint} onInspect={onInspect} />
         </section>

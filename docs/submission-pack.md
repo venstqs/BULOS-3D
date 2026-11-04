@@ -17,6 +17,20 @@ Judging: **Impact**, **Challenge Fit & Feasibility**, **Innovation**.
 > A river-wide early warning for rural water: one shared lab-grade sensor upstream and low-cost nodes at every
 > water point, joined by a digital twin that closes intakes before contaminated water arrives.
 
+### What we mean by "digital twin"
+
+> A digital twin is a virtual copy of a real system that stays in step with it through live data, uses physics to
+> predict what happens next, and sends decisions back to change the real system. A 3D map alone is not a twin.
+
+Bulos 3D runs this loop: **Sense → Sync → Simulate → Decide → Act**. Academic work separates a *digital model* (no
+live link), a *digital shadow* (data flows in only) and a *digital twin* (data flows both ways). Be exact when judges
+ask: the two-way loop runs against a simulated field that sends real-format packets. The real-node path has only been
+tested with a software stand-in until a physical node is connected.
+
+Design references: the 3D-plus-time view and layer catalogue of spatial twins such as the NSW Spatial Digital Twin, and
+the community hazard focus of Project NOAH. Our flood-prone layer is a terrain estimate from the 90 m elevation model,
+not an official hazard map, and Bulos 3D is not affiliated with either project.
+
 ## 3. Changes to make in the concept paper
 
 | Section | Old wording | New wording |
@@ -85,6 +99,7 @@ A quote or short letter from a barangay health worker, the City Health Office or
 | 0:20 | Team | "We're [names] from Camarines Sur National High School. This is Bulos 3D." |
 | 0:30 | 3D map, river from Isarog to Naga | "Bulos 3D is a digital twin of a real watershed, built from satellite elevation data. It knows how fast water moves and where it goes." |
 | 0:50 | Sentinel diagram | "Biological sensors are too expensive for every barangay. So we use one upstream, and cheap nodes everywhere else. The twin connects them." |
+| 1:05 | Drag the time bar: replay, then forecast | "This is what makes it a twin, not a map. It remembers the last six hours and runs the river forward four hours." |
 | 1:10 | Simulate spill; AG-02 alert, ETA, SMS | "A piggery lagoon fails. The sentinel sees it. Before the plume reaches the kiosk, the twin predicts its arrival, warns the health worker and closes the intake." |
 | 1:45 | **Real bench node:** add soil, LED, valve closes, dashboard reacts | "This is real hardware. Dirty water, and the valve closes by itself, even with no internet." |
 | 2:10 | Dirty-sensor case | "A dirty probe looks like pollution. Bulos 3D tells them apart, so nobody loses water because of a false alarm." |

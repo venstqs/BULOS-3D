@@ -18,6 +18,8 @@ function gaugeStatus(k, r, b) {
   return 'info';
 }
 
+const PART_LABEL = { turbidity: 'Turbidity', orp: 'ORP', ph: 'pH', tds: 'TDS', bio: 'Biological' };
+
 export default function PointDetail() {
   const { id } = useLocalSearchParams();
   const { live, forecast, apiBase, act } = useData();
@@ -103,7 +105,7 @@ export default function PointDetail() {
         <CardHead title="Health index breakdown" />
         {Object.entries(st.wqhi.parts).map(([k, v]) => (
           <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-            <Text style={[FONT.small, { width: 74, color: C.ink2 }]}>{k === 'bio' ? 'biological' : k}</Text>
+            <Text style={[FONT.small, { width: 74, color: C.ink2 }]}>{PART_LABEL[k] ?? k}</Text>
             <View style={{ flex: 1, height: 7, borderRadius: 4, backgroundColor: C.panel2 }}>
               <View style={{ width: `${v}%`, height: 7, borderRadius: 4, backgroundColor: C.primary }} />
             </View>

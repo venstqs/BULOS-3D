@@ -46,6 +46,19 @@ export default function About() {
       </Card>
 
       <Card>
+        <Text style={FONT.h2}>What makes this a digital twin</Text>
+        <Text style={[FONT.body, { color: C.ink2, marginTop: 6 }]}>
+          A digital twin is a virtual copy of a real system that stays in step with it through live data, uses physics to
+          predict what happens next, and sends decisions back to change the real system. A 3D map alone is not a twin.
+        </Text>
+        <Text style={[FONT.body, { fontWeight: '700', marginTop: 10 }]}>Sense → Sync → Simulate → Decide → Act</Text>
+        <Text style={[FONT.small, { marginTop: 8 }]}>
+          Today the full loop runs against a simulated field that sends real-format sensor packets. A physical node has not
+          been connected yet, so field accuracy is still unproven.
+        </Text>
+      </Card>
+
+      <Card>
         <Text style={FONT.h2}>The five core features</Text>
         {FEATURES.map(([icon, title, text, href], i) => (
           <View key={title} style={{ flexDirection: 'row', gap: 12, paddingVertical: 10, borderBottomWidth: i === FEATURES.length - 1 ? 0 : 1, borderBottomColor: C.line }}>

@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useMemo } from 'react';
+import { Suspense, lazy, useCallback, useState } from 'react';
 import { usePoll } from './api';
 
 // Full-screen 3D views embedded by the Bulos 3D mobile app in a WebView.
@@ -15,7 +15,10 @@ export default function Embed({ mode, params }) {
   const { data: staticData } = usePoll('/api/static', 0);
   const { data: live } = usePoll('/api/state', 2000);
   const { data: heatmap } = usePoll(mode === 'map' ? `/api/heatmap?index=${index}` : null, 5000);
-  const layers = useMemo(() => ({ heatmap: params.get('heatmap') !== '0', particles: true, streams: true, catchment: true }), [params]);
+  const { data: forecast } = usePoll(mode === 'map' ? '/api/forecast' : null, 4000);
+  const [layers, setLayers] = useState(() => ({
+    heatmap: params.get('heatmap') !== '0', flood: false, particles: true, streams: true, pipes: true, columns: true, catchment: true,
+  }));
   const select = useCallback((id) => send({ type: 'select', id }), []);
   const st = live?.stations.find((s) => s.id === params.get('id'));
 
@@ -23,8 +26,8 @@ export default function Embed({ mode, params }) {
     <div className="fixed inset-0 bg-panel-2">
       {mode === 'map' && (
         <Suspense fallback={<Loading text="Loading the 3D map…" />}>
-          <CesiumScene staticData={staticData} live={live} heatmap={heatmap} selectedId={params.get('id') ?? ''}
-                       onSelect={select} onInspect={select} layers={layers} />
+          <CesiumScene staticData={staticData} live={live} forecast={forecast} heatmap={heatmap} selectedId={params.get('id') ?? ''}
+                       onSelect={select} onInspect={select} layers={layers} setLayers={setLayers} />
         </Suspense>
       )}
       {mode === 'site' && (st ? (

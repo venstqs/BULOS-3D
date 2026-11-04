@@ -1,3 +1,4 @@
+import numpy as np
 """
     python -m pytest tests -q
 """
@@ -266,3 +267,13 @@ def test_reset_restores_the_demo():
     run(p, 10)
     assert all(n["edge"].valve_open for n in p.world.nodes.values())
     assert p.world.nodes["KS-03"]["tank_l"] > 0.8 * C.STATIONS[2]["tank"]["capacity_l"]
+
+
+def test_flood_layer_is_low_ground_beside_the_river():
+    p = Platform(store=False)
+    g = np.frombuffer(base64.b64decode(p.twin.risk_grid("flood")["data"]), np.uint8)
+    inside = g[g > 0]
+    assert inside.size and inside.max() > 100          # some ground is flagged
+    assert np.mean(inside > 100) < 0.5                 # but not the whole catchment
+    with pytest.raises(ValueError):
+        p.twin.risk_grid("nonsense")
