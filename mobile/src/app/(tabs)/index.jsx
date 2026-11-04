@@ -24,7 +24,7 @@ const ACTIVITY = {
 };
 
 export default function Home() {
-  const { live, static: st, trend, tasks, forecast } = useData();
+  const { live, static: st, trend, tasks, forecast, isStandalone } = useData();
   const router = useRouter();
   const [selId, setSelId] = useState('KS-03');
   if (!live) return <Screen title="Bulos 3D" subtitle="Water quality digital twin" />;
@@ -55,7 +55,14 @@ export default function Home() {
       title="Keep every water point safe"
       right={<Logo size={42} />}
     >
-      <Text style={[FONT.small, { marginTop: -8 }]}>{st?.site?.subtitle ?? 'Naga City'} · updated {fmtClock(now)}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: -8 }}>
+        <Text style={FONT.small}>{st?.site?.subtitle ?? 'Naga City'} · updated {fmtClock(now)}</Text>
+        {isStandalone && (
+          <Pressable onPress={() => router.push('/settings')}>
+            <Pill text="Standalone Demo" kind="amber" />
+          </Pressable>
+        )}
+      </View>
 
       <Card>
         <CardHead icon="water" title="Water quality" sub={attention ? `${attention} water point${attention > 1 ? 's' : ''} need attention` : 'All water points good'} />
