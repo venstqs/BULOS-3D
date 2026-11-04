@@ -1,6 +1,6 @@
 import { createContext, createElement, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { AppState, Vibration } from 'react-native';
-import { apiGet, apiPost, loadServers, saveServers, clearServers, defaultServers, getIsStandalone, setStandalone } from './api';
+import { DEMO_BASE, apiGet, apiPost, loadServers, saveServers, clearServers, defaultServers } from './api';
 import { demoTwin } from './demoEngine';
 
 const DataContext = createContext(null);
@@ -8,25 +8,21 @@ export const useData = () => useContext(DataContext);
 
 /* One poller per endpoint. Never stacks requests, pauses while the app is in the background. */
 function usePoll(base, path, intervalMs, active) {
-  const [data, setData] = useState(null);
-  const [status, setStatus] = useState('connecting');
-  const [error, setError] = useState(null);
+  const [got, setGot] = useState(null);              // { base, data }: data is only valid for its own server
+  const [status, setStatus] = useState({ base: null, value: 'connecting', error: null });
   const busy = useRef(false);
   const have = useRef(null);
 
   const refresh = useCallback(async () => {
-    if (!path || busy.current) return;
+    if (!path || !base || busy.current) return;
     busy.current = true;
     try {
       const next = await apiGet(base, path);
-      setData(next);
+      setGot({ base, data: next });
       have.current = base;
-      setStatus(getIsStandalone() ? 'standalone' : 'online');
-      setError(null);
+      setStatus({ base, value: base === DEMO_BASE ? 'standalone' : 'online', error: null });
     } catch (e) {
-      // Fallback
-      setStatus('standalone');
-      setError(null);
+      setStatus({ base, value: 'offline', error: e.message });
     } finally {
       busy.current = false;
     }
@@ -40,7 +36,13 @@ function usePoll(base, path, intervalMs, active) {
     return () => { clearTimeout(first); clearInterval(id); };
   }, [refresh, intervalMs, active, base]);
 
-  return { data, status, error, refresh };
+  const current = status.base === base;
+  return {
+    data: got?.base === base ? got.data : null,
+    status: current ? status.value : 'connecting',
+    error: current ? status.error : null,
+    refresh,
+  };
 }
 
 export function DataProvider({ children }) {
@@ -54,10 +56,7 @@ export function DataProvider({ children }) {
   useEffect(() => {
     loadServers().then((sv) => {
       setServersState(sv);
-      if (sv?.mode === 'standalone') {
-        setStandalone(true);
-        setStandaloneState(true);
-      }
+      if (sv?.mode === 'standalone') setStandaloneState(true);
     });
   }, []);
 
@@ -66,16 +65,14 @@ export function DataProvider({ children }) {
     return () => sub.remove();
   }, []);
 
-  // Tick the in-app twin simulator every second
+  // The on-phone demo twin only runs while demo mode is switched on
   useEffect(() => {
-    const id = setInterval(() => {
-      demoTwin.tick();
-      setStandaloneState(getIsStandalone());
-    }, 1000);
+    if (!standalone) return undefined;
+    const id = setInterval(() => demoTwin.tick(), 1000);
     return () => clearInterval(id);
-  }, []);
+  }, [standalone]);
 
-  const base = standalone ? 'standalone' : servers?.api;
+  const base = standalone ? DEMO_BASE : servers?.api;
   const staticQ = usePoll(base, '/api/static', 0, active);
   const live = usePoll(base, '/api/state', 1500, active);
   const forecast = usePoll(base, '/api/forecast', 4000, active);
@@ -120,41 +117,25 @@ export function DataProvider({ children }) {
   const setServers = useCallback(async (next) => {
     await saveServers(next);
     setServersState(next);
-    if (next.mode === 'standalone') {
-      setStandalone(true);
-      setStandaloneState(true);
-    } else {
-      setStandalone(false);
-      setStandaloneState(false);
-    }
+    setStandaloneState(next.mode === 'standalone');
   }, []);
 
   const resetServers = useCallback(async () => {
     await clearServers();
-    setStandalone(false);
     setStandaloneState(false);
     setServersState(defaultServers());
   }, []);
 
   const toggleStandalone = useCallback(async () => {
     const nextVal = !standalone;
-    setStandalone(nextVal);
     setStandaloneState(nextVal);
-    if (servers) {
-      await saveServers({ ...servers, mode: nextVal ? 'standalone' : 'auto' });
-    }
-    notify(true, nextVal ? 'Switched to React Native Standalone Demo Mode.' : 'Switched to Live Data Server Mode.');
-    live.refresh();
-    staticQ.refresh();
-  }, [standalone, servers, notify, live, staticQ]);
+    if (servers) await saveServers({ ...servers, mode: nextVal ? 'standalone' : 'auto' });
+    notify(true, nextVal ? 'Demo mode on: simulated data on this phone only.' : 'Connecting to the live data server.');
+  }, [standalone, servers, notify]);
 
   const value = {
     servers, setServers, resetServers, toggleStandalone, isStandalone: standalone,
-    static: staticQ.data || demoTwin.getStatic(),
-    live: live.data || demoTwin.getState(),
-    forecast: forecast.data || demoTwin.getForecast(),
-    tasks: maint.data?.tasks || demoTwin.getMaintenance().tasks,
-    trend: trend.data?.series || demoTwin.getTrend().series,
+    static: staticQ.data, live: live.data, forecast: forecast.data, tasks: maint.data?.tasks, trend: trend.data?.series,
     status: live.status, error: live.error, refresh: live.refresh,
     act, notify, toast, dismissToast: () => setToast(null),
     heatIndex, setHeatIndex,

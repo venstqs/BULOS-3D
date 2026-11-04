@@ -5,7 +5,7 @@ import { Button, Card, Empty, Pill, Screen } from '../components/ui';
 import { Chips, Label } from '../components/Choice';
 import { useData } from '../lib/data';
 import { C, FONT } from '../lib/theme';
-import { fmt, fmtClock } from '../lib/format';
+import { fmt, fmtClock, notFitted } from '../lib/format';
 
 export default function WaterTest() {
   const params = useLocalSearchParams();
@@ -23,6 +23,9 @@ export default function WaterTest() {
     ['Biological indicator (TLF)', r.bio == null ? 'no sensor' : `${fmt(r.bio, 1)} ppb`, '< 10 ppb', r.bio == null ? null : r.bio < 10],
     ['Water temperature', `${fmt(r.temp, 1)} °C`, 'reference', null],
   ];
+  ['turbidity', 'ph', 'tds', 'orp', 'bio', 'temp'].forEach((k, i) => {
+    if (notFitted(s, k)) rows[i] = [rows[i][0], 'not fitted', rows[i][2], null];
+  });
   const fails = rows.filter((x) => x[3] === false).length;
   const share = () => Share.share({
     message: [`Bulos 3D water test: ${s.name} (${s.id}), ${fmtClock(live.clock.epoch_ms)}`,

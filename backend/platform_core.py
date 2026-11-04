@@ -55,6 +55,8 @@ class Platform:
         self.epoch0 = time.time()
         self._static = None
         self.schedule = None
+        self.node_seen = {}                              # real hardware: station id -> last check-in
+        self.node_commands = {}                          # pending commands for real nodes
         if self.world:
             self._warmup()
         self.schedule = Schedule(C.STATIONS, self.epoch() * 1000)
@@ -89,7 +91,10 @@ class Platform:
             self.ingest_rain(g["gauge_id"], g["rain_mm_hr"])
             for sid in self.world.nodes:                 # DOST rainfall broadcast to edge nodes
                 self.world.downlink(sid, CMD["RAIN"], g["rain_mm_hr"])
+            self._expire_nodes()
             for up in self.world.uplinks():
+                if up["station_id"] in self.node_seen:   # a real node owns this water point
+                    continue
                 dec = decode_uplink(up["payload"])
                 meta = dict(edge_state=dec["edge_state"], valve_open=dec["valve_open"], tank_pct=dec["tank_pct"],
                             battery_v=dec["battery_v"], rssi=up["rssi"], snr=up["snr"], f_cnt=up["f_cnt"],
@@ -107,6 +112,65 @@ class Platform:
         if self.store:
             self.store.add_reading(self.epoch(), sid, reading,
                                    self.twin.station_view(self.twin.stations[sid]), meta.get("source", "api"))
+
+    # ----------------------------------------------------- real field nodes
+    NODE_TIMEOUT_S = 45
+    EDGE_KIND = {"TRIPPED": "AUTO_TRIP", "SUSPECT": "SUSPECT", "MAINTENANCE": "MAINTENANCE"}
+
+    def _reset_station(self, st):
+        """Forget learned history when a water point changes between simulated and real."""
+        st.hist.clear()
+        st.baseline, st.reading, st.classification = None, None, "NORMAL"
+        st.flags.clear()
+
+    def _expire_nodes(self):
+        for sid, seen in list(self.node_seen.items()):
+            if time.time() - seen > self.NODE_TIMEOUT_S:
+                del self.node_seen[sid]
+                self.node_commands.pop(sid, None)
+                st = self.twin.stations[sid]
+                self._reset_station(st)
+                self._emit(dict(t=self.t, station=sid, type="NODE_OFFLINE", severity="warning",
+                                message=f"Real sensor node {sid} stopped reporting; back to simulated data."))
+
+    def ingest_node(self, body):
+        """
+        Check-in from a real Wi-Fi node (firmware/bulos_bench_node). It can take over one water
+        point while the others stay simulated. Sensors it does not carry are filled with the
+        station baseline and listed as `estimated`, so they add no evidence and the UI can say so.
+        Returns pending valve commands plus the DOST rainfall value for the node's risk score.
+        """
+        sid = body["station_id"]
+        if sid not in self.twin.stations:
+            raise KeyError(f"unknown station {sid}")
+        st = self.twin.stations[sid]
+        if sid not in self.node_seen:
+            self._reset_station(st)
+            self._emit(dict(t=self.t, station=sid, type="NODE_ONLINE", severity="info",
+                            message=f"Real sensor node connected at {sid}. Live readings replace the simulation here."))
+        self.node_seen[sid] = time.time()
+        base = st.baseline or st.cfg["base"]
+        reading, estimated = {}, []
+        for k in ("turbidity", "orp", "ph", "tds", "temp"):
+            if body.get(k) is None:
+                reading[k] = base[k]
+                estimated.append(k)
+            else:
+                reading[k] = float(body[k])
+        reading["bio"] = None if body.get("bio") is None else float(body["bio"])
+        state = body.get("edge_state", st.edge_state)
+        log = []
+        if state != st.edge_state and state in self.EDGE_KIND:
+            log.append((self.EDGE_KIND[state], f"Real node reported {state.replace('_', ' ').lower()} "
+                                               f"(turbidity {reading['turbidity']:.1f} NTU)."))
+        meta = dict(edge_state=state, valve_open=bool(body.get("valve_open", True)), estimated=estimated,
+                    source="Wi-Fi bench node (real sensor)", edge_log=log,
+                    rssi=body.get("rssi"), battery_v=body.get("battery_v"))
+        if body.get("tank_pct") is not None:
+            meta["tank_pct"] = float(body["tank_pct"])
+        self.ingest_reading(sid, reading, meta)
+        pending = list(self.node_commands.pop(sid, []))
+        return dict(ok=True, commands=pending, rain_mm_hr=self.twin.rain)
 
     def ingest_rain(self, gauge, mm_hr):
         self.twin.ingest_rain(self.t, mm_hr)
@@ -133,7 +197,10 @@ class Platform:
     def send_command(self, sid, name, actor="operator", reason="", arg=0):
         if sid not in self.twin.stations:
             raise KeyError(sid)
-        if self.world:
+        if sid in self.node_seen:
+            self.node_commands.setdefault(sid, []).append(dict(cmd=name, arg=arg))
+            ok, msg = True, "Sent to the real node; it acts at its next check-in (a few seconds)."
+        elif self.world:
             ok, msg = self.world.downlink(sid, CMD[name], arg)
         else:
             frame = dict(devEui=DEV_EUI[sid], fPort=10, confirmed=True,
@@ -300,5 +367,6 @@ class Platform:
             sms_provider=self.notifier.provider,
             auto_preempt=tw.auto_preempt,
             forecast_engine=self.forecast_engine,
+            live_nodes=sorted(self.node_seen),
             storage=None if not self.store else ("TimescaleDB" if self.store.timescale else self.store.dialect),
         )

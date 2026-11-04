@@ -7,7 +7,7 @@ import { Gauge, LineChart } from '../../components/charts';
 import { apiGet } from '../../lib/api';
 import { useData } from '../../lib/data';
 import { C, FONT } from '../../lib/theme';
-import { BAND, CLASS_LABEL, EDGE_LABEL, fmt, fmtClock, fmtMin } from '../../lib/format';
+import { BAND, CLASS_LABEL, EDGE_LABEL, fmt, fmtClock, fmtMin, isRealNode, notFitted } from '../../lib/format';
 
 function gaugeStatus(k, r, b) {
   if (k === 'turbidity') return r.turbidity <= 5 ? 'good' : r.turbidity <= 10 ? 'warning' : 'critical';
@@ -64,6 +64,7 @@ export default function PointDetail() {
           <View style={{ flex: 1, gap: 5 }}>
             <Text style={FONT.h2}>{st.name}</Text>
             <StatusBadge st={st} />
+            {isRealNode(st) && <Pill text="Real sensor" kind="good" icon="radio" />}
             <Text style={FONT.small}>{CLASS_LABEL[st.classification]} · risk {fmt(st.risk, 2)}</Text>
           </View>
         </View>
@@ -90,9 +91,9 @@ export default function PointDetail() {
         <CardHead title="Live telemetry" sub={`Baseline ORP ${fmt(b.orp, 0)} mV · updated ${fmtClock(live.clock.epoch_ms)}`} />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           <Gauge label="Turbidity" unit="NTU" value={r.turbidity} min={0} max={50} status={gaugeStatus('turbidity', r, b)} />
-          <Gauge label="pH" unit="" value={r.ph} min={4} max={10} digits={2} status={gaugeStatus('ph', r, b)} />
-          <Gauge label="TDS" unit="mg/L" value={r.tds} min={0} max={1000} digits={0} status={gaugeStatus('tds', r, b)} />
-          <Gauge label="ORP" unit="mV" value={r.orp} min={0} max={600} digits={0} status={gaugeStatus('orp', r, b)} />
+          {!notFitted(st, 'ph') && <Gauge label="pH" unit="" value={r.ph} min={4} max={10} digits={2} status={gaugeStatus('ph', r, b)} />}
+          {!notFitted(st, 'tds') && <Gauge label="TDS" unit="mg/L" value={r.tds} min={0} max={1000} digits={0} status={gaugeStatus('tds', r, b)} />}
+          {!notFitted(st, 'orp') && <Gauge label="ORP" unit="mV" value={r.orp} min={0} max={600} digits={0} status={gaugeStatus('orp', r, b)} />}
           <Gauge label="Biological" unit="ppb" value={r.bio} min={0} max={40} status={gaugeStatus('bio', r, b)} />
           <Gauge label="Temperature" unit="°C" value={r.temp} min={15} max={40} />
         </View>

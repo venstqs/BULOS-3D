@@ -158,9 +158,17 @@ export function Toast() {
 }
 
 export function ConnectionNotice() {
-  const { status, live, servers, error } = useData();
+  const { status, live, servers, error, toggleStandalone } = useData();
   const router = useRouter();
   if (status === 'online') return null;
+  if (status === 'standalone') {
+    return (
+      <Pressable onPress={() => router.push('/settings')} style={s.demoBar} accessibilityRole="button">
+        <Ionicons name="flask" size={15} color="#7a5600" />
+        <Text style={[FONT.small, { color: '#7a5600', fontWeight: '700', flex: 1 }]}>Demo mode: simulated data on this phone. Nothing here is a real reading.</Text>
+      </Pressable>
+    );
+  }
   if (status === 'connecting' && !live) {
     return <View style={s.notice}><ActivityIndicator color={C.primary} /><Text style={FONT.body}>Connecting to {servers?.api ?? 'the data server'}…</Text></View>;
   }
@@ -173,6 +181,7 @@ export function ConnectionNotice() {
       </Text>
       {error ? <Text style={[FONT.small, { marginTop: 6 }]}>{error}</Text> : null}
       <Button title="Server settings" kind="ghost" icon="settings" onPress={() => router.push('/settings')} style={{ marginTop: 12 }} />
+      {!live && <Button title="Use demo mode instead" kind="ghost" icon="flask" onPress={toggleStandalone} style={{ marginTop: 8 }} />}
     </Card>
   );
 }
@@ -221,6 +230,7 @@ const s = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: C.line },
   toast: { position: 'absolute', left: 16, right: 16, bottom: 18, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderRadius: 16, borderWidth: 1, padding: 14, ...shadow },
   notice: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 6 },
+  demoBar: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fff3cf', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
   advisory: { flexDirection: 'row', gap: 12, backgroundColor: '#fff8e1', borderColor: '#f4dd8a', borderWidth: 1, borderRadius: 22, padding: 16 },
   advisoryIcon: { width: 38, height: 38, borderRadius: 12, backgroundColor: C.advisory, alignItems: 'center', justifyContent: 'center' },
 });

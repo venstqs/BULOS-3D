@@ -7,7 +7,7 @@ import { LineChart, Spark } from '../../components/charts';
 import Logo from '../../components/Logo';
 import { useData } from '../../lib/data';
 import { C, FONT } from '../../lib/theme';
-import { TASK_PILL, dueIn, fmt, fmtClock, fmtDate, quality, stationStatus } from '../../lib/format';
+import { TASK_PILL, dueIn, fmt, fmtClock, fmtDate, notFitted, quality, stationStatus } from '../../lib/format';
 
 const ACTIVITY = {
   TASK_DONE: ['Maintenance done', 'checkmark-done', 'Completed', 'good'],
@@ -48,6 +48,10 @@ export default function Home() {
     ['ORP', `${fmt(r.orp, 0)} mV`, 'flash', r.orp >= sel.baseline.orp - 100],
     ['Biological', r.bio == null ? 'no sensor' : `${fmt(r.bio, 1)} ppb`, 'beaker', r.bio == null ? null : r.bio < 10],
   ];
+
+  ['temp', 'ph', 'tds', 'turbidity', 'orp', 'bio'].forEach((k, i) => {
+    if (notFitted(sel, k)) tiles[i] = [tiles[i][0], 'not fitted', tiles[i][2], null];
+  });
 
   return (
     <Screen

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Droplets, Lock, LockOpen, Radio, ShieldAlert, Sparkles, Wrench } from 'lucide-react';
 import { post } from '../api';
-import { BAND, CLASS_LABEL, EDGE_LABEL, fmt, fmtMin, stationStatus } from '../lib/format';
+import { BAND, CLASS_LABEL, EDGE_LABEL, fmt, fmtMin, isRealNode, notFitted, stationStatus } from '../lib/format';
 
 const PARAMS = [
   { key: 'turbidity', label: 'Turbidity', unit: 'NTU', d: 1, limit: (p) => `PNSDW ≤ ${p.turbidity_ntu}` },
@@ -71,7 +71,10 @@ export default function StationPanel({ st, history, forecast, pnsdw, onChanged }
       <div className="px-4 pb-3 pt-4">
         <div className="flex items-start justify-between gap-3">
           <p className="text-sm leading-relaxed text-ink-2">{st.note}</p>
-          <StatusBadge status={status} />
+          <div className="grid justify-items-end gap-1">
+            <StatusBadge status={status} />
+            {isRealNode(st) && <span className="pill pill-good">Real sensor</span>}
+          </div>
         </div>
         <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
           <div><dt className="text-xs text-muted">Elevation</dt><dd className="tabular">{fmt(st.elevation_m, 0)} m</dd></div>
@@ -121,8 +124,8 @@ export default function StationPanel({ st, history, forecast, pnsdw, onChanged }
                 <div>
                   <div className="flex items-baseline gap-1.5">
                     <span className="w-20 text-xs text-ink-2">{p.label}</span>
-                    <span className="text-base font-semibold tabular">{fmt(v, p.d)}</span>
-                    <span className="text-[11px] text-muted">{p.unit}</span>
+                    <span className="text-base font-semibold tabular">{notFitted(st, p.key) || v == null ? 'not fitted' : fmt(v, p.d)}</span>
+                    {!notFitted(st, p.key) && v != null && <span className="text-[11px] text-muted">{p.unit}</span>}
                     {part > 0.1 && <span className="text-[11px] font-medium" style={{ color: BAND.HIGH.ink }}>▲ evidence {fmt(part, 2)}</span>}
                   </div>
                   <div className="text-[10.5px] text-muted">baseline {fmt(b, p.d)} · {p.limit(pnsdw)}</div>

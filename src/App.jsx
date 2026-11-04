@@ -299,6 +299,16 @@ function Connection({ status, hasData }) {
     return <div className="glass mb-5 px-4 py-2.5 text-sm text-[#a32626]" role="status">Lost connection to the data server. Showing the last readings and retrying every second.</div>;
   }
   if (status === 'connecting') return <div className="mb-5 px-1 text-sm text-muted" role="status">Connecting to the data server…</div>;
+  if (!/^(localhost|127\.|192\.168\.|10\.)/.test(window.location.hostname)) {
+    return (
+      <section className="glass mb-5 p-6" role="status">
+        <h2 className="font-display text-lg font-semibold">Waking up the demo server</h2>
+        <p className="mt-1 max-w-[70ch] text-sm leading-relaxed text-ink-2">
+          The free hosting plan sleeps when nobody is using it. It usually takes about a minute to start, and this page fills in by itself.
+        </p>
+      </section>
+    );
+  }
   return (
     <section className="glass mb-5 p-6" role="alert">
       <h2 className="font-display text-lg font-semibold">The data server is not running</h2>

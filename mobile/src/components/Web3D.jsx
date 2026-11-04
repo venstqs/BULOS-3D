@@ -4,8 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import { Button, Card, Dot, Pill, StatusBadge } from './ui';
 import { useData } from '../lib/data';
-import { C, FONT, STATION_COLOR } from '../lib/theme';
-import { fmt, fmtClock } from '../lib/format';
+import { C, FONT } from '../lib/theme';
+import { fmt } from '../lib/format';
 
 /**
  * 3D Cesium/Three.js view embedded via WebView.

@@ -4,7 +4,7 @@ import { Html, OrbitControls, OrthographicCamera, RoundedBox } from '@react-thre
 import * as THREE from 'three';
 import { X } from 'lucide-react';
 import { StatusBadge } from './StationPanel';
-import { CLASS_LABEL, EDGE_LABEL, fmt, stationStatus } from '../lib/format';
+import { CLASS_LABEL, EDGE_LABEL, fmt, notFitted, stationStatus } from '../lib/format';
 
 /* raw-water colour from turbidity: clear blue -> sediment brown */
 function waterColor(turb) {
@@ -274,7 +274,7 @@ export default function AssetInspector({ st, onClose }) {
           </dl>
           <h3 className="mt-4 font-display text-[13px] font-semibold text-ink">Live telemetry</h3>
           <div className="mt-1.5 grid grid-cols-3 gap-1.5">
-            {gaugeSpecs(st).map((g) => <Gauge key={g.k} {...g} />)}
+            {gaugeSpecs(st).filter((g) => !notFitted(st, g.k)).map((g) => <Gauge key={g.k} {...g} />)}
           </div>
           <h3 className="mt-4 font-display text-[13px] font-semibold text-ink">WQHI sub-scores</h3>
           <div className="mt-1.5 space-y-1.5">

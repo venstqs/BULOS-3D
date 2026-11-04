@@ -5,11 +5,13 @@ Bulos 3D API.
     BULOS_DATA_SOURCE=live  ...   to run on real uplinks only (no virtual field)
 """
 import asyncio
+import json
 import os
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import List, Literal, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -96,6 +98,15 @@ async def compliance(hours: float = 24):
 @app.get("/api/audit")
 async def audit(limit: int = 200):
     return P.store.recent_events(limit) if P.store else []
+
+
+@app.get("/api/evaluation")
+async def evaluation():
+    """Latest simulated test results (python -m backend.tools.evaluate)."""
+    path = Path(__file__).resolve().parent / "data" / "evaluation.json"
+    if not path.exists():
+        raise HTTPException(404, "not generated yet")
+    return json.loads(path.read_text())
 
 
 @app.get("/api/downlinks")
@@ -195,6 +206,20 @@ async def advisory(req: AdvisoryReq):
 @app.get("/api/trend")
 async def trend(hours: float = 12, bucket_min: int = 30):
     return dict(series=P.trend(hours, bucket_min))
+
+
+@app.post("/api/node/reading")
+async def node_reading(body: dict, x_node_key: Optional[str] = Header(default=None)):
+    """Real Wi-Fi sensor node check-in; replies with pending valve commands."""
+    key = os.getenv("BULOS_NODE_KEY")
+    if key and x_node_key != key:
+        raise HTTPException(401, "bad node key")
+    try:
+        return P.ingest_node(body)
+    except KeyError as e:
+        raise HTTPException(404, str(e))
+    except (TypeError, ValueError) as e:
+        _400(e)
 
 
 class PolicyReq(BaseModel):

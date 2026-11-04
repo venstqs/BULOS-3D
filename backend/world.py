@@ -45,6 +45,7 @@ class World:
         farm = np.zeros(self.ch.n_cells)
         farm[max(0, C.FARM_CONFLUENCE_INDEX - 8):C.FARM_CONFLUENCE_INDEX + 9] = 1.0
         self.farm_cells = farm
+        self.bio_stations = None                 # None = every node; else the ids that carry the sensor
         self.nodes = {}
         for st in stations:
             self.nodes[st["id"]] = dict(
@@ -71,9 +72,17 @@ class World:
         elif name == "RESET":
             self.hyetograph.clear()
             self.spills.clear()
+            self.tr.c[:] = 0.0                   # demo reset: clean river, intakes open, tanks full
+            self.runoff_rain = 0.0
             for n in self.nodes.values():
                 n["drift_rate"] = 0.0
                 n["drift"] = 0.0
+                n["aq"][:] = 0.0
+                n["sensor"] = dict(n["st"]["base"])
+                n["edge"].state, n["edge"].timer = "NORMAL", 0.0
+                n["edge"].window.clear()
+                if n["st"]["tank"]:
+                    n["tank_l"] = n["st"]["tank"]["capacity_l"] * 0.9
         else:
             raise ValueError(f"unknown scenario {name}")
 
@@ -137,6 +146,8 @@ class World:
             tds=max(0.0, s["tds"] + random.gauss(0, noise["tds"])),
             temp=s["temp"] + random.gauss(0, noise["temp"]),
         )
+        if self.bio_stations is not None and n["st"]["id"] not in self.bio_stations:
+            n["reading"]["bio"] = None           # low-cost node: no biological sensor
         e = n["edge"]
         e.step(self.t, n["reading"], dt)
 

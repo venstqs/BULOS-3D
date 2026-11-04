@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { CircleCheck, CircleX, X } from 'lucide-react';
-import { fmt, fmtClock } from '../lib/format';
+import { fmt, fmtClock, notFitted } from '../lib/format';
 
 export function Modal({ title, onClose, children, width = 520 }) {
   return (
@@ -45,6 +45,8 @@ export function WaterTestModal({ live, pnsdw, initialId, onClose }) {
     ['Biological indicator (TLF)', r.bio == null ? 'no sensor' : `${fmt(r.bio, 1)} ppb`, 'below 10 ppb (faecal alert)', r.bio == null ? null : r.bio < 10],
     ['Water temperature', `${fmt(r.temp, 1)} °C`, 'for reference', null],
   ];
+  const keyOf = ['turbidity', 'ph', 'tds', 'orp', 'bio', 'temp'];
+  keyOf.forEach((k, i) => { if (notFitted(st, k)) rows[i] = [rows[i][0], 'not fitted', rows[i][2], null]; });
   const fails = rows.filter((x) => x[3] === false).length;
   return (
     <Modal title="Water test report" onClose={onClose} width={600}>

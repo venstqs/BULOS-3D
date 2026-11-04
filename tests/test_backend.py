@@ -224,3 +224,45 @@ def test_forecast_is_a_pure_json_function():
     series = compute_forecast(snap)
     assert set(series) == set(p.twin.stations)
     assert len(series["RH-05"]) == 48 and len(series["RH-05"][0]) == 5
+
+
+# ------------------------------------------------------------ real node + sensor plans
+def test_real_node_takes_over_and_receives_commands():
+    p = Platform(store=False)
+    for _ in range(3):
+        p.ingest_node(dict(station_id="KS-03", turbidity=4.0, tds=170, temp=25, edge_state="NORMAL", valve_open=True))
+        p.tick(60)
+    st = p.twin.stations["KS-03"]
+    assert st.reading["turbidity"] == 4.0                                # simulator no longer overwrites it
+    assert set(st.meta["estimated"]) == {"orp", "ph"}                    # honest about missing probes
+    assert "KS-03" in p.state()["live_nodes"]
+    ok, msg = p.send_command("KS-03", "SHUT", actor="test")
+    assert ok and "real node" in msg
+    assert p.ingest_node(dict(station_id="KS-03", turbidity=4.0))["commands"] == [dict(cmd="SHUT", arg=0)]
+    assert p.ingest_node(dict(station_id="KS-03", turbidity=4.0))["commands"] == []
+    p.ingest_node(dict(station_id="KS-03", turbidity=60.0, edge_state="TRIPPED", valve_open=False))
+    assert first_event(p, "EDGE_AUTO_TRIP", "KS-03")
+    p.node_seen["KS-03"] = 0                                             # node goes quiet
+    p.tick(60)
+    assert "KS-03" not in p.node_seen and first_event(p, "NODE_OFFLINE", "KS-03")
+
+
+def test_sentinel_bio_signal_reaches_low_cost_sites_in_the_forecast():
+    p = Platform(store=False)
+    p.world.bio_stations = {"AG-02"}
+    run(p, 20)
+    p.scenario("SEPTIC")
+    run(p, 45)
+    assert p.twin.stations["KS-03"].reading["bio"] is None               # no sensor at the kiosk
+    fc = p.twin.forecast["stations"]["KS-03"]
+    assert max(x["bio_excess"] for x in fc["series"]) > 1                # but the forecast still sees it coming
+
+
+def test_reset_restores_the_demo():
+    p = Platform(store=False)
+    p.scenario("SEPTIC")
+    run(p, 120)
+    p.scenario("RESET")
+    run(p, 10)
+    assert all(n["edge"].valve_open for n in p.world.nodes.values())
+    assert p.world.nodes["KS-03"]["tank_l"] > 0.8 * C.STATIONS[2]["tank"]["capacity_l"]

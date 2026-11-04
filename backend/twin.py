@@ -88,9 +88,11 @@ def compute_forecast(inp, profile=None):
             for s in stations:
                 b = s["base"]
                 ex = well[s["id"]] if s["aquifer"] else tr.c[:, s["cell"]]
+                # sites with no biological sensor still get the sentinel's forecast biological signal
+                b0 = b.get("bio") or 0.0
                 r = dict(turbidity=b["turbidity"] + ex[TURB], orp=b["orp"] - ex[ORP], ph=b["ph"], tds=b["tds"],
-                         bio=None if b.get("bio") is None else b["bio"] + ex[BIO])
-                risk, _ = surrogate_risk(r, b, rain)
+                         bio=b0 + ex[BIO])
+                risk, _ = surrogate_risk(r, {**b, "bio": b0}, rain)
                 series[s["id"]].append((int(tau), round(float(ex[TURB]), 2), round(float(ex[ORP]), 1),
                                         round(float(ex[BIO]), 2), risk))
     return series
@@ -267,8 +269,12 @@ class Twin:
     def _assimilate(self, tr):
         """Direct insertion of observed excess at creek stations (wells sample groundwater, not the creek)."""
         for st in self.stations.values():
-            if not st.aquifer:
-                tr.c[:, st.cell] = self._excess(st)
+            if st.aquifer:
+                continue
+            te, oe, be = self._excess(st)
+            tr.c[TURB, st.cell], tr.c[ORP, st.cell] = te, oe
+            if st.reading is not None and st.reading.get("bio") is not None:
+                tr.c[BIO, st.cell] = be
 
     # ============================================================== forecast
     def forecast_input(self):
@@ -550,6 +556,7 @@ class Twin:
             catchment_km2=round(st.area, 2), population=st.cfg["population"],
             reading={k: (None if v is None else round(v, 2)) for k, v in r.items()},
             baseline={k: (None if v is None else round(v, 2)) for k, v in (st.baseline or r).items()}, aquifer=st.aquifer,
+            estimated=st.meta.get("estimated", []),
             risk=st.risk, risk_band=risk_band(st.risk),
             risk_parts={k: round(v, 3) for k, v in st.risk_parts.items()},
             wqhi=st.wqhi or wqhi(r), classification=st.classification, drift=st.drift,

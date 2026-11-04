@@ -2,6 +2,7 @@ import {
   Activity, Building2, Cpu, Database, Droplets, FlaskConical, HeartPulse, Map as MapIcon, Mountain, Radio,
   ServerCog, Users, Waves, Wrench,
 } from 'lucide-react';
+import { usePoll } from '../api';
 
 const FEATURES = [
   {
@@ -40,7 +41,7 @@ const STACK = [
   ['Frontend & 3D/GIS', 'React, Tailwind CSS, CesiumJS, Three.js / React Three Fiber', MapIcon],
   ['Backend & processing', 'Python FastAPI; forecasts in-process or on a Celery worker', ServerCog],
   ['Time-series storage', 'PostgreSQL + TimescaleDB (SQLite for laptop demos)', Database],
-  ['Field hardware', 'ESP32 nodes over LoRaWAN / MQTT: pH, turbidity, TDS, ORP, temperature, TLF biological indicator', Cpu],
+  ['Field hardware', 'Low-cost ESP32 nodes over Wi-Fi, LoRaWAN or MQTT, with one biological (TLF) sensor shared at an upstream sentinel', Cpu],
 ];
 
 const BENEFICIARIES = [
@@ -57,6 +58,36 @@ const SDGS = [
   ['11', 'Sustainable cities and communities', 'Strengthens disaster recovery for isolated barangays.', '#fd9d24'],
   ['13', 'Climate action', 'Links extreme-rainfall telemetry to runoff forecasts and protective action.', '#3f7e44'],
 ];
+
+const PLAN = { full: 'Biological sensor everywhere', sentinel: 'One sentinel + low-cost nodes', low_cost: 'No biological sensor' };
+
+function Results() {
+  const { data } = usePoll('/api/evaluation', 0);
+  if (!data?.cases) return null;
+  const rows = Object.values(data.cases).filter((c) => c.mode === 'full_twin');
+  return (
+    <Card>
+      <h2 className="font-display text-lg font-semibold">Simulation test results</h2>
+      <p className="mt-1 text-sm text-ink-2">
+        {data.runs_per_case} randomised runs per case. These are simulated results, not field measurements. Without protection, 0% of contaminated water is blocked.
+      </p>
+      <div className="tile mt-4 overflow-x-auto">
+        <table className="data">
+          <thead><tr><th>Event</th><th>Sensor plan</th><th>Contaminated minutes blocked</th><th>Closed before arrival</th><th>Median warning</th></tr></thead>
+          <tbody>
+            {rows.map((c) => (
+              <tr key={`${c.label}-${c.sensors}`}>
+                <td>{c.label}</td><td>{PLAN[c.sensors] ?? c.sensors}</td><td className="num">{c.blocked_pct}%</td>
+                <td className="num">{c.closed_before_arrival_pct}%</td>
+                <td className="num">{c.median_lead_min == null ? 'n/a' : `${c.median_lead_min} min`}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
 
 function Card({ children, className = '' }) {
   return <section className={`glass p-6 ${className}`}>{children}</section>;
@@ -115,6 +146,8 @@ export default function AboutPage({ live, staticData, go }) {
           ))}
         </ol>
       </Card>
+
+      <Results />
 
       <div className="grid gap-5 md:grid-cols-2">
         <Card>

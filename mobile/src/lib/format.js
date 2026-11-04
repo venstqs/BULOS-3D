@@ -8,6 +8,10 @@ export const BAND = {
 };
 export const MAINT = { color: C.warning, ink: '#7a5600', label: 'Sensor maintenance', icon: 'construct', pill: 'amber' };
 
+/** True when this reading is a placeholder because the node has no such sensor. */
+export const notFitted = (st, key) => Boolean(st.estimated?.includes(key));
+export const isRealNode = (st) => /real sensor/i.test(st.link?.source ?? '');
+
 export function stationStatus(st) {
   if (st.classification === 'SENSOR_BIOFOULING' || st.edge_state === 'MAINTENANCE') return MAINT;
   return BAND[st.risk_band] ?? BAND.LOW;

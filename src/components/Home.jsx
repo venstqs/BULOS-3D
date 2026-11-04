@@ -3,7 +3,7 @@ import {
   MessageSquareWarning, Microscope, Mountain, SunMedium, Thermometer, Waves,
 } from 'lucide-react';
 import LineChart from './charts/LineChart';
-import { fmt, fmtClock, stationStatus } from '../lib/format';
+import { fmt, fmtClock, isRealNode, notFitted, stationStatus } from '../lib/format';
 
 const DAY = 86_400_000;
 const KIND_ICON = { SPRING_INTAKE: Mountain, EXISTING_GOV_SENSOR: Gauge, COMMUNAL_KIOSK: Droplet, SOLAR_PUMP_WELL: SunMedium, MUNICIPAL_RESERVOIR: Waves, CRITICAL_ENDPOINT: Droplets };
@@ -247,6 +247,7 @@ function PointPanel({ st, live, forecast, onSelectPoint, onOpenPoint, onInspect 
         </div>
         <div className="min-w-0">
           <span className={`pill ${qPill}`}>{qLabel}</span>
+          {isRealNode(st) && <span className="pill pill-good ml-1">Real sensor</span>}
           <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-ink-2">{st.note}</p>
         </div>
       </div>
@@ -290,15 +291,16 @@ function Overview({ st, pnsdw = {} }) {
     { label: 'ORP', value: `${fmt(r.orp, 0)} mV`, Icon: Gauge, ok: r.orp >= st.baseline.orp - 100 },
     { label: 'Biological (TLF)', value: r.bio == null ? 'no sensor' : `${fmt(r.bio, 1)} ppb`, Icon: Microscope, ok: r.bio == null ? null : r.bio < 10 },
   ];
+  const keys = ['temp', 'ph', 'tds', 'turbidity', 'orp', 'bio'];
   return (
     <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 2xl:grid-cols-6">
-      {tiles.map(({ label, value, Icon, ok }) => (
+      {tiles.map((t, i) => (notFitted(st, keys[i]) ? { ...t, value: 'not fitted', ok: null, unfitted: true } : t)).map(({ label, value, Icon, ok, unfitted }) => (
         <div key={label} className="tile p-3">
           <Icon size={18} className="text-civic" />
           <div className="mt-2 font-display text-lg font-semibold tabular">{value}</div>
           <div className="text-xs text-muted">{label}</div>
           <div className={`mt-0.5 text-xs font-semibold ${ok == null ? 'text-[#7a5600]' : ok ? 'text-good' : 'text-[#a32626]'}`}>
-            {ok == null ? (label.startsWith('Biological') ? 'Not fitted' : 'Check sensor') : ok ? 'Good' : 'Out of range'}
+            {unfitted ? 'No sensor here' : ok == null ? (label.startsWith('Biological') ? 'Not fitted' : 'Check sensor') : ok ? 'Good' : 'Out of range'}
           </div>
         </div>
       ))}

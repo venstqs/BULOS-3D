@@ -1,0 +1,135 @@
+{
+ "runs_per_case": 2,
+ "site": "Naga City, Camarines Sur",
+ "cases": {
+  "SEPTIC/full/edge_only": {
+   "label": "Piggery lagoon spill",
+   "sensors": "full",
+   "mode": "edge_only",
+   "intake_events": 6,
+   "contaminated_min": 553,
+   "exposed_min": 30,
+   "blocked_pct": 94.6,
+   "closed_before_arrival_pct": 0.0,
+   "never_closed": 0,
+   "warned_pct": 100.0,
+   "median_lead_min": 78.0,
+   "median_eta_error_min": 5.5
+  },
+  "SEPTIC/full/full_twin": {
+   "label": "Piggery lagoon spill",
+   "sensors": "full",
+   "mode": "full_twin",
+   "intake_events": 6,
+   "contaminated_min": 553,
+   "exposed_min": 8,
+   "blocked_pct": 98.6,
+   "closed_before_arrival_pct": 83.3,
+   "never_closed": 0,
+   "warned_pct": 100.0,
+   "median_lead_min": 78.0,
+   "median_eta_error_min": 5.5
+  },
+  "SEPTIC/low_cost/edge_only": {
+   "label": "Piggery lagoon spill",
+   "sensors": "low_cost",
+   "mode": "edge_only",
+   "intake_events": 6,
+   "contaminated_min": 553,
+   "exposed_min": 269,
+   "blocked_pct": 51.4,
+   "closed_before_arrival_pct": 0.0,
+   "never_closed": 2,
+   "warned_pct": 33.3,
+   "median_lead_min": 58.0,
+   "median_eta_error_min": 2.0
+  },
+  "SEPTIC/low_cost/full_twin": {
+   "label": "Piggery lagoon spill",
+   "sensors": "low_cost",
+   "mode": "full_twin",
+   "intake_events": 6,
+   "contaminated_min": 553,
+   "exposed_min": 252,
+   "blocked_pct": 54.4,
+   "closed_before_arrival_pct": 33.3,
+   "never_closed": 2,
+   "warned_pct": 33.3,
+   "median_lead_min": 58.0,
+   "median_eta_error_min": 2.0
+  },
+  "MONSOON/full/edge_only": {
+   "label": "Monsoon cloudburst",
+   "sensors": "full",
+   "mode": "edge_only",
+   "intake_events": 6,
+   "contaminated_min": 1460,
+   "exposed_min": 258,
+   "blocked_pct": 82.3,
+   "closed_before_arrival_pct": 0.0,
+   "never_closed": 2,
+   "warned_pct": 100.0,
+   "median_lead_min": 39.0,
+   "median_eta_error_min": 6.5
+  },
+  "MONSOON/full/full_twin": {
+   "label": "Monsoon cloudburst",
+   "sensors": "full",
+   "mode": "full_twin",
+   "intake_events": 6,
+   "contaminated_min": 1460,
+   "exposed_min": 85,
+   "blocked_pct": 94.2,
+   "closed_before_arrival_pct": 83.3,
+   "never_closed": 1,
+   "warned_pct": 100.0,
+   "median_lead_min": 39.0,
+   "median_eta_error_min": 6.5
+  },
+  "MONSOON/low_cost/edge_only": {
+   "label": "Monsoon cloudburst",
+   "sensors": "low_cost",
+   "mode": "edge_only",
+   "intake_events": 6,
+   "contaminated_min": 1459,
+   "exposed_min": 261,
+   "blocked_pct": 82.1,
+   "closed_before_arrival_pct": 0.0,
+   "never_closed": 2,
+   "warned_pct": 83.3,
+   "median_lead_min": 38.0,
+   "median_eta_error_min": 8.0
+  },
+  "MONSOON/low_cost/full_twin": {
+   "label": "Monsoon cloudburst",
+   "sensors": "low_cost",
+   "mode": "full_twin",
+   "intake_events": 6,
+   "contaminated_min": 1459,
+   "exposed_min": 83,
+   "blocked_pct": 94.3,
+   "closed_before_arrival_pct": 83.3,
+   "never_closed": 1,
+   "warned_pct": 83.3,
+   "median_lead_min": 38.0,
+   "median_eta_error_min": 8.0
+  }
+ },
+ "false_alarms": {
+  "full": {
+   "runs": 2,
+   "biofouling_false_shutoffs": 0,
+   "biofouling_identified": 2,
+   "quiet_false_shutoffs": 0,
+   "quiet_false_advisories": 0
+  },
+  "low_cost": {
+   "runs": 2,
+   "biofouling_false_shutoffs": 0,
+   "biofouling_identified": 2,
+   "quiet_false_shutoffs": 0,
+   "quiet_false_advisories": 0
+  }
+ },
+ "note": "Simulated results from the Bulos 3D virtual field, not field measurements."
+}
