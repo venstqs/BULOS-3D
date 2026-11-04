@@ -12,7 +12,7 @@ It supports **both** standalone in-app testing and live synchronization with the
    ```
 2. **On your phone:**
    Open **Expo Go** and scan the QR code.
-3. The app automatically detects if the PC data server is offline and activates the **React Native In-App Digital Twin**:
+3. If the data server is offline, tap **Use demo mode instead** (or **More → Server settings**). This runs the **React Native In-App Digital Twin**, and every screen shows a demo label because the data is simulated:
    - Live sensor telemetry (pH, turbidity, TDS, ORP, biological TLF) ticks and updates every second.
    - Interactive intake valve actuation: test **Close intake**, **Re-arm**, and **Force Re-arm**.
    - Scenario injection in **More → Simulate**: inject **Piggery lagoon spill**, **Monsoon rain**, or **Biofouling**.

@@ -84,6 +84,13 @@ runs the FastAPI data server on port 8000 (API docs at http://127.0.0.1:8000/doc
 For development with hot reload use `npm run backend` and `npm run dev` in two terminals. Dev mode serves the
 3D libraries unbundled (around 50 MB), so the first load there is much slower.
 
+**Competition materials:** [`docs/submission-pack.md`](docs/submission-pack.md) (concept changes, results, video script,
+deployment, checklist), [`docs/bench-node.md`](docs/bench-node.md) (build the low-cost real prototype), and
+[`docs/evaluation.md`](docs/evaluation.md) (simulated test results; regenerate with `python -m backend.tools.evaluate`).
+
+**Real hardware:** a Wi-Fi bench node (`firmware/bulos_bench_node`) posts to `POST /api/node/reading` and takes over one
+water point while the rest stay simulated. Rehearse without hardware using `python -m backend.tools.fake_node`.
+
 **Mobile app (Expo Go):** see [`mobile/README.md`](mobile/README.md). In short, run `npm run start:lan` here,
 then `npm start` in `mobile/`, and scan the QR code with Expo Go on the same Wi-Fi.
 
@@ -146,6 +153,7 @@ Environment variables:
 | `BULOS_SMS_RECIPIENTS` | JSON map of role → phone numbers. |
 | `BULOS_SIM_SPEED` | Demo speed (default 60×). |
 | `BULOS_SITE` | `naga` (default) or `makiling`. |
+| `BULOS_NODE_KEY` | Secret that real nodes must send. Set this on any public deployment. |
 
 To add a study area, add it to `SITES` in `backend/config.py` (bounding box, main-stem head, station indices),
 run `python -m backend.tools.fetch_dem <site>`, and start with `BULOS_SITE=<site>`.

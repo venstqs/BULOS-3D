@@ -33,6 +33,7 @@ const char* STATION_ID = "KS-03";                      // the water point this n
 
 const bool  HAS_TDS  = true;     // set false if that probe is not connected
 const bool  HAS_TEMP = true;
+const bool  RELAY_ACTIVE_HIGH = true;   // set false if your relay board switches on with LOW (many do)
 
 // Turbidity calibration (see docs/bench-node.md): volts at the sensor in clear
 // water, and the drop in volts for the "dirty" reference sample.
@@ -44,7 +45,7 @@ const float DIRTY_NTU    = 100.0;   // your reference sample
 #define PIN_TURB     34   // through a 10k/20k divider: the sensor outputs up to ~4.5 V
 #define PIN_TDS      33
 #define PIN_ONEWIRE  4
-#define PIN_RELAY    26   // HIGH = coil on = normally-closed valve OPEN
+#define PIN_RELAY    26   // relay on = coil powered = normally-closed valve OPEN
 #define PIN_LED_G    18
 #define PIN_LED_Y    19
 #define PIN_LED_R    23
@@ -71,7 +72,7 @@ float turb = 0, tds = 0, tempC = 25;
 bool valveOpen() { return state == NORMAL || state == SUSPECT; }
 
 void outputs() {
-  digitalWrite(PIN_RELAY, valveOpen() ? HIGH : LOW);
+  digitalWrite(PIN_RELAY, valveOpen() == RELAY_ACTIVE_HIGH ? HIGH : LOW);
   digitalWrite(PIN_LED_G, state == NORMAL);
   digitalWrite(PIN_LED_Y, state == SUSPECT);
   digitalWrite(PIN_LED_R, !valveOpen());
