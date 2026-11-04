@@ -138,10 +138,12 @@ export default function CesiumScene({ staticData, live, heatmap, selectedId, onS
     refs.current.mLon = mLon;
     const cLon = (hLon + oLon) / 2;
     const cLat = (hLat + oLat) / 2;
+    // side-on to the river, so the water points spread across the view instead of stacking
+    const side = bearing - Math.PI / 2;
     const home = {
       destination: Cesium.Cartesian3.fromDegrees(
-        cLon - (Math.sin(bearing) * len) / mLon, cLat - (Math.cos(bearing) * len) / 111_320, 0.55 * len + 0.4 * hZ),
-      orientation: { heading: bearing, pitch: Cesium.Math.toRadians(-30), roll: 0 },
+        cLon - (Math.sin(side) * len * 0.72) / mLon, cLat - (Math.cos(side) * len * 0.72) / 111_320, 0.62 * len + 0.3 * hZ),
+      orientation: { heading: side, pitch: Cesium.Math.toRadians(-38), roll: 0 },
     };
     viewer.camera.setView(home);
     refs.current.home = () => viewer.camera.flyTo({ ...home, duration: 1.2 });
@@ -213,7 +215,7 @@ export default function CesiumScene({ staticData, live, heatmap, selectedId, onS
         heightReference: Cesium.HeightReference.CLAMP_TO_GROUND, disableDepthTestDistance: Number.POSITIVE_INFINITY,
       },
       label: {
-        text: 'DOST rain gauge', font: '600 11px system-ui', fillColor: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK,
+        text: 'Rain gauge', font: '600 10px system-ui', fillColor: Cesium.Color.WHITE, outlineColor: Cesium.Color.BLACK,
         outlineWidth: 3, style: Cesium.LabelStyle.FILL_AND_OUTLINE, pixelOffset: new Cesium.Cartesian2(0, 14),
         verticalOrigin: Cesium.VerticalOrigin.TOP,
         heightReference: Cesium.HeightReference.CLAMP_TO_GROUND, disableDepthTestDistance: Number.POSITIVE_INFINITY,
@@ -314,10 +316,10 @@ export default function CesiumScene({ staticData, live, heatmap, selectedId, onS
         e._key = key;
         e.billboard.image = pinCanvas(status.color, STATUS_GLYPH.get(status) ?? '', st.id === selectedId);
       }
-      const valve = st.valve ? (st.valve.open ? ' · valve open' : ' · VALVE CLOSED') : '';
+      const valve = st.valve && !st.valve.open ? ' · closed' : '';
       const fc = live.forecast.stations?.[st.id];
-      const eta = fc?.arrival_s > 0 ? ` · plume ETA ${Math.round(fc.arrival_s / 60)} min` : '';
-      e.label.text = `${st.id}  ${status.label}${valve}${eta}`;
+      const eta = fc?.arrival_s > 0 ? ` · ETA ${Math.round(fc.arrival_s / 60)} min` : '';
+      e.label.text = `${st.id}${valve}${eta}`;
     }
   }, [live, selectedId]);
 

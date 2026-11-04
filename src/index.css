@@ -19,6 +19,7 @@
   --color-muted: #7c86a9;
 
   --color-civic: #2f5be7;          /* primary (royal blue) */
+  --color-accent: #2f5be7;
   --color-civic-dark: #2346c4;
   --color-sky: #4fa8f5;
   --color-advisory: #f2c200;
@@ -31,6 +32,7 @@
 }
 
 html, body, #root { min-height: 100%; }
+html { background: #d6e6ff; }
 body {
   margin: 0;
   color: var(--color-ink);
@@ -132,3 +134,11 @@ input[type="text"], input[type="datetime-local"], select, textarea {
   .home-brand { display: block; }
 }
 .home-left > *, .home-right > *, .home-main > * { min-width: 0; }
+
+/* Nothing may push the page wider than the screen: wide tables scroll inside their card */
+main .grid > *, main .flex > * { min-width: 0; }
+.section > div:last-child { overflow-x: auto; }
+@media (max-width: 640px) {
+  .data th, .data td { padding: 8px; white-space: nowrap; }
+  .data td:first-child { white-space: normal; min-width: 130px; }
+}

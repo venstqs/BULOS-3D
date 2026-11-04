@@ -1,434 +1,552 @@
-// Pure React Native in-app Digital Twin simulation engine for Bulos 3D.
-// Allows complete standalone testing inside Expo Go with full fidelity
-// when offline or disconnected from the PC LAN data server.
+// On-phone demo twin. Used only when the user switches demo mode on, and always labelled.
+//
+// It returns the same shapes as the FastAPI data server, and ports its scoring exactly:
+// surrogate risk, WQHI and the re-arm interlock (backend/edge.py). Events are a simplified
+// script of the river rather than the real 1-D transport model, so its numbers are
+// illustrative only. Evaluation figures come from the data server, never from here.
+import { CHANNEL, PIPES, REACHES, STATIC, STATIONS } from './demoData';
 
-const PNSDW = { turbidity_ntu: 5.0, ph_min: 6.5, ph_max: 8.5, tds_mgL: 600.0 };
+const RISK_SUSPECT = 0.45;
+const RISK_TRIP = 0.60;
+const PERSISTENCE_S = 120;
+const PREEMPT_S = 1800;       // close up to 30 min before forecast arrival
+const HORIZON_S = 14400;
+const SAMPLE_S = 300;         // history resolution
+const DAY_MS = 86_400_000;
+const WELL_LAG_S = 5400;      // bank filtration delays the plume at the shallow well
 
-const STATIONS_DEF = [
-  {
-    id: 'IN-01', name: 'San Isidro Spring', kind: 'SPRING_INTAKE', owner: 'San Isidro Rural Waterworks',
-    gateway: 'Barangay Hall LoRaWAN', network: 'Level II gravity system', elevation_m: 420, chainage_m: 1200,
-    catchment_km2: 2.4, population: 850, note: 'Protected upland spring box. Supplies the San Isidro distribution tank via gravity line GL-1.',
-    valve: { model: '12V DC Solenoid', relay: 'GPIO 26' },
-    tank: { capacity_l: 45000, demand_lps: 2.1 },
-    base: { turbidity: 0.8, orp: 430.0, ph: 7.45, tds: 120.0, temp: 21.0, bio: 0.6 },
-    sms: 'Barangay Water Board', aquifer: false,
-  },
-  {
-    id: 'AG-02', name: 'Upper Naga River Sentinel', kind: 'EXISTING_GOV_SENSOR', owner: 'DOST Region V / LGU Naga',
-    gateway: 'Penafrancia Gateway', network: 'River basin monitoring network', elevation_m: 185, chainage_m: 8400,
-    catchment_km2: 18.2, population: null, note: 'Main-stem sentinel station below agricultural tributaries. Early warning node for downstream intakes.',
-    valve: null, tank: null,
-    base: { turbidity: 2.2, orp: 400.0, ph: 7.30, tds: 165.0, temp: 24.0, bio: 3.5 },
-    sms: 'LGU Environment Office', aquifer: false,
-  },
-  {
-    id: 'KS-03', name: 'Pacol Communal Kiosk', kind: 'COMMUNAL_KIOSK', owner: 'Pacol Water Association',
-    gateway: 'Pacol Elementary Gateway', network: 'Community tapstand & filtration', elevation_m: 92, chainage_m: 14600,
-    catchment_km2: 34.1, population: 2400, note: 'Community drinking water kiosk with activated carbon & UF. Auto-shutoff solenoid protects filtration membranes.',
-    valve: { model: '12V DC Solenoid', relay: 'GPIO 26' },
-    tank: { capacity_l: 30000, demand_lps: 3.2 },
-    base: { turbidity: 2.0, orp: 410.0, ph: 7.30, tds: 170.0, temp: 25.0, bio: 3.0 },
-    sms: 'Kiosk Caretaker', aquifer: false,
-  },
-  {
-    id: 'MB-04', name: 'Carolina Solar Well', kind: 'SOLAR_PUMP_WELL', owner: 'Carolina Farmers Cooperative',
-    gateway: 'Brgy Carolina Agritech Hub', network: 'Solar-pumped riverbank well', elevation_m: 54, chainage_m: 21000,
-    catchment_km2: 46.8, population: 1200, note: 'Shallow alluvium well with DC solar pump. Alluvial sand attenuates and delays creek plumes by 3–4 hours.',
-    valve: { model: 'Solar pump DC contactor', relay: 'GPIO 25' },
-    tank: { capacity_l: 20000, demand_lps: 1.8 },
-    base: { turbidity: 2.4, orp: 405.0, ph: 7.35, tds: 180.0, temp: 25.5, bio: 3.2 },
-    sms: 'Coop Water Committee', aquifer: true,
-  },
-  {
-    id: 'RH-05', name: 'Naga City RHU Intake', kind: 'CRITICAL_ENDPOINT', owner: 'City Health Office (CHO)',
-    gateway: 'City Hall LoRaWAN Base', network: 'Rural Health Unit clinical supply', elevation_m: 18, chainage_m: 27800,
-    catchment_km2: 58.0, population: 6800, note: 'Clinical grade supply intake for the rural health center, birthing clinic and emergency hydration point.',
-    valve: { model: 'Fail-safe solenoid', relay: 'GPIO 26' },
-    tank: { capacity_l: 60000, demand_lps: 4.5 },
-    base: { turbidity: 2.8, orp: 395.0, ph: 7.35, tds: 190.0, temp: 26.0, bio: 4.0 },
-    sms: 'RHU Duty Officer', aquifer: false,
-  },
-];
+const clamp = (x, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, x));
+const noise = (a) => (Math.random() - 0.5) * a;
+const round = (v, d) => Number(v.toFixed(d));
 
-const PIPES_DEF = [
-  { id: 'GL-1', name: 'San Isidro Spring to Kiosk', src: 'IN-01', dst: 'KS-03', length_m: 3200, diameter_m: 0.075, material: 'HDPE PN16', static_head_m: 318, note: 'Primary gravity transmission pipeline.' },
-  { id: 'DM-2', name: 'Carolina Well to RHU', src: 'MB-04', dst: 'RH-05', length_m: 2100, diameter_m: 0.050, material: 'PVC Class 100', static_head_m: 26, note: 'Gravity intertie for emergency clinic backup.' },
-];
-
-function calcWqhi(r) {
-  let sub = 100;
-  if (r.turbidity > 5) sub -= Math.min(35, (r.turbidity - 5) * 3);
-  if (r.ph < 6.5) sub -= Math.min(25, (6.5 - r.ph) * 30);
-  if (r.ph > 8.5) sub -= Math.min(25, (r.ph - 8.5) * 30);
-  if (r.tds > 600) sub -= Math.min(20, (r.tds - 600) * 0.1);
-  if (r.orp < 300) sub -= Math.min(25, (300 - r.orp) * 0.2);
-  if (r.bio != null && r.bio > 10) sub -= Math.min(40, (r.bio - 10) * 3);
-  const score = Math.max(0, Math.min(100, Math.round(sub)));
-  return { score, status: score >= 85 ? 'Excellent' : score >= 70 ? 'Fair' : 'Poor' };
+function riskParts(r, b, rain, useTurbidity) {
+  return {
+    turbidity: useTurbidity ? clamp((r.turbidity - b.turbidity) / 20) : 0,
+    orp: clamp((b.orp - r.orp) / 200),
+    ph: clamp((Math.abs(r.ph - b.ph) - 0.2) / 0.8),
+    tds: clamp((r.tds - b.tds) / 200),
+    rain: clamp(rain / 40),
+    bio: r.bio == null || b.bio == null ? 0 : clamp((r.bio - b.bio) / 15),
+  };
 }
 
-function calcRisk(r, base, rain = 0) {
-  const turbRisk = Math.max(0, Math.min(1, (r.turbidity - base.turbidity) / 15));
-  const orpRisk = Math.max(0, Math.min(1, (base.orp - r.orp) / 180));
-  const bioRisk = r.bio != null ? Math.max(0, Math.min(1, (r.bio - base.bio) / 12)) : 0;
-  const rainRisk = Math.min(0.2, rain / 200);
-  const total = 1 - (1 - turbRisk * 0.7) * (1 - orpRisk * 0.75) * (1 - bioRisk * 0.8) * (1 - rainRisk);
-  const risk = Math.max(0, Math.min(1, Math.round(total * 100) / 100));
-  const band = risk < 0.25 ? 'Low' : risk < 0.45 ? 'Watch' : risk < 0.60 ? 'Suspect' : 'Severe';
-  return { risk, band, parts: { turbidity: turbRisk, orp: orpRisk, bio: bioRisk } };
+const WEIGHTS = { turbidity: 0.55, orp: 0.60, ph: 0.25, tds: 0.30, rain: 0.20, bio: 0.70 };
+
+function surrogateRisk(parts) {
+  let clean = 1;
+  for (const [k, x] of Object.entries(parts)) clean *= 1 - WEIGHTS[k] * x;
+  const faecal = Math.max(Math.min(parts.turbidity, parts.orp), Math.min(parts.bio, Math.max(parts.turbidity, parts.orp)));
+  return round(clamp(1 - clean + 0.30 * faecal), 3);
 }
+
+const riskBand = (risk) => (risk >= RISK_TRIP ? 'SEVERE' : risk >= RISK_SUSPECT ? 'HIGH' : risk >= 0.25 ? 'MODERATE' : 'LOW');
+
+function wqhi(r) {
+  const t = r.turbidity;
+  const parts = {
+    turbidity: t <= 1 ? 100 : Math.max(0, 100 - 58.9 * Math.log10(t)),
+    orp: 100 * clamp((r.orp - 100) / 300),
+    ph: 100 * clamp(1 - Math.max(0, Math.abs(r.ph - 7.5) - 0.5) / 1.5),
+    tds: 100 * clamp(1 - Math.max(0, r.tds - 300) / 700),
+  };
+  let w = { turbidity: 0.35, orp: 0.30, ph: 0.15, tds: 0.20 };
+  if (r.bio != null) {
+    parts.bio = 100 * clamp(1 - Math.max(0, r.bio - 2) / 30);
+    w = { turbidity: 0.28, orp: 0.22, ph: 0.12, tds: 0.13, bio: 0.25 };
+  }
+  const score = Math.round(Math.exp(Object.entries(parts).reduce((a, [k, v]) => a + w[k] * Math.log(Math.max(v, 1)), 0)));
+  const rounded = Object.fromEntries(Object.entries(parts).map(([k, v]) => [k, Math.round(v)]));
+  return { score, category: score >= 80 ? 'GOOD' : score >= 60 ? 'FAIR' : score >= 40 ? 'POOR' : 'UNSAFE', parts: rounded };
+}
+
+// River travel time from the farm tributary, which joins just above AG-02
+const reachS = (from) => REACHES.find((r) => r.reach.startsWith(from)).travel_time_s;
+const SPILL_LAG = {
+  'AG-02': 1200,
+  'KS-03': 1200 + reachS('AG-02'),
+  'MB-04': 1200 + reachS('AG-02') + reachS('KS-03') + WELL_LAG_S,
+  'RH-05': 1200 + reachS('AG-02') + reachS('KS-03') + reachS('MB-04'),
+};
+const SPILL_SIZE = { 'AG-02': 1, 'KS-03': 0.8, 'MB-04': 0.3, 'RH-05': 0.45 };
+
+/** A 30 min rise, then a slow tail. x = seconds since the front arrived. */
+const pulse = (x) => (x <= 0 ? 0 : x < 1800 ? x / 1800 : Math.exp(-(x - 1800) / 2700));
+
+const NONE = { turbidity: 0, orp: 0, ph: 0, tds: 0, bio: 0 };
 
 class DemoDigitalTwin {
   constructor() {
-    this.epoch0 = Date.now() - 3600 * 4 * 1000;
-    this.simSpeed = 60;
+    this.epoch0 = Date.now();
+    this.t = 0;
+    this.speed = 60;
     this.autoPreempt = true;
-    this.rain = 0;
-    this.runoffRain = 0;
-    this.scenarioName = 'NORMAL';
-    this.scenarioElapsed = 0;
+    this.scenario = null;      // { name, t0 }
+    this.fouling = 0;          // NTU of false turbidity on the KS-03 lens
+    this.foulingRate = 0;      // NTU per minute
+    this.detected = false;     // forecasts start once AG-02 has actually seen the plume
+    this.events = [];
+    this.sms = [];
+    this.taskSeq = 0;
+    this.tasks = [];
+    this.forecast = {};
 
     this.stations = {};
-    for (const d of STATIONS_DEF) {
+    for (const d of STATIONS) {
       this.stations[d.id] = {
         ...d,
         reading: { ...d.base },
-        baseline: { ...d.base },
-        valveOpen: Boolean(d.valve),
-        tankPct: d.tank ? 75 : null,
+        open: Boolean(d.valve),
+        tankPct: d.tank ? 95 : null,
         edgeState: 'NORMAL',
+        suspectS: 0,
         classification: 'NORMAL',
-        drift: null,
-        lastSeenT: Date.now(),
-        batteryV: 3.98 + (Math.random() * 0.2),
-        rssi: -85 - Math.round(Math.random() * 15),
-        snr: 6.5 + Math.round(Math.random() * 4),
+        flags: {},
+        fCnt: 1200,
+        rssi: -82 - Math.round(Math.random() * 14),
+        snr: round(2 + Math.random() * 6, 1),
+        battery: 3.9 + Math.random() * 0.2,
         hist: [],
       };
+      this._score(this.stations[d.id]);
     }
-
-    this.events = [
-      { t_ms: Date.now() - 1800000, station: 'KS-03', type: 'SYSTEM', severity: 'info', message: 'Edge node KS-03 online via LoRaWAN (RSSI -91 dBm).' },
-      { t_ms: Date.now() - 900000, station: 'IN-01', type: 'TASK_DONE', severity: 'info', message: 'Intake strainer inspected by operator. Flow clear.' },
-    ];
-
-    this.smsOutbox = [];
-
-    this.tasks = [
-      { id: 'T-101', station: 'KS-03', title: 'Clean optical turbidity lens', kind: 'LENS_CLEAN', due_ms: Date.now() + 3600000, urgent: false, status: 'PENDING' },
-      { id: 'T-102', station: 'IN-01', title: 'Monthly spring box catchment patrol', kind: 'PATROL', due_ms: Date.now() + 86400000, urgent: false, status: 'PENDING' },
-      { id: 'T-103', station: 'MB-04', title: 'Solar pump inverter check', kind: 'PUMP', due_ms: Date.now() - 7200000, urgent: true, status: 'PENDING' },
-      { id: 'T-104', station: 'RH-05', title: 'Replace pre-filter sediment cartridge', kind: 'FILTER', due_ms: Date.now() - 18000000, urgent: false, status: 'COMPLETED', done_ms: Date.now() - 14000000, done_by: 'Staff nurse' },
-    ];
 
     this._seedHistory();
+    this._seedTasks();
+    this._forecast();
   }
 
-  _seedHistory() {
-    const now = Date.now();
-    for (const st of Object.values(this.stations)) {
-      st.hist = [];
-      for (let m = 360; m >= 0; m -= 5) {
-        const t_ms = now - m * 60 * 1000;
-        const jTurb = (Math.random() - 0.5) * 0.2;
-        const jOrp = (Math.random() - 0.5) * 4;
-        const r = {
-          turbidity: Math.max(0.1, st.base.turbidity + jTurb),
-          orp: st.base.orp + jOrp,
-          ph: st.base.ph + (Math.random() - 0.5) * 0.04,
-          tds: st.base.tds + (Math.random() - 0.5) * 2,
-          temp: st.base.temp + (Math.random() - 0.5) * 0.3,
-          bio: st.base.bio ? Math.max(0.1, st.base.bio + (Math.random() - 0.5) * 0.2) : null,
-        };
-        const w = calcWqhi(r);
-        const rsk = calcRisk(r, st.base);
-        st.hist.push({ t_ms, ...r, wqhi: w.score, risk: rsk.risk, valve_open: st.valveOpen });
-      }
+  now() { return this.epoch0 + this.t * 1000; }
+
+  _rain(t) {
+    const s = this.scenario;
+    return s?.name === 'MONSOON' && t >= s.t0 && t < s.t0 + 3600 ? 45 : 0;
+  }
+
+  /** How far from baseline each water point is at sim time t: the script of the event. */
+  _excess(id, t) {
+    const s = this.scenario;
+    if (!s) return NONE;
+    if (s.name === 'SEPTIC' && SPILL_LAG[id] != null) {
+      const k = SPILL_SIZE[id] * pulse(t - s.t0 - SPILL_LAG[id]);
+      return { turbidity: 30 * k, orp: 190 * k, ph: 0.35 * k, tds: 70 * k, bio: 22 * k };
     }
-  }
-
-  tick() {
-    this.scenarioElapsed += 1;
-    const now = Date.now();
-
-    for (const st of Object.values(this.stations)) {
-      // Natural micro-jitter
-      let dTurb = (Math.random() - 0.5) * 0.08;
-      let dOrp = (Math.random() - 0.5) * 1.5;
-      let dPh = (Math.random() - 0.5) * 0.02;
-      let dTds = (Math.random() - 0.5) * 0.8;
-      let dBio = st.reading.bio != null ? (Math.random() - 0.5) * 0.1 : null;
-
-      if (this.scenarioName === 'SEPTIC') {
-        if (st.id === 'AG-02') {
-          st.reading.turbidity = Math.min(38, st.reading.turbidity + 0.6);
-          st.reading.orp = Math.max(160, st.reading.orp - 4.5);
-          if (st.reading.bio != null) st.reading.bio = Math.min(26, st.reading.bio + 0.4);
-          st.classification = 'ACUTE_EVENT';
-          st.edgeState = 'TRIPPED';
-        } else if (st.id === 'KS-03' && this.scenarioElapsed > 20) {
-          // Plume reaches Pacol kiosk after ~20s
-          st.reading.turbidity = Math.min(24, st.reading.turbidity + 0.4);
-          st.reading.orp = Math.max(220, st.reading.orp - 3.2);
-          if (st.reading.bio != null) st.reading.bio = Math.min(18, st.reading.bio + 0.3);
-          if (this.autoPreempt && st.valveOpen) {
-            st.valveOpen = false;
-            st.edgeState = 'TRIPPED';
-            this.events.unshift({
-              t_ms: now, station: 'KS-03', type: 'CMD_PREEMPT_SHUT', severity: 'warning',
-              message: 'Twin pre-emptive shut-off: plume arrival window in 12 min. Intake solenoid closed automatically.',
-            });
-          }
-        }
-      } else if (this.scenarioName === 'MONSOON') {
-        this.rain = Math.min(48, this.rain + 0.8);
-        dTurb += 0.15;
-        dTds += 0.5;
-      } else if (this.scenarioName === 'BIOFOULING') {
-        if (st.id === 'KS-03') {
-          // Slow linear turbidity creep while ORP and TDS remain completely flat
-          st.reading.turbidity = Math.min(22.5, st.reading.turbidity + 0.12);
-          st.classification = 'SENSOR_BIOFOULING';
-          st.drift = { slope_ntu_per_min: 0.28, r2: 0.98, orp_dev: 4 };
-        }
-      } else if (this.scenarioName === 'RESET') {
-        // Smooth recovery to base
-        st.reading.turbidity += (st.base.turbidity - st.reading.turbidity) * 0.15;
-        st.reading.orp += (st.base.orp - st.reading.orp) * 0.15;
-        st.reading.ph += (st.base.ph - st.reading.ph) * 0.15;
-        st.reading.tds += (st.base.tds - st.reading.tds) * 0.15;
-        if (st.reading.bio != null) st.reading.bio += (st.base.bio - st.reading.bio) * 0.15;
-        if (Math.abs(st.reading.turbidity - st.base.turbidity) < 0.2) {
-          st.classification = 'NORMAL';
-          st.edgeState = 'NORMAL';
-          st.drift = null;
-          this.scenarioName = 'NORMAL';
-        }
-      }
-
-      st.reading.turbidity = Math.max(0.1, Number((st.reading.turbidity + dTurb).toFixed(2)));
-      st.reading.orp = Number((st.reading.orp + dOrp).toFixed(1));
-      st.reading.ph = Number(Math.max(4, Math.min(10, st.reading.ph + dPh)).toFixed(2));
-      st.reading.tds = Number((st.reading.tds + dTds).toFixed(1));
-      if (st.reading.bio != null) st.reading.bio = Math.max(0.1, Number((st.reading.bio + dBio).toFixed(2)));
-
-      if (st.tankPct != null) {
-        if (st.valveOpen) st.tankPct = Math.min(98, st.tankPct + 0.05);
-        else st.tankPct = Math.max(8, st.tankPct - 0.15);
-      }
-
-      const w = calcWqhi(st.reading);
-      const rsk = calcRisk(st.reading, st.baseline, this.rain);
-      st.wqhi = w;
-      st.risk = rsk.risk;
-      st.riskBand = rsk.band;
-      st.riskParts = rsk.parts;
+    if (s.name === 'MONSOON') {
+      const lag = (this.stations[id].chainage_m / 24792) * 5400 + (this.stations[id].aquifer ? WELL_LAG_S : 0);
+      const k = (id === 'IN-01' ? 0.2 : this.stations[id].aquifer ? 0.35 : 1) * pulse(t - s.t0 - lag);
+      return { turbidity: 32 * k, orp: 115 * k, ph: 0.2 * k, tds: 25 * k, bio: (id === 'IN-01' ? 0 : 9) * k };
     }
+    return NONE;
   }
 
-  getStatic() {
+  _readingAt(st, t, jitter = true) {
+    const b = st.base;
+    const e = this._excess(st.id, t);
+    const j = (a) => (jitter ? noise(a) : 0);
     return {
-      site: { id: 'naga', title: 'Mt. Isarog → Naga River Catchment', subtitle: 'Naga City, Camarines Sur' },
-      pnsdw: PNSDW,
-      thresholds: { suspect: 0.45, trip: 0.60, persistence_s: 120 },
-      task_kinds: [
-        { kind: 'LENS_CLEAN', label: 'Optical lens cleaning', interval_days: 14 },
-        { kind: 'PATROL', label: 'Catchment patrol', interval_days: 30 },
-        { kind: 'PUMP', label: 'Pump & electrical check', interval_days: 45 },
-        { kind: 'FILTER', label: 'Pre-filter cartridge change', interval_days: 60 },
-      ],
-      heat_indices: ['risk', 'turbidity', 'ph', 'tds', 'bio'],
-      pipes: PIPES_DEF,
+      turbidity: round(Math.max(0.1, b.turbidity + e.turbidity + j(0.08) + (st.id === 'KS-03' ? this.fouling : 0)), 2),
+      orp: round(b.orp - e.orp + j(1.5), 1),
+      ph: round(b.ph - e.ph + j(0.02), 2),
+      tds: round(b.tds + e.tds + j(0.8), 1),
+      temp: round(b.temp + j(0.05), 2),
+      bio: b.bio == null ? null : round(Math.max(0.1, b.bio + e.bio + j(0.1)), 2),
     };
   }
 
+  _isFouled(st) { return st.id === 'KS-03' && this.fouling >= 3; }
+
+  _score(st) {
+    const rain = this._rain(this.t);
+    st.riskParts = riskParts(st.reading, st.base, rain, !this._isFouled(st));
+    st.risk = surrogateRisk(st.riskParts);
+    st.riskBand = riskBand(st.risk);
+    st.wqhi = wqhi(st.reading);
+  }
+
+  _sample(st, t, t_ms, r, risk, score, rain = 0) {
+    st.hist.push({ t, t_ms, ...r, risk, wqhi: score, rain, edge_state: st.edgeState, valve_open: st.valve ? st.open : true });
+    if (st.hist.length > 300) st.hist.shift();
+  }
+
+  _seedHistory() {
+    for (const st of Object.values(this.stations)) {
+      for (let m = 1440; m > 0; m -= SAMPLE_S / 60) {
+        const r = this._readingAt(st, 0);
+        this._sample(st, -m * 60, this.epoch0 - m * 60_000, r, surrogateRisk(riskParts(r, st.base, 0, true)), wqhi(r).score);
+      }
+    }
+  }
+
+  _addTask(station, kind, due_ms, { title, recurring = null, by = 'schedule', urgent = false } = {}) {
+    const task = {
+      id: ++this.taskSeq, station, kind, title: title || STATIC.task_kinds[kind], due_ms, recurring_days: recurring,
+      created_by: by, urgent, done_ms: null, done_by: null,
+    };
+    this.tasks.push(task);
+    return task;
+  }
+
+  _seedTasks() {
+    const n = this.epoch0;
+    this._addTask('KS-03', 'LENS_CLEAN', n + 3 * 3_600_000, { recurring: 14 });
+    this._addTask('IN-01', 'LENS_CLEAN', n + 2 * DAY_MS, { recurring: 14 });
+    this._addTask('MB-04', 'SOLAR', n - 2 * 3_600_000, { recurring: 30 });
+    this._addTask('KS-03', 'FILTER', n + 6 * DAY_MS, { recurring: 30 });
+    this._addTask('RH-05', 'TANK', n + 10 * DAY_MS, { recurring: 90 });
+    this._addTask('RH-05', 'PH_CAL', n + 12 * DAY_MS, { recurring: 30 });
+  }
+
+  _event(station, type, severity, message, sms_to = null) {
+    this.events.unshift({ t: this.t, t_ms: this.now(), station, type, severity, message, sms_to });
+    if (this.events.length > 120) this.events.pop();
+    if (sms_to) this._sms(sms_to, message);
+  }
+
+  _sms(role, message) {
+    this.sms.unshift({ t: this.now() / 1000, role, numbers: 0, message: `[Bulos 3D] ${message}`, provider: 'demo', status: 'simulated, not sent' });
+    if (this.sms.length > 40) this.sms.pop();
+  }
+
+  _once(st, flag, fn) {
+    if (st.flags[flag]) return;
+    st.flags[flag] = true;
+    fn();
+  }
+
+  _forecast() {
+    const out = {};
+    for (const st of Object.values(this.stations)) {
+      const series = [];
+      const nowRisk = st.risk;
+      let arrival = null;
+      let peak = nowRisk;
+      let peakS = null;
+      let clear = null;
+      for (let tau = SAMPLE_S; tau <= HORIZON_S; tau += SAMPLE_S) {
+        const known = this.detected || this.scenario?.name === 'MONSOON';
+        const r = known ? this._readingAt(st, this.t + tau, false) : st.reading;
+        const e = known ? this._excess(st.id, this.t + tau) : NONE;
+        const risk = known ? surrogateRisk(riskParts(r, st.base, this._rain(this.t + tau), !this._isFouled(st))) : nowRisk;
+        series.push({ tau, risk: round(risk, 3), turb_excess: round(e.turbidity, 2), orp_deficit: round(e.orp, 1), bio_excess: round(e.bio, 2) });
+        if (risk > peak) { peak = risk; peakS = tau; }
+        if (arrival == null && nowRisk < RISK_SUSPECT && risk >= RISK_SUSPECT) arrival = tau;
+        if (arrival != null && clear == null && risk < RISK_SUSPECT) clear = tau;
+      }
+      out[st.id] = { arrival_s: arrival, peak_s: peakS, clear_s: clear, peak_risk: round(peak, 3), peak_band: riskBand(peak), series };
+    }
+    this.forecast = out;
+  }
+
+  _edge(st, dt) {
+    const closed = ['TRIPPED', 'REMOTE_SHUT', 'PREEMPTIVE_SHUT'].includes(st.edgeState);
+    if (closed) return;
+    if (this._isFouled(st)) { st.edgeState = 'MAINTENANCE'; return; }
+    if (st.edgeState === 'MAINTENANCE') st.edgeState = 'NORMAL';
+    if (st.risk < RISK_SUSPECT) { st.edgeState = 'NORMAL'; st.suspectS = 0; return; }
+    if (st.edgeState !== 'SUSPECT') {
+      st.edgeState = 'SUSPECT';
+      st.suspectS = 0;
+      this._event(st.id, 'EDGE_SUSPECT', 'warning', `Surrogate risk ${st.risk.toFixed(2)}. Verifying persistence for 2 min.`);
+    }
+    st.suspectS += dt;
+    if (st.valve && st.risk >= RISK_TRIP && st.suspectS >= PERSISTENCE_S) {
+      st.edgeState = 'TRIPPED';
+      st.open = false;
+      this._event(st.id, 'EDGE_AUTO_TRIP', 'danger', `Risk ${st.risk.toFixed(2)} held for 2 min. Intake closed by the sensor node.`, st.sms);
+    }
+  }
+
+  _classify(st) {
+    const prev = st.classification;
+    st.classification = this._isFouled(st) ? 'SENSOR_BIOFOULING' : st.risk >= RISK_SUSPECT ? 'ACUTE_EVENT' : st.risk >= 0.25 ? 'WATCH' : 'NORMAL';
+    if (st.classification === 'SENSOR_BIOFOULING' && prev !== 'SENSOR_BIOFOULING') {
+      this._event(st.id, 'BIOFOULING', 'warning', 'Turbidity is drifting in a straight line while ORP and TDS stay flat. Sensor fault, not contamination.');
+      const open = this.tasks.find((x) => x.station === st.id && x.kind === 'LENS_CLEAN' && !x.done_ms);
+      if (open) { open.due_ms = this.now(); open.urgent = true; } else this._addTask(st.id, 'LENS_CLEAN', this.now(), { by: 'twin', urgent: true });
+    } else if (st.classification === 'ACUTE_EVENT' && prev !== 'ACUTE_EVENT') {
+      this._event(st.id, 'ANOMALY', 'danger', `Contamination signature at ${st.name}. Risk ${st.risk.toFixed(2)}.`);
+    } else if (prev === 'ACUTE_EVENT' && st.classification === 'NORMAL') {
+      this._event(st.id, 'RECOVERED', 'info', 'Surrogates back at baseline.');
+      if (st.valve && !st.open) this._event(st.id, 'REARM_RECOMMENDED', 'info', 'Operator may re-arm the intake (interlock will verify on-site).');
+      st.flags = {};
+    }
+  }
+
+  _protect(st) {
+    const f = this.forecast[st.id];
+    if (!f?.arrival_s || f.peak_risk < RISK_SUSPECT) return;
+    this._once(st, 'advised', () => this._event(st.id, 'FORECAST_ADVISORY', 'danger',
+      `Plume forecast at ${st.name} in about ${Math.round(f.arrival_s / 60)} min, peak risk ${f.peak_risk.toFixed(2)}.`, st.sms));
+    if (this.autoPreempt && st.valve && st.open && f.arrival_s <= PREEMPT_S && f.peak_risk >= RISK_TRIP) {
+      st.open = false;
+      st.edgeState = 'PREEMPTIVE_SHUT';
+      this._event(st.id, 'CMD_PREEMPT_SHUT', 'warning', `Twin pre-emptive shut-off: plume ETA ${Math.round(f.arrival_s / 60)} min, peak risk ${f.peak_risk.toFixed(2)}. Valve closed.`, st.sms);
+    }
+  }
+
+  _tank(st, dt) {
+    if (st.tankPct == null) return;
+    const flow = (st.tank.demand_lps * dt * 100) / st.tank.capacity_l;
+    st.tankPct = st.open ? Math.min(95, st.tankPct + flow * 2) : Math.max(0, st.tankPct - flow);
+    if (!st.open && this._reserveH(st) < 1) {
+      this._once(st, 'reserve', () => this._event(st.id, 'RESERVE_LOW', 'danger', `Tank reserve at ${st.name} is under 1 hour.`, st.sms));
+    }
+  }
+
+  _reserveH(st) { return (st.tank.capacity_l * st.tankPct) / 100 / (st.tank.demand_lps * 3600); }
+
+  tick() {
+    const dt = this.speed;
+    const before = Math.floor(this.t / SAMPLE_S);
+    this.t += dt;
+    this.fouling += (this.foulingRate * dt) / 60;
+    const s = this.scenario;
+    if (s && this.t > s.t0 + 8 * 3600) this.scenario = null;
+
+    const list = Object.values(this.stations);
+    for (const st of list) {
+      st.reading = this._readingAt(st, this.t);
+      this._score(st);
+      st.fCnt += 1;
+      st.lastSeen = this.t;
+    }
+    if (this.stations['AG-02'].risk >= RISK_SUSPECT) this.detected = true;
+    this._forecast();
+    for (const st of list) {
+      this._edge(st, dt);
+      this._classify(st);
+      this._protect(st);
+      this._tank(st, dt);
+    }
+    if (Math.floor(this.t / SAMPLE_S) > before) {
+      const rain = this._rain(this.t);
+      for (const st of list) this._sample(st, this.t, this.now(), st.reading, st.risk, st.wqhi.score, rain);
+    }
+  }
+
+  _drift(st) {
+    const fouled = this._isFouled(st);
+    return {
+      slope_ntu_per_min: fouled ? this.foulingRate : 0, r2: fouled ? 0.98 : 0,
+      orp_dev: round(Math.abs(st.reading.orp - st.base.orp), 1), tds_dev: round(Math.abs(st.reading.tds - st.base.tds), 1),
+    };
+  }
+
+  _channel() {
+    const list = Object.values(this.stations).sort((a, b) => a.chainage_m - b.chainage_m);
+    const at = (x, key) => {
+      const hi = list.findIndex((s) => s.chainage_m >= x);
+      if (hi <= 0) return hi === 0 ? this._excess(list[0].id, this.t)[key] : this._excess(list.at(-1).id, this.t)[key];
+      const [a, b] = [list[hi - 1], list[hi]];
+      const f = (x - a.chainage_m) / (b.chainage_m - a.chainage_m);
+      return this._excess(a.id, this.t)[key] * (1 - f) + this._excess(b.id, this.t)[key] * f;
+    };
+    const profile = (key) => CHANNEL.chainage_m.map((x) => round(at(x, key), 2));
+    return {
+      ...CHANNEL, turb_excess: profile('turbidity'), orp_deficit: profile('orp'), bio_excess: profile('bio'),
+      velocity_factor: CHANNEL.chainage_m.map(() => 1),
+    };
+  }
+
+  getStatic() {
+    return { ...STATIC, pipes: PIPES };
+  }
+
   getState() {
-    const now = Date.now();
     const stations = Object.values(this.stations).map((st) => ({
       id: st.id, name: st.name, kind: st.kind, owner: st.owner, network: st.network, gateway: st.gateway, note: st.note,
-      lat: 13.62 + (st.chainage_m / 28000) * 0.08, lon: 123.25 - (st.chainage_m / 28000) * 0.12,
-      elevation_m: st.elevation_m, chainage_m: st.chainage_m, catchment_km2: st.catchment_km2, population: st.population,
-      reading: { ...st.reading }, baseline: { ...st.baseline }, aquifer: st.aquifer,
-      risk: st.risk, risk_band: st.riskBand, risk_parts: st.riskParts,
-      wqhi: st.wqhi, classification: st.classification, drift: st.drift, edge_state: st.edgeState,
-      valve: st.valve ? { ...st.valve, open: st.valveOpen } : null,
-      tank: st.tank ? { capacity_l: st.tank.capacity_l, pct: Math.round(st.tankPct), reserve_h: Number(((st.tank.capacity_l * st.tankPct / 100) / (st.tank.demand_lps * 3600)).toFixed(1)) } : null,
-      link: { last_seen_t: st.lastSeenT, rssi: st.rssi, snr: st.snr, battery_v: Number(st.batteryV.toFixed(2)), f_cnt: 142, source: `LoRaWAN ${st.id}` },
+      lat: st.lat, lon: st.lon, elevation_m: st.elevation_m, chainage_m: st.chainage_m, catchment_km2: st.catchment_km2, population: st.population,
+      reading: { ...st.reading }, baseline: { ...st.base }, aquifer: st.aquifer, estimated: [],
+      risk: st.risk, risk_band: st.riskBand, risk_parts: st.riskParts, wqhi: st.wqhi,
+      classification: st.classification, drift: this._drift(st), edge_state: st.edgeState,
+      valve: st.valve ? { ...st.valve, open: st.open } : null,
+      tank: st.tank ? { capacity_l: st.tank.capacity_l, pct: Math.round(st.tankPct), reserve_h: round(this._reserveH(st), 1) } : null,
+      link: { last_seen_t: this.t, rssi: st.rssi, snr: st.snr, battery_v: round(st.battery, 3), f_cnt: st.fCnt, source: `Simulated on phone (${st.id})` },
       sms: st.sms,
     }));
 
-    const fcStations = {};
-    for (const st of Object.values(this.stations)) {
-      const isSeptic = this.scenarioName === 'SEPTIC';
-      const arr = st.id === 'AG-02' ? (isSeptic ? 0 : null) : st.id === 'KS-03' ? (isSeptic ? Math.max(60, 720 - this.scenarioElapsed * 20) : null) : null;
-      fcStations[st.id] = {
-        arrival_s: arr,
-        peak_risk: isSeptic && (st.id === 'AG-02' || st.id === 'KS-03') ? 0.78 : st.risk,
-        peak_band: isSeptic && (st.id === 'AG-02' || st.id === 'KS-03') ? 'Severe' : st.riskBand,
-        clear_s: arr ? arr + 3600 : null,
-      };
-    }
+    const fc = {};
+    for (const [id, { series, ...rest }] of Object.entries(this.forecast)) fc[id] = rest;
 
-    const reaches = [
-      { reach: 'IN-01→AG-02', length_km: 7.2, slope_m_per_m: 0.032, velocity_mps: 1.15, travel_time_min: 104, velocity_factor: 0.94 },
-      { reach: 'AG-02→KS-03', length_km: 6.2, slope_m_per_m: 0.015, velocity_mps: 0.92, travel_time_min: 112, velocity_factor: 0.88 },
-      { reach: 'KS-03→MB-04', length_km: 6.4, slope_m_per_m: 0.006, velocity_mps: 0.74, travel_time_min: 144, velocity_factor: 0.91 },
-      { reach: 'MB-04→RH-05', length_km: 6.8, slope_m_per_m: 0.005, velocity_mps: 0.68, travel_time_min: 166, velocity_factor: 0.89 },
-    ];
-
-    const pipes = PIPES_DEF.map((p) => {
+    const pipes = PIPES.map((p) => {
       const src = this.stations[p.src];
-      const flowing = src.valveOpen && (src.tankPct == null || src.tankPct > 5);
+      const flowing = !src.valve || src.open;
+      const full = p.id === PIPES[0].id ? 6 : 2.4;
       return {
-        id: p.id, flow_lps: flowing ? (p.id === 'GL-1' ? 4.8 : 2.4) : 0,
-        velocity_mps: flowing ? (p.id === 'GL-1' ? 1.08 : 0.82) : 0,
-        flowing, status: flowing ? 'Flowing by gravity' : 'Stopped: valve closed',
-        source_risk: src.risk, source_band: src.riskBand,
+        id: p.id, flow_lps: flowing ? full : 0, velocity_mps: flowing ? round(full / 1000 / (Math.PI * (p.diameter_m / 2) ** 2), 2) : 0,
+        flowing, status: flowing ? 'Flowing by gravity' : 'Stopped: valve closed', source_risk: src.risk, source_band: src.riskBand,
       };
     });
 
+    const rain = this._rain(this.t);
     return {
-      clock: { t: this.scenarioElapsed * 60, epoch_ms: now, speed: this.simSpeed, mode: 'sim' },
-      rain_mm_hr: Number(this.rain.toFixed(1)), runoff_mm_hr: Number((this.rain * 0.7).toFixed(1)),
-      stations,
-      forecast: { t: now, stations: fcStations },
-      reaches, pipes, calibration: [], events: this.events.slice(0, 50),
-      sms: this.smsOutbox.slice(0, 20), sms_provider: 'Local SMS Bridge (Simulated)',
-      auto_preempt: this.autoPreempt, forecast_engine: 'React Native in-app twin',
-      storage: 'React Native Local Storage',
+      clock: { t: this.t, epoch_ms: this.now(), speed: this.speed, mode: 'sim' },
+      rain_mm_hr: rain, runoff_mm_hr: round(rain * 0.6, 1),
+      stations, forecast: { t: this.t, stations: fc }, reaches: REACHES, pipes, calibration: [], channel: this._channel(),
+      events: this.events.slice(0, 50), sms: this.sms.slice(0, 20), sms_provider: 'on-phone demo (nothing is really sent)',
+      auto_preempt: this.autoPreempt, forecast_engine: 'on-phone demo', live_nodes: [], storage: 'on-phone demo',
     };
   }
 
   getForecast() {
-    const stations = {};
-    for (const [id, st] of Object.entries(this.stations)) {
-      const arr = this.scenarioName === 'SEPTIC' && id === 'KS-03' ? Math.max(60, 720 - this.scenarioElapsed * 20) : null;
-      const series = [];
-      for (let tau = 300; tau <= 14400; tau += 300) {
-        let r = st.risk;
-        if (this.scenarioName === 'SEPTIC' && (id === 'KS-03' || id === 'AG-02')) {
-          const dt = (tau - (arr || 0)) / 1800;
-          r = Math.max(st.risk, 0.75 * Math.exp(-dt * dt));
-        }
-        series.push({ tau, risk: Number(Math.min(1, r).toFixed(2)) });
-      }
-      stations[id] = {
-        arrival_s: arr,
-        peak_risk: this.scenarioName === 'SEPTIC' ? 0.78 : st.risk,
-        peak_band: this.scenarioName === 'SEPTIC' ? 'Severe' : st.riskBand,
-        clear_s: arr ? arr + 3600 : null,
-        series,
-      };
-    }
-    return { t: Date.now(), stations };
+    return { t: this.t, horizon_s: HORIZON_S, stations: this.forecast };
   }
 
-  getHistory(stationId, minutes = 360) {
-    const st = this.stations[stationId] || this.stations['KS-03'];
-    return { station_id: st.id, series: st.hist };
+  getHistory(id, minutes = 360) {
+    const st = this.stations[id];
+    if (!st) throw new Error('unknown station');
+    return { station_id: id, series: st.hist.filter((h) => h.t >= this.t - minutes * 60) };
   }
 
   getMaintenance() {
-    return { tasks: this.tasks };
+    const now = this.now();
+    const status = (t) => (t.done_ms ? 'COMPLETED' : t.due_ms < now - DAY_MS / 24 ? 'OVERDUE' : t.due_ms < now + DAY_MS ? 'DUE_TODAY' : 'UPCOMING');
+    const tasks = this.tasks.map((t) => ({ ...t, status: status(t) })).sort((a, b) => a.due_ms - b.due_ms);
+    return { now_ms: now, tasks };
   }
 
   getCompliance(hours = 24) {
-    return {
-      backend: 'React Native local audit archive',
-      stations: Object.values(this.stations).map((s) => ({
-        station_id: s.id, samples: 288, wqhi_avg: s.wqhi.score,
-        turbidity_pct: s.classification === 'ACUTE_EVENT' ? 76.4 : 98.6,
-        ph_pct: 100.0, tds_pct: 100.0,
-        intake_closed_pct: s.valveOpen ? 0.0 : 100.0,
-      })),
-    };
+    const from = this.t - hours * 3600;
+    const p = STATIC.pnsdw;
+    const stations = Object.values(this.stations).map((st) => {
+      const rows = st.hist.filter((h) => h.t >= from);
+      const pct = (ok) => round((100 * rows.filter(ok).length) / Math.max(1, rows.length), 1);
+      return {
+        station_id: st.id, samples: rows.length,
+        turbidity_pct: pct((h) => h.turbidity <= p.turbidity_ntu), ph_pct: pct((h) => h.ph >= p.ph_min && h.ph <= p.ph_max), tds_pct: pct((h) => h.tds <= p.tds_mgL),
+        wqhi_avg: round(rows.reduce((a, h) => a + h.wqhi, 0) / Math.max(1, rows.length), 1),
+        risk_max: Math.max(0, ...rows.map((h) => h.risk)), intake_closed_pct: pct((h) => !h.valve_open),
+      };
+    });
+    return { standard: 'PNSDW 2017 (DOH AO 2017-0010)', limits: p, stations, backend: 'on-phone demo' };
   }
 
   getTrend(hours = 12, bucketMin = 30) {
-    const now = Date.now();
-    const count = Math.round((hours * 60) / bucketMin);
+    const now = this.now();
+    const rows = Object.values(this.stations).flatMap((s) => s.hist);
     const series = [];
-    for (let i = 0; i < count; i++) {
-      series.push({
-        t_ms: now - (count - i) * bucketMin * 60 * 1000,
-        avg: Math.min(100, Math.max(65, 88 + Math.round((Math.random() - 0.5) * 8))),
-        min: 72,
-      });
+    for (let i = (hours * 60) / bucketMin; i > 0; i -= 1) {
+      const to = now - (i - 1) * bucketMin * 60_000;
+      const vals = rows.filter((h) => h.t_ms > to - bucketMin * 60_000 && h.t_ms <= to).map((h) => h.wqhi);
+      if (vals.length) series.push({ t_ms: to, avg: round(vals.reduce((a, b) => a + b, 0) / vals.length, 1), min: Math.min(...vals) });
     }
     return { series };
   }
 
+  _command(st, name, actor) {
+    if (name === 'CLEANED') {
+      if (st.id === 'KS-03') { this.fouling = 0; this.foulingRate = 0; }
+      if (st.edgeState === 'MAINTENANCE') st.edgeState = 'NORMAL';
+      st.reading = this._readingAt(st, this.t);
+      this._score(st);
+      this._classify(st);
+      this._event(st.id, 'CMD_CLEANED', 'info', `${actor}: cleaned. Lens cleaned; drift window reset.`);
+      return 'Lens cleaned; drift window reset.';
+    }
+    if (!st.valve) throw new Error('Node has no actuator.');
+    if (name === 'SHUT') {
+      st.open = false;
+      st.edgeState = 'REMOTE_SHUT';
+      this._event(st.id, 'CMD_SHUT', 'warning', `${actor}: shut. Valve closed.`);
+      return 'Valve closed.';
+    }
+    if (name === 'REARM' && st.risk >= RISK_SUSPECT) {
+      const msg = `Interlock: on-site risk ${st.risk.toFixed(2)} still >= ${RISK_SUSPECT}. Re-arm refused.`;
+      this._event(st.id, 'CMD_REARM_REFUSED', 'danger', `${actor}: rearm. ${msg}`);
+      throw new Error(msg);
+    }
+    st.open = true;
+    st.edgeState = 'NORMAL';
+    st.suspectS = 0;
+    const msg = `Valve re-armed (open).${name === 'FORCE_REARM' ? ' Interlock BYPASSED.' : ''}`;
+    this._event(st.id, `CMD_${name}`, name === 'FORCE_REARM' ? 'warning' : 'info', `${actor}: ${name.replace('_', ' ').toLowerCase()}. ${msg}`);
+    return msg;
+  }
+
+  _reset() {
+    this.scenario = null;
+    this.detected = false;
+    this.fouling = 0;
+    this.foulingRate = 0;
+    for (const st of Object.values(this.stations)) {
+      st.open = Boolean(st.valve);
+      st.edgeState = 'NORMAL';
+      st.suspectS = 0;
+      st.flags = {};
+      st.classification = 'NORMAL';
+    }
+  }
+
+  _advisory(ids, message, by) {
+    const fc = this.forecast;
+    const targets = ids?.length ? ids
+      : Object.values(this.stations).filter((s) => s.risk >= RISK_SUSPECT || fc[s.id]?.arrival_s > 0).map((s) => s.id);
+    if (!targets.length) throw new Error('No water point is affected right now. Pick a water point to send an advisory anyway.');
+    const sent = [];
+    for (const id of targets) {
+      const st = this.stations[id];
+      if (!st?.sms) continue;
+      const arr = fc[id]?.arrival_s;
+      const text = message || `Water advisory for ${st.name}: ${arr ? `contaminated water expected in about ${Math.floor(arr / 60)} min. ` : 'contamination detected. '}Do not drink untreated water; boil water for at least 1 minute.`;
+      this._sms(st.sms, text);
+      sent.push({ station: id, role: st.sms, status: 'simulated, not sent' });
+      this._event(id, 'ADVISORY_SENT', 'warning', `${by} sent an SMS advisory to ${st.sms}: ${text}`);
+    }
+    if (!sent.length) throw new Error('None of the selected water points has an SMS contact.');
+    return sent;
+  }
+
   act(path, body) {
-    const now = Date.now();
     if (path === '/api/valve') {
-      const { station_id, action } = body;
-      const st = this.stations[station_id];
-      if (st) {
-        if (action === 'SHUT') {
-          st.valveOpen = false;
-          st.edgeState = 'TRIPPED';
-          this.events.unshift({ t_ms: now, station: station_id, type: 'CMD_SHUT', severity: 'warning', message: `Operator closed intake valve at ${st.name}.` });
-          return { ok: true, message: `Intake at ${st.name} closed.` };
-        }
-        if (action === 'REARM' || action === 'FORCE_REARM') {
-          st.valveOpen = true;
-          st.edgeState = 'NORMAL';
-          this.events.unshift({ t_ms: now, station: station_id, type: 'CMD_REARM', severity: 'info', message: `Operator re-opened intake valve at ${st.name}.` });
-          return { ok: true, message: `Intake at ${st.name} re-opened.` };
-        }
-      }
+      const st = this.stations[body.station_id];
+      if (!st) throw new Error('unknown station');
+      return { ok: true, message: this._command(st, body.action, body.operator ?? 'Mobile operator') };
+    }
+    if (path === '/api/maintenance/clean') {
+      const st = this.stations[body.station_id];
+      if (!st) throw new Error('unknown station');
+      return { ok: true, message: this._command(st, 'CLEANED', body.technician ?? 'Mobile technician') };
+    }
+    if (path === '/api/maintenance') {
+      const task = this._addTask(body.station_id, body.kind, body.due_ms ?? this.now(), { title: body.title, by: body.created_by ?? 'Mobile operator' });
+      this._event(task.station, 'TASK_ADDED', 'info', `${task.created_by} scheduled: ${task.title}.`);
+      return { ok: true, task, message: `Reminder added: ${task.title}.` };
+    }
+    const done = path.match(/^\/api\/maintenance\/(\d+)\/done$/);
+    if (done) {
+      const task = this.tasks.find((t) => t.id === Number(done[1]));
+      if (!task) throw new Error('unknown task');
+      if (task.done_ms) throw new Error('Task is already completed.');
+      const by = body.done_by ?? 'Field technician';
+      task.done_ms = this.now();
+      task.done_by = by;
+      const next = task.recurring_days
+        ? this._addTask(task.station, task.kind, this.now() + task.recurring_days * DAY_MS, { title: task.title, recurring: task.recurring_days })
+        : null;
+      if (task.kind === 'LENS_CLEAN') this._command(this.stations[task.station], 'CLEANED', by);
+      this._event(task.station, 'TASK_DONE', 'info', `${by} completed: ${task.title}.${body.note ? ` ${body.note}` : ''}`);
+      return { ok: true, task, next, message: `Marked done: ${task.title}.${next ? ' Next one scheduled.' : ''}` };
+    }
+    if (path === '/api/advisory') {
+      const sent = this._advisory(body.station_ids, body.message, body.sent_by ?? 'Mobile operator');
+      return { ok: true, sent, message: `SMS advisory simulated for ${[...new Set(sent.map((s) => s.role))].sort().join(', ')}.` };
     }
     if (path === '/api/scenario') {
-      const { name } = body;
-      this.scenarioName = name;
-      this.scenarioElapsed = 0;
-      this.events.unshift({ t_ms: now, station: null, type: 'SCENARIO', severity: 'info', message: `Scenario triggered: ${name}.` });
-      return { ok: true, message: `Injected scenario ${name}.` };
+      if (!STATIC.scenarios[body.name]) throw new Error('unknown scenario');
+      this._reset();
+      if (body.name === 'BIOFOULING') this.foulingRate = 0.06;
+      else if (body.name !== 'RESET') this.scenario = { name: body.name, t0: this.t };
+      this._event(null, 'SCENARIO', 'info', `Field scenario injected: ${STATIC.scenarios[body.name]}`);
+      return { ok: true, message: body.name };
     }
     if (path === '/api/policy') {
       this.autoPreempt = Boolean(body.auto_preempt);
-      return { ok: true, message: `Auto-preempt ${this.autoPreempt ? 'enabled' : 'disabled'}.` };
+      return { ok: true, auto_preempt: this.autoPreempt };
     }
     if (path === '/api/speed') {
-      this.simSpeed = Number(body.speed) || 60;
-      return { ok: true, message: `Speed set to ${this.simSpeed}×.` };
+      this.speed = Number(body.speed) || 60;
+      return { ok: true, speed: this.speed };
     }
-    if (path === '/api/maintenance/clean') {
-      const { station_id } = body;
-      const st = this.stations[station_id];
-      if (st) {
-        st.reading.turbidity = st.base.turbidity;
-        st.classification = 'NORMAL';
-        st.drift = null;
-        this.events.unshift({ t_ms: now, station: station_id, type: 'CMD_CLEANED', severity: 'info', message: `Probe cleaned at ${st.name}. Drift reset.` });
-      }
-      return { ok: true, message: 'Probe cleaned.' };
-    }
-    if (path === '/api/maintenance/task') {
-      const { id, done } = body;
-      const task = this.tasks.find((t) => t.id === id);
-      if (task && done) {
-        task.status = 'COMPLETED';
-        task.done_ms = now;
-        this.events.unshift({ t_ms: now, station: task.station, type: 'TASK_DONE', severity: 'info', message: `Task "${task.title}" completed.` });
-      }
-      return { ok: true, message: 'Task updated.' };
-    }
-    if (path === '/api/advisory') {
-      const { station_ids, message } = body;
-      const target = (station_ids && station_ids.length ? station_ids : ['KS-03', 'RH-05']);
-      for (const sid of target) {
-        const st = this.stations[sid];
-        if (st) {
-          const text = message || `Water Advisory: Potential contamination detected upstream of ${st.name}. Boil water advisory in effect.`;
-          this.smsOutbox.unshift({ t: now, role: st.sms, status: 'Simulated SMS Sent', message: text });
-          this.events.unshift({ t_ms: now, station: sid, type: 'ADVISORY_SENT', severity: 'warning', message: `Advisory sent to ${st.sms}: ${text}` });
-        }
-      }
-      return { ok: true, message: 'SMS advisories dispatched.' };
-    }
-    return { ok: true };
+    throw new Error(`Demo mode does not support ${path}.`);
   }
 }
 

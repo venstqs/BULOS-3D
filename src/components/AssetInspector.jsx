@@ -148,7 +148,7 @@ function Site({ st }) {
         <mesh position={[0, 2.35, -0.1]} rotation-x={-0.6}><boxGeometry args={[1.4, 0.05, 0.9]} /><meshStandardMaterial color="#1f3b73" metalness={0.4} roughness={0.3} /></mesh>
         <mesh position={[0.38, 1.85, 0.2]}><cylinderGeometry args={[0.025, 0.025, 0.8, 8]} /><meshStandardMaterial color="#111" /></mesh>
         <group position={[0, 2.55, 0.25]}><Beacon color={status.color} blink={tripped} /></group>
-        <Tag position={[0, 3.3, 0]} title="Edge node (ESP32 · LoRaWAN · GSM)" value={st.edge_state.replaceAll('_', ' ')} tone={status.color} />
+        <Tag position={[0, 3.3, 0]} title="Sensor node" value={st.edge_state.replaceAll('_', ' ')} tone={status.color} />
       </group>
 
       {isSpring && (
@@ -170,7 +170,7 @@ function Site({ st }) {
           <mesh position={[0, 0.35, 0]}><cylinderGeometry args={[0.45, 0.45, 0.7, 24]} /><meshStandardMaterial color="#8e8c84" /></mesh>
           <mesh position={[0, 0.78, 0]}><cylinderGeometry args={[0.18, 0.18, 0.2, 16]} /><meshStandardMaterial color="#2f5d9b" /></mesh>
           <mesh position={[0, -0.6, 0]}><cylinderGeometry args={[0.2, 0.2, 1.2, 16]} /><meshStandardMaterial color="#5c6b7a" transparent opacity={0.5} /></mesh>
-          <Tag position={[0, 1.5, 0]} title="Shallow well + solar pump" value={open ? 'pumping' : 'pump disabled'} tone={open ? '#0ca30c' : '#d03b3b'} />
+          <Tag position={[-1.1, 1.3, 1.6]} title="Shallow well" value={open ? 'pumping' : 'pump off'} tone={open ? '#0ca30c' : '#d03b3b'} />
         </group>
       )}
       {isWell && (
@@ -179,7 +179,7 @@ function Site({ st }) {
             <mesh key={x} position={[x, 0.9, 0]} rotation-x={-0.5}><boxGeometry args={[1.6, 0.05, 1.0]} /><meshStandardMaterial color="#1f3b73" metalness={0.4} roughness={0.3} /></mesh>
           ))}
           <mesh position={[0, 0.45, 0.2]}><boxGeometry args={[3.4, 0.08, 0.08]} /><meshStandardMaterial color="#777" /></mesh>
-          <Tag position={[0, 1.8, 0]} title="Solar array (pump)" value="1.2 kWp" />
+          <Tag position={[2.6, 1.4, -1.2]} title="Solar array" value="1.2 kWp" />
         </group>
       )}
 
@@ -199,7 +199,7 @@ function Site({ st }) {
           <group position={[-1.2, 0.35, 0]}>
             <mesh><boxGeometry args={[0.55, 0.45, 0.45]} /><meshStandardMaterial color={open ? '#0ca30c' : '#d03b3b'} /></mesh>
             <mesh position={[0, 0.4, 0]}><cylinderGeometry args={[0.15, 0.15, 0.4, 16]} /><meshStandardMaterial color="#333" /></mesh>
-            <Tag position={[0, 1.15, 0]} title={st.valve.model} value={open ? 'OPEN' : 'CLOSED'} tone={open ? '#0ca30c' : '#d03b3b'} />
+            <Tag position={[0.3, -0.35, 1.9]} title="Intake valve" value={open ? 'OPEN' : 'CLOSED'} tone={open ? '#0ca30c' : '#d03b3b'} />
           </group>
           {/* cartridge filter */}
           <mesh position={[0.2, 0.6, 0]}><cylinderGeometry args={[0.28, 0.28, 1.1, 20]} /><meshStandardMaterial color="#4a6fa5" /></mesh>

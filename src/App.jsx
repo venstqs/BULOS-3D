@@ -118,7 +118,7 @@ export default function App() {
     <div className="min-h-full pb-8">
       {/* ---------------- top bar ---------------- */}
       <header className="sticky top-0 z-30 px-4 pt-4">
-        <div className="glass mx-auto flex max-w-[1560px] items-center gap-3 px-4 py-2.5">
+        <div className="glass mx-auto flex max-w-[1560px] flex-wrap items-center gap-x-3 gap-y-2 !bg-white/90 px-4 py-2.5 lg:flex-nowrap">
           <button onClick={() => go('home')} className="flex shrink-0 items-center gap-2.5">
             <img src="/favicon.svg" alt="" className="h-9 w-9" />
             <span className="hidden text-left leading-tight sm:block">
@@ -126,7 +126,7 @@ export default function App() {
               <span className="block text-[11px] text-muted">{staticData?.site.title ?? 'Water quality digital twin'}</span>
             </span>
           </button>
-          <nav className="mx-auto flex min-w-0 gap-1 overflow-x-auto rounded-2xl bg-white/60 p-1">
+          <nav className="order-last flex w-full min-w-0 gap-1 overflow-x-auto rounded-2xl bg-white/60 p-1 lg:order-none lg:mx-auto lg:w-auto">
             {PAGES.map(([id, label]) => (
               <button key={id} onClick={() => go(id)} aria-current={page === id ? 'page' : undefined}
                       className={`shrink-0 whitespace-nowrap rounded-xl px-3.5 py-1.5 text-sm font-medium transition ${page === id ? 'bg-civic text-white shadow-[0_6px_14px_rgba(47,91,231,0.3)]' : 'text-ink-2 hover:bg-white hover:text-ink'}`}>
@@ -134,7 +134,7 @@ export default function App() {
               </button>
             ))}
           </nav>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-2 lg:ml-0">
             {live && (
               <span className="hidden items-center gap-1.5 rounded-xl bg-white/70 px-2.5 py-1.5 text-xs text-ink-2 2xl:inline-flex">
                 <CloudRain size={14} className="text-civic" />{live.rain_mm_hr} mm/h

@@ -66,7 +66,7 @@ export default function RiverSchematic({ live, forecast, staticData, selectedId,
         <path d={line} fill="none" stroke="#ffffff" strokeOpacity={0.8} strokeWidth={2} strokeLinecap="round" className="river-flow" />
 
         <text x={m.l} y={H - 8} fontSize={10.5} fill="#6b7a86">▲ {srcName} · {Math.round(ch.elev_m[0]).toLocaleString()} m</text>
-        <text x={w - m.r} y={H - 8} fontSize={10.5} fill="#6b7a86" textAnchor="end">{townName} · {Math.round(ch.elev_m.at(-1))} m ▼ · {(L / 1000).toFixed(1)} km</text>
+        <text x={w - m.r} y={14} fontSize={10.5} fill="#6b7a86" textAnchor="end">{townName} · {Math.round(ch.elev_m.at(-1))} m ▼ · {(L / 1000).toFixed(1)} km</text>
 
         {live.stations.map((s) => {
           const x = sx(s.chainage_m);

@@ -11,14 +11,20 @@ const PARAMS = [
   { key: 'bio', label: 'Biological', unit: 'ppb TLF', d: 1, limit: () => 'faecal indicator, alert at 10 ppb' },
 ];
 
-function Spark({ values, color = '#4a5a66' }) {
-  if (!values?.length) return <div className="h-6" />;
-  const lo = Math.min(...values);
-  const hi = Math.max(...values);
+function Spark({ values, color = '#2f5be7' }) {
+  if (!values || values.length < 2) return <div className="h-6" />;
+  // average into 24 points and keep a minimum span, so sensor noise reads as a calm line
+  const n = Math.min(24, values.length);
+  const pts = Array.from({ length: n }, (_, i) => {
+    const part = values.slice(Math.floor((i * values.length) / n), Math.max(Math.floor(((i + 1) * values.length) / n), Math.floor((i * values.length) / n) + 1));
+    return part.reduce((a, b) => a + b, 0) / part.length;
+  });
+  const mid = (Math.min(...pts) + Math.max(...pts)) / 2;
+  const span = Math.max(Math.max(...pts) - Math.min(...pts), Math.abs(mid) * 0.3, 0.5);
   const w = 96;
   const h = 24;
-  const d = values.map((v, i) => `${i ? 'L' : 'M'}${(i / (values.length - 1)) * w},${h - 2 - ((v - lo) / (hi - lo || 1)) * (h - 4)}`).join('');
-  return <svg width={w} height={h}><path d={d} fill="none" stroke={color} strokeWidth={1.5} /></svg>;
+  const d = pts.map((v, i) => `${i ? 'L' : 'M'}${((i / (n - 1)) * w).toFixed(1)},${(h / 2 - ((v - mid) / span) * (h - 6)).toFixed(1)}`).join('');
+  return <svg width={w} height={h} aria-hidden><path d={d} fill="none" stroke={color} strokeWidth={1.6} strokeLinejoin="round" /></svg>;
 }
 
 export function StatusBadge({ status, className = '' }) {

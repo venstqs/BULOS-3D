@@ -86,7 +86,7 @@ export default function Home({
 
         <Card>
           <CardHead icon={Droplet} title="Water quality"
-                    sub={attention.length ? `${attention.length} water point${attention.length > 1 ? 's' : ''} need attention` : 'All water points good'} />
+                    sub={advisory ? 'Water advisory active' : attention.length ? `${attention.length} water point${attention.length > 1 ? 's' : ''} need attention` : 'All water points good'} />
           <div className="tile mt-auto flex items-end justify-between gap-3 p-4">
             <div className="shrink-0">
               <div className="font-display text-4xl font-semibold leading-none text-civic tabular">{avg}<span className="text-xl">%</span></div>

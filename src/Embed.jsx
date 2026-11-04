@@ -29,7 +29,7 @@ export default function Embed({ mode, params }) {
       )}
       {mode === 'site' && (st ? (
         <Suspense fallback={<Loading text="Loading the 3D site view…" />}>
-          <SiteScene st={st} zoom={38} />
+          <SiteScene st={st} zoom={Math.max(20, Math.min(46, window.innerWidth / 15))} />
         </Suspense>
       ) : <Loading text={live ? 'Unknown water point.' : 'Connecting to the data server…'} />)}
     </div>

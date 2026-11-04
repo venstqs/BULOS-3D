@@ -42,6 +42,7 @@ export async function clearServers() {
 const clean = (u) => (u ? u.replace(/\/+$/, '') : '');
 
 function routeMock(path, method = 'GET', body = null) {
+  if (method === 'POST') return demoTwin.act(path, body);
   if (path.startsWith('/api/health')) return { status: 'ok', mode: 'sim', engine: 'standalone' };
   if (path.startsWith('/api/static')) return demoTwin.getStatic();
   if (path.startsWith('/api/state')) return demoTwin.getState();
@@ -53,10 +54,7 @@ function routeMock(path, method = 'GET', body = null) {
     const id = path.split('/api/history/')[1]?.split('?')[0];
     return demoTwin.getHistory(id);
   }
-  if (method === 'POST') {
-    return demoTwin.act(path, body);
-  }
-  return {};
+  throw new Error(`Demo mode does not support ${path}.`);
 }
 
 async function request(base, path, init = {}) {

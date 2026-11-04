@@ -38,7 +38,7 @@ function usePoll(base, path, intervalMs, active) {
 
   const current = status.base === base;
   return {
-    data: got?.base === base ? got.data : null,
+    data: got && got.base === base ? got.data : null,
     status: current ? status.value : 'connecting',
     error: current ? status.error : null,
     refresh,
@@ -134,7 +134,7 @@ export function DataProvider({ children }) {
   }, [standalone, servers, notify]);
 
   const value = {
-    servers, setServers, resetServers, toggleStandalone, isStandalone: standalone,
+    servers, apiBase: base, setServers, resetServers, toggleStandalone, isStandalone: standalone,
     static: staticQ.data, live: live.data, forecast: forecast.data, tasks: maint.data?.tasks, trend: trend.data?.series,
     status: live.status, error: live.error, refresh: live.refresh,
     act, notify, toast, dismissToast: () => setToast(null),

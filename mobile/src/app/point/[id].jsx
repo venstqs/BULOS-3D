@@ -20,19 +20,19 @@ function gaugeStatus(k, r, b) {
 
 export default function PointDetail() {
   const { id } = useLocalSearchParams();
-  const { live, forecast, servers, act } = useData();
+  const { live, forecast, apiBase, act } = useData();
   const router = useRouter();
   const [history, setHistory] = useState(null);
   const [busy, setBusy] = useState(null);
 
   useEffect(() => {
-    if (!servers) return undefined;
+    if (!apiBase) return undefined;
     let alive = true;
-    const load = () => apiGet(servers.api, `/api/history/${id}?minutes=360`).then((h) => alive && setHistory(h.series)).catch(() => {});
+    const load = () => apiGet(apiBase, `/api/history/${id}?minutes=360`).then((h) => alive && setHistory(h.series)).catch(() => {});
     load();
     const t = setInterval(load, 10000);
     return () => { alive = false; clearInterval(t); };
-  }, [servers, id]);
+  }, [apiBase, id]);
 
   const st = live?.stations.find((x) => x.id === id);
   if (!st) return <Screen edges={[]}><Stack.Screen options={{ title: id }} /><Empty text="Loading…" /></Screen>;

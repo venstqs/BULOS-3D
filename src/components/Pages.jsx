@@ -274,9 +274,9 @@ export function FlowPage({ live, forecast, staticData, onPreempt, onOpen }) {
           <LineChart series={[{ id: 'v', label: 'Velocity', color: '#0b4f8a', points: ch.velocity_mps.map((y, i) => ({ x: km[i], y })) }]}
                      height={170} xFormat={(x) => `${x.toFixed(0)} km`} yFormat={(y) => `${y.toFixed(1)}`} yLabel="m/s" markers={mk} directLabels={false} />
         </Section>
-        <Section title="Modelled turbidity in the river now">
+        <Section title="Modelled turbidity in the river now" note="NTU above each point's normal level.">
           <LineChart series={[{ id: 't', label: 'Turbidity above normal', color: '#0b4f8a', area: true, points: ch.turb_excess.map((y, i) => ({ x: km[i], y })) }]}
-                     height={170} xFormat={(x) => `${x.toFixed(0)} km`} yFormat={(y) => y.toFixed(0)} yLabel="NTU above normal" markers={mk}
+                     height={170} xFormat={(x) => `${x.toFixed(0)} km`} yFormat={(y) => y.toFixed(0)} markers={mk}
                      directLabels={false} yDomain={[0, Math.max(10, ...ch.turb_excess) * 1.1]} />
         </Section>
       </div>

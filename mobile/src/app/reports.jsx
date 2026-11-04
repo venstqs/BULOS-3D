@@ -9,11 +9,11 @@ import { fmtClock, fmtDate } from '../lib/format';
 const SEV = { danger: '#a32626', warning: '#7a5600', info: C.ink };
 
 export default function Reports() {
-  const { live, servers } = useData();
+  const { live, apiBase } = useData();
   const [comp, setComp] = useState(null);
   useEffect(() => {
-    if (servers) apiGet(servers.api, '/api/compliance?hours=24').then(setComp).catch(() => setComp(false));
-  }, [servers]);
+    if (apiBase) apiGet(apiBase, '/api/compliance?hours=24').then(setComp).catch(() => setComp(false));
+  }, [apiBase]);
   return (
     <Screen edges={[]} advisory={false}>
       <Card>
