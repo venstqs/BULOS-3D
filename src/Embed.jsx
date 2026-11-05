@@ -4,7 +4,7 @@ import { usePoll } from './api';
 // Full-screen 3D views embedded by the Bulos 3D mobile app in a WebView.
 //   ?embed=map&index=risk     3D watershed (tap a water point -> app opens it)
 //   ?embed=site&id=KS-03      isometric site model
-const CesiumScene = lazy(() => import('./components/CesiumScene'));
+const TwinView = lazy(() => import('./components/TwinView'));
 const SiteScene = lazy(() => import('./components/AssetInspector').then((m) => ({ default: m.SiteScene })));
 
 const send = (msg) => window.ReactNativeWebView?.postMessage(JSON.stringify(msg));
@@ -26,7 +26,7 @@ export default function Embed({ mode, params }) {
     <div className="fixed inset-0 bg-panel-2">
       {mode === 'map' && (
         <Suspense fallback={<Loading text="Loading the 3D map…" />}>
-          <CesiumScene staticData={staticData} live={live} forecast={forecast} heatmap={heatmap} selectedId={params.get('id') ?? ''}
+          <TwinView staticData={staticData} live={live} forecast={forecast} heatmap={heatmap} selectedId={params.get('id') ?? ''}
                        onSelect={select} onInspect={select} layers={layers} setLayers={setLayers} />
         </Suspense>
       )}

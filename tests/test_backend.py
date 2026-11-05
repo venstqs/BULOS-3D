@@ -277,3 +277,25 @@ def test_flood_layer_is_low_ground_beside_the_river():
     assert np.mean(inside > 100) < 0.5                 # but not the whole catchment
     with pytest.raises(ValueError):
         p.twin.risk_grid("nonsense")
+
+
+def test_terrain_grid_matches_the_dem():
+    p = Platform(store=False)
+    g = p.twin.terrain_grid()
+    elev = np.frombuffer(base64.b64decode(g["elev"]), "<i2")
+    hand = np.frombuffer(base64.b64decode(g["hand"]), np.uint8)
+    assert elev.size == hand.size == g["nrows"] * g["ncols"]
+    assert elev.max() / 10 > 500                       # the mountain is there
+    assert (hand < 255).any() and (hand == 255).any()  # catchment cells and outside cells
+
+
+def test_reset_clears_the_twin_as_well_as_the_field():
+    p = Platform(store=False)
+    p.scenario("SEPTIC")
+    for _ in range(60):
+        p.tick(60)
+    assert p.twin.tr.c.max() > 1                       # the plume is in the model
+    p.scenario("RESET")
+    assert p.twin.tr.c.max() == 0
+    assert not any((f["arrival_s"] or 0) > 0 for f in p.twin.forecast["stations"].values())
+

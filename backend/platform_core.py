@@ -223,6 +223,8 @@ class Platform:
         if not self.world:
             raise ValueError("Scenarios are only available in sim mode.")
         self.world.trigger(name)
+        if name == "RESET":
+            self.twin.clear_model()
         self._emit(dict(t=self.t, station=None, type="SCENARIO", severity="info",
                         message=f"Field scenario injected: {SCENARIOS[name]}"), actor="demo")
 

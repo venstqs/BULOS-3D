@@ -79,6 +79,11 @@ async def heatmap(index: str = "risk"):
         _400(e)
 
 
+@app.get("/api/terrain")
+async def terrain():
+    return P.twin.terrain_grid()
+
+
 @app.get("/api/history/{station_id}")
 async def history(station_id: str, minutes: int = 360):
     if station_id not in P.twin.stations:

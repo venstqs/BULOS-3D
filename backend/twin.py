@@ -294,6 +294,18 @@ class Twin:
             return
         self._apply_forecast(self.t, compute_forecast(inp, self.profile))
 
+    def clear_model(self):
+        """Demo reset: forget the modelled plume and rain, then forecast again from clean water."""
+        self.tr.c[:] = 0.0
+        self.rain = 0.0
+        self.runoff_rain = 0.0
+        self.rain_hist.clear()
+        for st in self.stations.values():          # the last packets predate the reset
+            if st.baseline and st.reading:
+                st.reading = dict(st.reading, **st.baseline)
+        self._pending_forecast = None
+        self._apply_forecast(self.t, compute_forecast(self.forecast_input(), self.profile))
+
     def _collect_forecast(self):
         if not self._pending_forecast:
             return
@@ -480,6 +492,7 @@ class Twin:
         # Height above the nearest river point: low ground beside the channel floods first.
         # A terrain screening estimate from the 90 m DEM, not an official hazard map.
         hand = np.clip(T.elev[rr, cc] - self.ch.z[self._near_cell], 0, None)
+        self._hand = hand
         self._flood_potential = np.clip(1 - hand / 8.0, 0, 1) * np.exp(-self._near_dist / 1500)
 
     HEAT_INDICES = ("risk", "turbidity", "ph", "tds", "bio")
@@ -536,6 +549,17 @@ class Twin:
         grid[self._grid_idx] = np.clip(val * 254 + 1, 1, 255).astype(np.uint8)
         return dict(index=index, north=T.north, south=T.south, west=T.west, east=T.east,
                     nrows=T.nrows, ncols=T.ncols, data=base64.b64encode(grid.tobytes()).decode())
+
+    def terrain_grid(self):
+        """Elevation (int16 decimetres) and height above the river (uint8 quarter-metres,
+        255 = outside the catchment), both base64, for the Water 3D view."""
+        T = self.terrain
+        hand = np.full((T.nrows, T.ncols), 255, np.uint8)
+        near = np.where(self._near_dist < 900, self._hand * 4, 255)      # floods stay close to the channel
+        hand[self._grid_idx] = np.clip(near, 0, 255).astype(np.uint8)
+        elev = np.clip(T.elev * 10, -32000, 32000).astype("<i2")
+        return dict(north=T.north, south=T.south, west=T.west, east=T.east, nrows=T.nrows, ncols=T.ncols,
+                    elev=base64.b64encode(elev.tobytes()).decode(), hand=base64.b64encode(hand.tobytes()).decode())
 
     # ============================================================== snapshot
     def channel_state(self):

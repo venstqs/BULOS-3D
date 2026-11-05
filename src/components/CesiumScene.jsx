@@ -1,9 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Cesium from 'cesium';
-import { Layers, Pause, Play, Plane, RotateCcw, X } from 'lucide-react';
-import { get, usePoll } from '../api';
 import { BAND, MAINT, stationStatus } from '../lib/format';
-import { AHEAD_S, PAST_S, exposure, fmtOffset, riverAt, stationsAt } from '../lib/twinField';
+import { riverAt } from '../lib/twinField';
 
 const ESRI_IMAGERY = 'https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}';
 const ESRI_TERRAIN = 'https://elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer';
@@ -16,8 +14,6 @@ const lift = (z, m) => z * EXAGGERATION + m;
 const SHOW_RIVER = 900;
 const SHOW_STREAM = 480;
 const SHOW_PIPE = 620;
-const SLIDER_STEP = 300;
-const REPLAY_S = 24;            // one pass of the time slider
 
 /* Single-hue risk ramp (light, transparent -> dark, opaque red). */
 function riskRGBA(v) {
@@ -145,55 +141,11 @@ function placeAt(path, s, out) {
   return k;
 }
 
-const CATALOGUE = [
-  ['Hazard', [['heatmap', 'Contamination risk'], ['flood', 'Flood-prone ground']]],
-  ['Water', [['particles', 'River and pipe flow'], ['streams', 'Streams'], ['pipes', 'Gravity pipelines']]],
-  ['Context', [['columns', 'Risk columns'], ['catchment', 'Watershed boundary']]],
-];
-
-function LayerPanel({ layers, setLayers, onClose }) {
-  return (
-    <div className="absolute right-2 top-12 z-10 max-h-[calc(100%-132px)] w-[218px] overflow-y-auto rounded-2xl bg-white/95 p-3 text-xs text-ink-2 shadow-lg backdrop-blur">
-      <div className="mb-1 flex items-center justify-between">
-        <span className="font-display text-sm font-semibold text-ink">Layers</span>
-        <button onClick={onClose} aria-label="Close layers" className="rounded p-0.5 hover:bg-panel-2"><X size={14} /></button>
-      </div>
-      {CATALOGUE.map(([group, items]) => (
-        <div key={group} className="mt-2">
-          <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted">{group}</div>
-          {items.map(([k, label]) => (
-            <label key={k} className="flex items-center gap-2 py-0.5">
-              <input type="checkbox" checked={Boolean(layers[k])} onChange={() => setLayers((l) => ({ ...l, [k]: !l[k] }))} className="h-3.5 w-3.5 accent-[#2f5be7]" />
-              {label}
-            </label>
-          ))}
-        </div>
-      ))}
-      <div className="mt-3 border-t border-line pt-2">
-        <div className="h-1.5 rounded" style={{ background: 'linear-gradient(90deg, rgb(64,184,255), rgb(150,120,90), rgb(190,30,30))' }} />
-        <div className="mt-0.5 flex justify-between text-[10px] text-muted"><span>clean water</span><span>polluted</span></div>
-        {layers.flood && (
-          <p className="mt-2 text-[10px] leading-snug text-muted">
-            Flood-prone ground is our estimate from the 90 m elevation model. It is not an official hazard map.
-          </p>
-        )}
-        <p className="mt-2 text-[10px] leading-snug text-muted">Flow is sped up so it can be seen, and terrain height is exaggerated 1.6×.</p>
-      </div>
-    </div>
-  );
-}
-
-export default function CesiumScene({ staticData, live, forecast, heatmap, selectedId, onSelect, onInspect, layers, setLayers }) {
+export default function CesiumScene({ staticData, live, heatmap, floodmap, selectedId, onSelect, onInspect, layers, tauStep, atTime, controls, onTour }) {
   const host = useRef(null);
   const viewerRef = useRef(null);
   const refs = useRef({});
   const [fatal, setFatal] = useState(null);
-  const [tau, setTau] = useState(0);                 // seconds from now on the time slider
-  const [playing, setPlaying] = useState(false);
-  const [showLayers, setShowLayers] = useState(false);
-  const [touring, setTouring] = useState(false);
-  const [history, setHistory] = useState(null);
-  const { data: floodmap } = usePoll(layers.flood ? '/api/heatmap?index=flood' : null, 15000);
   if (fatal) throw fatal;                            // hand WebGL failures to the error boundary
 
   /* ---------------- viewer ---------------- */
@@ -432,39 +384,6 @@ export default function CesiumScene({ staticData, live, forecast, heatmap, selec
     return () => { if (!viewer.isDestroyed()) viewer.scene.preUpdate.removeEventListener(onTick); };
   }, []);
 
-  /* ---------------- time slider ---------------- */
-  useEffect(() => {
-    if (tau >= 0 || !live) return undefined;         // recorded readings load only when someone looks back
-    let alive = true;
-    const load = () => Promise.all(live.stations.map((s) => get(`/api/history/${s.id}?minutes=${PAST_S / 60}`).then((h) => [s.id, h.series])))
-      .then((rows) => { if (alive) setHistory(Object.fromEntries(rows)); }).catch(() => {});
-    if (!history) load();
-    const id = setInterval(load, 20000);
-    return () => { alive = false; clearInterval(id); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tau < 0, Boolean(live)]);
-
-  useEffect(() => {
-    if (!playing) return undefined;
-    let raf;
-    let last = performance.now();
-    const step = (now) => {
-      const dt = (now - last) / 1000;
-      last = now;
-      setTau((t) => {
-        const next = t + (dt / REPLAY_S) * (PAST_S + AHEAD_S);
-        if (next >= AHEAD_S) { setPlaying(false); return AHEAD_S; }
-        return next;
-      });
-      raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-  }, [playing]);
-
-  const tauStep = Math.round(tau / SLIDER_STEP) * SLIDER_STEP;   // the data has 5-minute resolution
-  const atTime = useMemo(() => (live ? stationsAt(tauStep, live, forecast, history) : null), [tauStep, live, forecast, history]);
-
   /* ---------------- river state ---------------- */
   useEffect(() => {
     if (!live || !atTime) return;
@@ -637,9 +556,8 @@ export default function CesiumScene({ staticData, live, forecast, heatmap, selec
     if (!r.tourOff) return;
     r.tourOff();
     r.tourOff = null;
-    setTouring(false);
-  }, []);
-  useEffect(() => { refs.current.stopTour = stopTour; }, [stopTour]);
+    onTour?.(false);
+  }, [onTour]);
 
   const startTour = useCallback(() => {
     const viewer = viewerRef.current;
@@ -663,69 +581,18 @@ export default function CesiumScene({ staticData, live, forecast, heatmap, selec
       });
     };
     refs.current.tourOff = viewer.scene.preRender.addEventListener(step);
-    setTouring(true);
-  }, [staticData, stopTour]);
+    onTour?.(true);
+  }, [staticData, stopTour, onTour]);
 
-  const live0 = tauStep === 0;
-  const danger = live ? exposure(live) : null;
-  const syncedS = live ? Math.max(0, Math.round((live.clock.t - Math.max(...live.stations.map((s) => s.link?.last_seen_t ?? 0))) / Math.max(1, live.clock.speed))) : null;
-  const source = live?.live_nodes?.length ? 'real node + virtual field' : live?.clock.mode === 'sim' ? 'virtual field' : 'field sensors';
-  const iconBtn = 'flex h-8 items-center gap-1.5 rounded-xl bg-white/95 px-2.5 text-xs font-medium text-ink-2 shadow-sm backdrop-blur hover:text-civic';
+  useEffect(() => {
+    refs.current.stopTour = stopTour;
+    controls.current = { home: () => refs.current.home?.(), startTour, stopTour };
+    return () => { controls.current = {}; };
+  }, [controls, startTour, stopTour]);
 
   return (
-    <div className="relative h-full w-full">
+    <div className="absolute inset-0">
       <div ref={host} className="absolute inset-0" />
-
-      <div className="pointer-events-none absolute left-2 top-2 z-10 grid max-w-[58%] justify-items-start gap-1">
-        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm ${live0 ? 'bg-[#0b7a43]' : tauStep > 0 ? 'bg-[#2f5be7]' : 'bg-[#4a5a6a]'}`}>
-          <span className={`h-1.5 w-1.5 rounded-full bg-white ${live0 ? 'animate-pulse' : ''}`} />
-          {live0 ? 'LIVE' : tauStep > 0 ? `FORECAST ${fmtOffset(tauStep)}` : `REPLAY ${fmtOffset(tauStep)}`}
-        </span>
-        {live0 && live && <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] text-ink-2 shadow-sm">Synced {syncedS} s ago · {source}</span>}
-        {live0 && danger?.points > 0 && (
-          <span className="rounded-xl bg-[#a32626]/95 px-2.5 py-1 text-[11px] font-semibold leading-tight text-white shadow-sm">
-            {danger.people.toLocaleString()} people in the path
-            {danger.next && <span className="block font-normal">Next: {danger.next.id} in {Math.round(danger.next.s / 60)} min</span>}
-          </span>
-        )}
-      </div>
-
-      <div className="absolute right-2 top-2 z-10 flex gap-1.5">
-        {setLayers && <button onClick={() => setShowLayers((v) => !v)} className={iconBtn} aria-label="Layers"><Layers size={14} /> Layers</button>}
-        <button onClick={touring ? stopTour : startTour} className={iconBtn} aria-label="Fly the river"><Plane size={14} /> {touring ? 'Stop' : 'Fly'}</button>
-        <button onClick={() => { stopTour(); refs.current.home?.(); }} className={iconBtn} aria-label="Reset view"><RotateCcw size={14} /></button>
-      </div>
-      {showLayers && setLayers && <LayerPanel layers={layers} setLayers={setLayers} onClose={() => setShowLayers(false)} />}
-
-      <div className="absolute inset-x-2 bottom-2 z-10 rounded-2xl bg-white/95 px-3 py-1.5 shadow-md backdrop-blur">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => { if (!playing && tau >= AHEAD_S - SLIDER_STEP) setTau(-PAST_S); else if (!playing && tau === 0) setTau(-PAST_S); setPlaying((p) => !p); }}
-            aria-label={playing ? 'Pause' : 'Play the last 6 hours and next 4 hours'}
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#2f5be7] text-white"
-          >
-            {playing ? <Pause size={13} /> : <Play size={13} />}
-          </button>
-          <input
-            type="range" min={-PAST_S} max={AHEAD_S} step={SLIDER_STEP} value={tauStep} aria-label="Time"
-            onChange={(e) => { setPlaying(false); setTau(Number(e.target.value)); }}
-            className="min-w-0 flex-1 accent-[#2f5be7]"
-          />
-          <button
-            onClick={() => { setPlaying(false); setTau(0); }} disabled={live0}
-            className="shrink-0 rounded-full border border-line px-2 py-0.5 text-[11px] font-semibold text-ink-2 disabled:opacity-40"
-          >
-            Now
-          </button>
-        </div>
-        <div className="relative mt-0.5 h-3 pl-9 pr-11 text-[10px] text-muted">
-          <div className="relative h-full">
-            <span className="absolute left-0">−6 h recorded</span>
-            <span className="absolute -translate-x-1/2" style={{ left: `${(PAST_S / (PAST_S + AHEAD_S)) * 100}%` }}>now</span>
-            <span className="absolute right-0">+4 h forecast</span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

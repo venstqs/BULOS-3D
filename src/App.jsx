@@ -9,7 +9,7 @@ import { post, usePoll } from './api';
 import { fmtClock, fmtMin } from './lib/format';
 
 // Heavy 3D libraries load on demand so the page itself appears immediately.
-const CesiumScene = lazy(() => import('./components/CesiumScene'));
+const TwinView = lazy(() => import('./components/TwinView'));
 const AssetInspector = lazy(() => import('./components/AssetInspector'));
 
 const hasWebGL = (() => {
@@ -107,8 +107,8 @@ export default function App() {
   ) : (
     <ErrorBoundary label="The 3D map" compact onDisable={() => setLite(true)}>
       <Suspense fallback={<div className="flex h-full items-center justify-center bg-panel-2 text-sm text-muted">Loading the 3D map…</div>}>
-        {/* click a water point: isometric 3D site view; double-click: its details page */}
-        <CesiumScene staticData={staticData} live={live} forecast={forecast} heatmap={heatmap} selectedId={selectedId}
+        {/* click a water point: isometric 3D site view; double-click: its details page. */}
+        <TwinView staticData={staticData} live={live} forecast={forecast} heatmap={heatmap} selectedId={selectedId}
                      onSelect={onInspect} onInspect={openPoint} layers={layers} setLayers={setLayers} />
       </Suspense>
     </ErrorBoundary>
