@@ -10,6 +10,7 @@ import { fmtClock, fmtMin } from './lib/format';
 
 // Heavy 3D libraries load on demand so the page itself appears immediately.
 const TwinView = lazy(() => import('./components/TwinView'));
+const CommandCenter = lazy(() => import('./components/CommandCenter'));
 const AssetInspector = lazy(() => import('./components/AssetInspector'));
 
 const hasWebGL = (() => {
@@ -23,6 +24,7 @@ const hasWebGL = (() => {
 
 const PAGES = [
   ['home', 'Home'],
+  ['overview', 'Overview'],
   ['map', 'Watershed'],
   ['flow', 'Forecast'],
   ['points', 'Water points'],
@@ -56,7 +58,7 @@ export default function App() {
   const [page, setPage] = useState(deepLink ? 'points' : 'home');
   const [selectedId, setSelectedId] = useState(deepLink ?? 'KS-03');
   const [inspectId, setInspectId] = useState(deepLink);
-  const [layers, setLayers] = useState({ heatmap: true, flood: false, particles: true, streams: true, pipes: true, columns: true, catchment: true });
+  const [layers, setLayers] = useState({ heatmap: true, flood: false, particles: true, streams: true, pipes: true, columns: true, catchment: true, buildings: true, labels: true });
   const [dialog, setDialog] = useState(null);           // { kind, arg }
   const [toast, setToast] = useState(null);
   // Lite mode: no 3D map (for slow PCs or a crashing graphics driver). Remembered in this browser.
@@ -114,8 +116,27 @@ export default function App() {
     </ErrorBoundary>
   );
 
+  const command = page === 'home' && !lite;
+
   return (
-    <div className="min-h-full pb-8">
+    <div className={command ? 'min-h-full' : 'min-h-full pb-8'}>
+      {command ? (
+        <ErrorBoundary label="The 3D command view" onDisable={() => setLite(true)}>
+          <Suspense fallback={<div className="flex h-screen items-center justify-center text-sm text-muted">Loading Bulos 3D…</div>}>
+            <CommandCenter
+              live={live} forecast={forecast} tasks={maint?.tasks} staticData={staticData} heatmap={heatmap} layers={layers} setLayers={setLayers} status={status} selectedId={selectedId}
+              onSelect={setSelectedId} onInspect={onInspect} onDetails={openPoint} act={act} quick={quick} pages={PAGES} page={page} go={go}
+              actions={(
+                <>
+                  <AlertBell live={live} go={go} />
+                  {live?.clock.mode === 'sim' && <SimulationMenu speed={live.clock.speed} onScenario={runScenario} onSpeed={setSpeed} />}
+                </>
+              )}
+            />
+          </Suspense>
+        </ErrorBoundary>
+      ) : (
+      <>
       {/* ---------------- top bar ---------------- */}
       <header className="sticky top-0 z-30 px-4 pt-4">
         <div className="glass mx-auto flex max-w-[1560px] flex-wrap items-center gap-x-3 gap-y-2 !bg-white/90 px-4 py-2.5 lg:flex-nowrap">
@@ -159,7 +180,7 @@ export default function App() {
         <SimulationStatus live={live} onReset={() => runScenario('RESET')} />
         <Advisory live={live} forecast={forecast} onOpen={openPoint} onSend={() => quick('advisory')} />
 
-        {page === 'home' && (
+        {(page === 'overview' || page === 'home') && (
           <Home live={live} forecast={forecast} staticData={staticData} trend={trend?.series} tasks={maint?.tasks}
                 map={map} selectedId={selectedId} onSelectPoint={setSelectedId} onOpenPoint={openPoint} onInspect={onInspect} go={go} quick={quick} />
         )}
@@ -182,6 +203,8 @@ export default function App() {
         government system. Elevation: Copernicus GLO-90 (ESA). Imagery © Esri. Water-point locations are an illustrative pilot layout;
         standards follow PNSDW 2017.
       </footer>
+      </>
+      )}
 
       {/* ---------------- dialogs ---------------- */}
       {dialog?.kind === 'test' && live && (

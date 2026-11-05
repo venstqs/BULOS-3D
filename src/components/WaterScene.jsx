@@ -4,6 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { get } from '../api';
 import { stationStatus } from '../lib/format';
 import { riverAt } from '../lib/twinField';
+import { NOISE, RAIN_FRAG, RAIN_VERT, RIBBON_VERT, RIVER_FRAG, paintRiver } from '../lib/waterShaders';
 
 // The watershed as a physical model: real Copernicus elevation, a carved river channel,
 // and water drawn by shaders, so the water itself is what you look at.
@@ -208,36 +209,6 @@ function ribbonsToGeometry(list) {
   return g;
 }
 
-const NOISE = `
-float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-float noise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
-  return mix(mix(hash(i),hash(i+vec2(1,0)),f.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x),f.y); }
-`;
-
-const RIBBON_VERT = `
-attribute float aS; varying vec2 vUv; varying float vS;
-void main(){ vUv=uv; vS=aS; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`;
-
-const RIVER_FRAG = `
-precision highp float;
-uniform float uTime; uniform float uFlow; uniform sampler2D uField; uniform vec3 uTint; uniform float uUseField;
-varying vec2 vUv; varying float vS;
-${NOISE}
-void main(){
-  vec4 f = texture2D(uField, vec2(vS, 0.5));
-  vec3 water = mix(uTint, f.rgb, uUseField);
-  float dirty = f.a * uUseField;
-  float across = abs(vUv.y - 0.5) * 2.0;
-  vec2 q = vec2(vUv.x * 2.4 - uTime * uFlow, vUv.y * 2.6);
-  float n = noise(q * 2.0) * 0.6 + noise(q * 5.0 + 3.1) * 0.4;
-  float streak = smoothstep(0.58, 0.78, n);
-  vec3 c = mix(water * 0.72, water, 1.0 - across * 0.7);
-  c = mix(c, vec3(1.0), streak * (0.55 - 0.3 * dirty));
-  float pulse = 0.5 + 0.5 * sin(uTime * 3.2 - vUv.x * 1.6);
-  c += vec3(0.45, 0.06, 0.02) * dirty * pulse * 0.55;
-  gl_FragColor = vec4(c, smoothstep(1.0, 0.72, across));
-}`;
-
 const FLOOD_VERT = `
 attribute float aHand; varying float vHand; varying vec3 vW;
 void main(){ vHand=aHand; vW=(modelMatrix*vec4(position,1.0)).xyz; gl_Position=projectionMatrix*viewMatrix*vec4(vW,1.0); }`;
@@ -253,19 +224,6 @@ void main(){
   vec3 c = mix(vec3(0.42, 0.74, 0.98), vec3(0.08, 0.36, 0.8), depth);
   gl_FragColor = vec4(c + n * 0.08, 0.42 + depth * 0.4);
 }`;
-
-const RAIN_VERT = `
-attribute float aSeed; uniform float uTime; uniform float uTop; varying float vA;
-void main(){
-  vec3 p = position;
-  p.y = mod(p.y - uTime * (7.0 + aSeed * 3.0), uTop);
-  vA = smoothstep(0.0, 0.6, p.y);
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
-}`;
-
-const RAIN_FRAG = `
-precision highp float; uniform float uAmount; varying float vA;
-void main(){ gl_FragColor = vec4(0.82, 0.9, 1.0, 0.55 * uAmount * vA); }`;
 
 function dispose(root) {
   root.traverse((o) => {
@@ -579,23 +537,7 @@ export default function WaterScene({ staticData, live, heatmap, selectedId, onSe
   useEffect(() => {
     const w = world.current;
     if (!w || !live || !atTime) return;
-    const fieldNow = riverAt(tauStep, live, atTime);
-    const n = fieldNow.turb.length;
-    const px = w.field.image.data;
-    let lastDirty = -1;
-    for (let i = 0; i < 256; i += 1) {
-      const k = Math.min(n - 1, Math.round((i / 255) * (n - 1)));
-      const t = Math.min(1, (fieldNow.turb[k] ?? 0) / 30);
-      const o = Math.min(1, (fieldNow.orp[k] ?? 0) / 150);
-      const dirty = Math.max(t, o);
-      px.set([
-        Math.min(255, (0.23 + 0.5 * t + 0.34 * o) * 255),
-        Math.max(0, (0.66 - 0.32 * t - 0.46 * o) * 255),
-        Math.max(0, (1 - 0.8 * t - 0.68 * o) * 255),
-        dirty * 255,
-      ], i * 4);
-      if ((fieldNow.turb[k] ?? 0) > 3 || (fieldNow.orp[k] ?? 0) > 25) lastDirty = i;
-    }
+    const lastDirty = paintRiver(w.field.image.data, riverAt(tauStep, live, atTime));
     w.field.needsUpdate = true;
     const moving = lastDirty >= 0 && lastDirty < 250;
     w.state.frontTarget = moving ? lastDirty / 255 : null;
