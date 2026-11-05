@@ -299,3 +299,13 @@ def test_reset_clears_the_twin_as_well_as_the_field():
     assert p.twin.tr.c.max() == 0
     assert not any((f["arrival_s"] or 0) > 0 for f in p.twin.forecast["stations"].values())
 
+
+def test_hazard_check_at_a_point():
+    p = Platform(store=False)
+    st = p.twin.stations["KS-03"]
+    h = p.twin.hazard_at(st.lat, st.lon)
+    assert h["in_catchment"] and h["nearest_id"] == "KS-03" and h["nearest_km"] < 0.2
+    assert h["flood_class"] in ("HIGH", "MEDIUM", "LOW", "MINIMAL")
+    with pytest.raises(ValueError):
+        p.twin.hazard_at(0.0, 0.0)
+

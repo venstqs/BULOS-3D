@@ -37,7 +37,7 @@ const roofTex = (base) => canvasTex(128, 128, (g, w, h) => {
 const plasterTex = (base) => canvasTex(128, 128, (g, w, h) => { g.fillStyle = base; g.fillRect(0, 0, w, h); speckle(g, w, h, 900, 0.05); }, 2, 2);
 const concreteTex = () => canvasTex(256, 256, (g, w, h) => {
   g.fillStyle = '#c9ccc9'; g.fillRect(0, 0, w, h); speckle(g, w, h, 3000, 0.09);
-  g.strokeStyle = 'rgba(70,70,70,0.3)'; g.lineWidth = 2;
+  g.strokeStyle = 'rgba(70,70,70,0.13)'; g.lineWidth = 1.5;
   for (let i = 0; i <= 4; i += 1) { g.beginPath(); g.moveTo(i * 64, 0); g.lineTo(i * 64, h); g.moveTo(0, i * 64); g.lineTo(w, i * 64); g.stroke(); }
 }, 4, 4);
 const grassTex = () => canvasTex(256, 256, (g, w, h) => {
@@ -534,34 +534,172 @@ function springBox(ctx) {
   for (const [x, z, s] of [[-12, -6, 1.3], [-6, -9, 1.1], [3, -10, 1.4], [11, -8, 1.2], [14, 2, 1], [-14, 4, 1.1]]) broadTree(g, x, z, s);
 }
 
+/** Chain-link fence along a closed list of corner points. */
+function fence(g, pts, m) {
+  m.chain ??= new THREE.MeshStandardMaterial({
+    map: canvasTex(64, 64, (c, w, h) => {
+      c.clearRect(0, 0, w, h);
+      c.strokeStyle = '#aeb6bf'; c.lineWidth = 2.4;
+      for (let i = -64; i < 128; i += 16) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i + 64, 64); c.moveTo(i + 64, 0); c.lineTo(i, 64); c.stroke(); }
+    }), alphaTest: 0.35, side: THREE.DoubleSide, metalness: 0.5, roughness: 0.5,
+  });
+  for (let i = 0; i < pts.length - 1; i += 1) {
+    const [a, b] = [pts[i], pts[i + 1]];
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const ang = Math.atan2(-(b[1] - a[1]), b[0] - a[0]);
+    const panel = add(g, new THREE.PlaneGeometry(len, 1.8), m.chain.clone(), (a[0] + b[0]) / 2, 0.95, (a[1] + b[1]) / 2);
+    panel.material.map = m.chain.map.clone();
+    panel.material.map.repeat.set(len / 0.6, 3);
+    panel.material.map.needsUpdate = true;
+    panel.rotation.y = ang;
+    const rail = add(g, cylinder(0.022, 0.022, len, 8), m.steel, (a[0] + b[0]) / 2, 1.86, (a[1] + b[1]) / 2);
+    rail.rotation.set(0, ang, Math.PI / 2);
+    for (let d = 0; d <= len; d += 2.4) add(g, cylinder(0.03, 0.03, 1.95, 8), m.steel, a[0] + ((b[0] - a[0]) * d) / len, 0.97, a[1] + ((b[1] - a[1]) * d) / len);
+  }
+}
+
+/** Cup anemometer and wind vane; the cups turn. */
+function anemometer(ctx, x, y, z) {
+  const { g, m } = ctx;
+  add(g, cylinder(0.02, 0.02, 0.5, 8), m.darkSteel, x, y + 0.25, z);
+  const head = new THREE.Group();
+  head.position.set(x, y + 0.52, z);
+  for (let i = 0; i < 3; i += 1) {
+    const a = (i / 3) * Math.PI * 2;
+    const arm = add(head, cylinder(0.008, 0.008, 0.24, 6), m.darkSteel, Math.cos(a) * 0.12, 0, Math.sin(a) * 0.12);
+    arm.rotation.set(0, -a, Math.PI / 2);
+    add(head, new THREE.SphereGeometry(0.05, 12, 10, 0, Math.PI), m.white, Math.cos(a) * 0.24, 0, Math.sin(a) * 0.24).rotation.y = -a;
+  }
+  g.add(head);
+  ctx.spin.push(head);
+}
+
+/** Tipping-bucket rain gauge: funnel on a pedestal. */
+function rainGaugeUnit(g, x, z, m) {
+  add(g, rbox(0.7, 0.14, 0.7, 0.02), m.concrete, x, 0.1, z);
+  add(g, cylinder(0.05, 0.07, 1, 12), m.steel, x, 0.65, z);
+  add(g, cylinder(0.14, 0.14, 0.42, 24), m.white, x, 1.35, z);
+  const funnel = new THREE.LatheGeometry([new THREE.Vector2(0.03, 0), new THREE.Vector2(0.14, 0.1), new THREE.Vector2(0.15, 0.14)], 24);
+  add(g, funnel, m.darkSteel, x, 1.52, z);
+}
+
+function dataCabinet(g, x, z, m) {
+  add(g, rbox(0.75, 0.16, 0.5, 0.02), m.concrete, x, 0.08, z);
+  add(g, rbox(0.62, 1.15, 0.36, 0.04), m.tankWhite, x, 0.74, z);
+  add(g, new THREE.BoxGeometry(0.5, 0.95, 0.02), m.wall2 ?? m.tankWhite, x, 0.74, z + 0.19);
+  add(g, new THREE.SphereGeometry(0.018, 8, 6), m.steel, x + 0.2, 0.74, z + 0.21);
+  ctxLed(g, x - 0.18, 1.14, z + 0.2);
+}
+
+function ctxLed(g, x, y, z) {
+  add(g, new THREE.SphereGeometry(0.018, 8, 6), new THREE.MeshBasicMaterial({ color: '#35e06a' }), x, y, z);
+}
+
+function staffGauge(g, x, z, h, m) {
+  m.staff ??= new THREE.MeshStandardMaterial({
+    map: canvasTex(64, 512, (c, w, hh) => {
+      c.fillStyle = '#ffffff'; c.fillRect(0, 0, w, hh);
+      for (let i = 0; i < 40; i += 1) {
+        c.fillStyle = i % 10 === 0 ? '#c0281f' : '#14243f';
+        if (i % 2 === 0) c.fillRect(0, i * 12.8, i % 10 === 0 ? w : w * 0.55, 6.4);
+      }
+    }), roughness: 0.5,
+  });
+  add(g, new THREE.BoxGeometry(0.2, h, 0.03), m.staff, x, h / 2, z);
+  add(g, cylinder(0.04, 0.04, h + 0.5, 8), m.steel, x, h / 2, z - 0.05);
+}
+
+/** Hydromet station: the sentinel on the Naga River. */
 function sentinel(ctx) {
   const { g, m, people } = ctx;
-  add(g, new THREE.CircleGeometry(9, 48).rotateX(-Math.PI / 2), m.concrete, 0, 0.03, 0);
-  building(g, 5, 3.6, 2.6, m.wallBlue, m.roofTin, m, { winFront: 1, winBack: 1 });
-  door(g, 1.5, 1.83, 0, m);
-  signBoard(g, 'AG-02 SENTINEL STATION', 'Biological water sensor', -0.5, 2.5, 1.92, 3.2, '#10325f', '#ffffff');
-  // Lattice mast
-  for (const [x, z] of [[-0.42, -0.42], [0.42, -0.42], [0, 0.42]]) add(g, cylinder(0.035, 0.07, 11, 8), m.steel, 5.6 + x * 0.55, 5.5, -1.5 + z * 0.55);
-  for (let y = 1; y < 11; y += 1.1) { const r = add(g, new THREE.TorusGeometry(0.38 - y * 0.012, 0.016, 6, 3), m.steel, 5.6, y, -1.5); r.rotation.x = Math.PI / 2; }
-  const panel = add(g, new THREE.BoxGeometry(2.1, 0.06, 1.2), m.solar, 5.6, 8.6, -0.5);
+  add(g, new THREE.CircleGeometry(13, 56).rotateX(-Math.PI / 2), m.concrete, 0, 0.03, 0);
+  fence(g, [[-11, -8], [10, -8], [10, 9], [1.2, 9]], m);
+  fence(g, [[-1.8, 9], [-11, 9], [-11, -8]], m);
+  for (const [x, r] of [[-0.9, 0.35], [0.5, -0.35]]) { const gate = add(g, new THREE.BoxGeometry(1.45, 1.75, 0.04), m.chain ?? m.steel, x - 0.2, 0.95, 9.3); gate.rotation.y = r; }
+
+  building(g, 6, 4, 2.7, m.wallBlue, m.roofTin, m, { x: -4.6, z: -4, winFront: 1, winBack: 1 });
+  door(g, -2.9, -1.77, 0, m);
+  signBoard(g, 'HYDROMET STATION AG-02', 'River and water quality monitoring', -4.6, 2.72, -1.67, 4.2, '#10325f', '#ffffff');
+
+  // Stilling well: a concrete tower connected to the river, with a shelter for the recorder
+  add(g, cylinder(0.85, 0.95, 4.2, 28), m.concrete, 6, 2.1, 5.2);
+  add(g, rbox(2.1, 1.3, 2.1, 0.05), m.wallBlue, 6, 4.85, 5.2);
+  add(g, rbox(2.5, 0.12, 2.5, 0.03), m.roofTin, 6, 5.56, 5.2);
+  ladder(g, 7, 0, 5.2, 4.3, Math.PI / 2, m);
+  add(g, rbox(2.6, 0.08, 1, 0.02), m.steel, 7.2, 4.15, 5.2);
+  staffGauge(g, 8.6, 7.9, 3.4, m);
+
+  // Telemetry mast
+  for (const [x, z] of [[-0.42, -0.42], [0.42, -0.42], [0, 0.42]]) add(g, cylinder(0.03, 0.06, 11, 8), m.steel, 5.6 + x * 0.55, 5.5, -3.6 + z * 0.55);
+  for (let y = 1; y < 11; y += 1) { const r = add(g, new THREE.TorusGeometry(0.34 - y * 0.012, 0.014, 6, 3), m.steel, 5.6, y, -3.6); r.rotation.x = Math.PI / 2; }
+  const panel = add(g, new THREE.BoxGeometry(2.1, 0.06, 1.2), m.solar, 5.6, 8.6, -2.6);
   panel.rotation.x = 0.55;
-  add(g, cylinder(0.05, 0.05, 1.4, 10), m.darkSteel, 5.6, 11.6, -1.5);
-  const dish = add(g, new THREE.SphereGeometry(0.42, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2.6), m.white, 5.6, 10.3, -1);
+  add(g, cylinder(0.05, 0.05, 1.4, 10), m.darkSteel, 5.6, 11.6, -3.6);
+  const dish = add(g, new THREE.SphereGeometry(0.42, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2.6), m.white, 5.6, 10.3, -3.1);
   dish.rotation.x = 2.1;
-  ctx.beacon = add(g, new THREE.SphereGeometry(0.11, 12, 10), new THREE.MeshBasicMaterial({ color: '#ff3b30' }), 5.6, 12.4, -1.5);
-  // Walkway out to the water, with the sonde cable
-  add(g, rbox(1.4, 0.1, 8, 0.02), m.wood, -4.8, 0.85, 6);
-  for (const z of [3, 6, 9]) for (const x of [-5.4, -4.2]) add(g, cylinder(0.05, 0.05, 1.5, 8), m.darkSteel, x, 0.2, z);
-  for (const x of [-5.45, -4.15]) { const r = add(g, cylinder(0.018, 0.018, 8, 6), m.steel, x, 1.8, 6); r.rotation.x = Math.PI / 2; }
-  for (const z of [2.2, 4.8, 7.4, 9.9]) for (const x of [-5.45, -4.15]) add(g, cylinder(0.018, 0.018, 0.95, 6), m.steel, x, 1.35, z);
-  add(g, cylinder(0.014, 0.014, 1.2, 6), m.rubber, -4.8, 0.3, 10);
-  add(g, rbox(0.3, 0.45, 0.3, 0.05), m.tankWhite, -4.8, 0, 10);
+  ctx.beacon = add(g, new THREE.SphereGeometry(0.11, 12, 10), new THREE.MeshBasicMaterial({ color: '#ff3b30' }), 5.6, 12.4, -3.6);
+  anemometer(ctx, 5.6, 11.8, -3.6);
+
+  // Instruments in the yard
+  rainGaugeUnit(g, -1.6, 3.2, m);
+  dataCabinet(g, 1.2, 1.2, m);
+  dataCabinet(g, 2.4, 1.2, m);
+  pipeRun(g, [[1.2, 0.1, 1.4], [4, 0.1, 3.2], [5.2, 0.1, 4.6]], 0.04, m.rubber);
+
+  // Walkway out to the river, carrying the biological sonde
+  add(g, rbox(1.4, 0.1, 9, 0.02), m.wood, -6.2, 0.85, 12.5);
+  for (const z of [9, 12, 15]) for (const x of [-6.8, -5.6]) add(g, cylinder(0.05, 0.05, 1.5, 8), m.darkSteel, x, 0.2, z);
+  for (const x of [-6.85, -5.55]) { const r = add(g, cylinder(0.018, 0.018, 9, 6), m.steel, x, 1.8, 12.5); r.rotation.x = Math.PI / 2; }
+  for (const z of [8.4, 11, 13.6, 16.4]) for (const x of [-6.85, -5.55]) add(g, cylinder(0.018, 0.018, 0.95, 6), m.steel, x, 1.35, z);
+  add(g, cylinder(0.014, 0.014, 1.2, 6), m.rubber, -6.2, 0.3, 16.6);
+  add(g, rbox(0.3, 0.45, 0.3, 0.05), m.tankWhite, -6.2, 0, 16.6);
+
   const tech = person({ shirt: '#f28c28', pants: '#37424f', hat: 'hard', carry: 'clipboard', mode: 'work' });
-  tech.position.set(-4.8, 0.9, 9.2); people.push(tech); g.add(tech);
-  const t2 = person({ shirt: '#ffffff', pants: '#1f3a5f', long: true, carry: 'clipboard', mode: 'walk', path: [[-2, 3], [4, 4], [4, -4], [-3, -4], [-2, 3]], speed: 0.9 });
+  tech.position.set(-6.2, 0.9, 15.6); people.push(tech); g.add(tech);
+  const t2 = person({ shirt: '#ffffff', pants: '#1f3a5f', long: true, carry: 'clipboard', mode: 'walk', path: [[-1, 5], [5, 7], [8, -1], [0, -1], [-1, 5]], speed: 0.9 });
   people.push(t2); g.add(t2);
-  for (const [x, z, s] of [[-12, -5, 1.2], [12, 6, 1.1], [11, -8, 1.3], [-11, 7, 1]]) broadTree(g, x, z, s);
+  const t3 = person({ shirt: '#2c8a99', pants: '#37424f', hat: 'cap', mode: 'work' });
+  t3.position.set(1.8, 0.03, 2.3); t3.rotation.y = Math.PI; people.push(t3); g.add(t3);
+  for (const [x, z, s] of [[-16, -6, 1.2], [15, 6, 1.1], [14, -11, 1.3], [-15, 9, 1]]) broadTree(g, x, z, s);
   ctx.valve = null;
+}
+
+/** Automated rain gauge plot. */
+function rainStation(ctx) {
+  const { g, m } = ctx;
+  add(g, new THREE.CircleGeometry(8, 48).rotateX(-Math.PI / 2), m.concrete, 0, 0.03, 0);
+  fence(g, [[-5.5, -5.5], [5.5, -5.5], [5.5, 5.5], [-5.5, 5.5], [-5.5, -5.5]], m);
+  rainGaugeUnit(g, -1.8, 1, m);
+  rainGaugeUnit(g, 0.2, 2, m);
+  dataCabinet(g, 2.4, 0.2, m);
+  add(g, cylinder(0.05, 0.07, 6.5, 10), m.steel, 1.2, 3.25, -3);
+  const p = add(g, new THREE.BoxGeometry(1.2, 0.05, 0.8), m.solar, 1.2, 5.3, -2.5);
+  p.rotation.x = 0.5;
+  anemometer(ctx, 1.2, 6.5, -3);
+  signBoard(g, 'AUTOMATED RAIN GAUGE', 'Naga City', 0, 1.3, 5.6, 2.4, '#10325f', '#ffffff');
+}
+
+/** Break-pressure tank on the gravity line. */
+function breakTank(ctx) {
+  const { g, m } = ctx;
+  add(g, rbox(3.2, 1.5, 2.4, 0.06), m.concrete, 0, 0.75, 0);
+  add(g, rbox(0.9, 0.1, 0.9, 0.02), m.darkSteel, 0.5, 1.55, 0);
+  add(g, cylinder(0.05, 0.05, 0.7, 10), m.pipe, -0.9, 1.85, 0.5);
+  const hood = add(g, new THREE.TorusGeometry(0.1, 0.05, 8, 14, Math.PI), m.pipe, -0.8, 2.2, 0.5);
+  hood.rotation.y = 0;
+  pipeRun(g, [[-3.5, 0.5, 0], [-1.6, 0.5, 0]], 0.08, m.pipeBlue);
+  pipeRun(g, [[1.6, 0.5, 0], [3.5, 0.5, 0]], 0.08, m.pipeBlue);
+  signBoard(g, 'BREAK-PRESSURE TANK', '', 0, 1, 1.23, 1.9, '#f7f7f2', '#20335e');
+}
+
+/** Valve chamber on a pipeline. */
+function valveChamber(ctx) {
+  const { g, m } = ctx;
+  add(g, rbox(2.2, 0.5, 2.2, 0.05), m.concrete, 0, 0.25, 0);
+  add(g, rbox(1.2, 0.07, 1.2, 0.02), m.darkSteel, 0, 0.53, 0);
+  add(g, cylinder(0.04, 0.04, 0.6, 8), m.steel, -0.7, 0.8, 0.7);
+  const w = add(g, new THREE.TorusGeometry(0.17, 0.03, 8, 20), m.pipeBlue, -0.7, 1.1, 0.7);
+  w.rotation.x = Math.PI / 2;
 }
 
 function solarWell(ctx) {
@@ -708,14 +846,14 @@ function farm(ctx) {
   for (const [x, z, h] of [[12, -3, 9], [-8, -6, 8]]) coconut(g, x, z, h, 0.6);
 }
 
-export const BUILDERS = { 'IN-01': springBox, 'AG-02': sentinel, 'KS-03': kiosk, 'MB-04': solarWell, 'RH-05': healthUnit, FARM: farm };
+export const BUILDERS = { 'IN-01': springBox, 'AG-02': sentinel, 'KS-03': kiosk, 'MB-04': solarWell, 'RH-05': healthUnit, FARM: farm, RAIN: rainStation, BPT: breakTank, CHAMBER: valveChamber };
 
 /** Build a facility. Returns its group and the parts the scene animates. */
 export function buildSite(id) {
   const m = materials();
   const g = new THREE.Group();
-  const ctx = { g, m, people: [], taps: [], valve: null, flag: null, beacon: null, lagoon: null };
-  if (id !== 'FARM') pad(g, id === 'RH-05' ? 34 : 19, m);
+  const ctx = { g, m, people: [], taps: [], spin: [], valve: null, flag: null, beacon: null, lagoon: null };
+  if (!['FARM', 'BPT', 'CHAMBER'].includes(id)) pad(g, id === 'RH-05' ? 34 : id === 'RAIN' ? 10 : 19, m);
   (BUILDERS[id] ?? kiosk)(ctx);
   return ctx;
 }

@@ -2,7 +2,7 @@ import { Suspense, lazy, useMemo, useRef, useState } from 'react';
 import {
   Activity, Box, Check, Clock, Compass, Crosshair, Droplets, FlaskConical, Layers, Lock, LockOpen, Minus, Pause, Plane, Play, Plus, RotateCcw, Search, Send, ShieldCheck, TriangleAlert, Truck, Users, X,
 } from 'lucide-react';
-import { usePoll } from '../api';
+import { get, usePoll } from '../api';
 import { EDGE_LABEL, fmt, fmtClock, fmtMin, stationStatus } from '../lib/format';
 import { AHEAD_S, PAST_S, exposure, fmtOffset } from '../lib/twinField';
 import { useTwinTime } from '../lib/useTwinTime';
@@ -124,7 +124,7 @@ function Tables({ live, tasks, quick, onPick }) {
   const [tab, setTab] = useState('intakes');
   const open = (tasks ?? []).filter((t) => t.status !== 'COMPLETED');
   const feed = live.events.filter((e) => e.type !== 'TRANSIT_CALIBRATION').slice(0, 12);
-  const tabs = [['intakes', 'Intakes', live.stations.filter((s) => s.valve).length], ['sensors', 'Sensors', live.stations.length], ['crews', 'Crew tasks', open.length], ['events', 'Events', feed.length]];
+  const tabs = [['intakes', 'Intakes', live.stations.filter((s) => s.valve).length], ['sensors', 'Sensors', live.stations.length], ['crews', 'Crew', open.length], ['events', 'Events', feed.length], ['river', 'River', live.reaches.length]];
   const line = 'flex w-full items-center gap-2 border-b border-line py-1.5 text-left text-xs last:border-0 hover:bg-panel-2';
   return (
     <div className={`${card} p-3`}>
@@ -152,6 +152,19 @@ function Tables({ live, tasks, quick, onPick }) {
             <span className="text-muted">{s.link?.rssi} dBm</span>
           </button>
         ))}
+        {tab === 'river' && (
+          <>
+            <div className="flex items-center justify-between border-b border-line py-1.5 text-xs"><span className="text-muted">Rain now</span><b>{fmt(live.rain_mm_hr, 1)} mm/h</b></div>
+            {live.reaches.map((r) => (
+              <div key={r.reach} className="flex items-center gap-2 border-b border-line py-1.5 text-xs last:border-0">
+                <span className="min-w-0 flex-1 truncate font-semibold">{r.reach}</span>
+                <span className="text-muted">{fmt(r.mean_velocity_mps, 2)} m/s</span>
+                <span className="text-muted">{fmt(r.depth_m, 2)} m deep</span>
+                <span className="text-muted">{fmtMin(r.travel_time_s)}</span>
+              </div>
+            ))}
+          </>
+        )}
         {tab === 'events' && (feed.length ? feed.map((e, i) => (
           <div key={`${e.t_ms}-${i}`} className="flex items-start gap-2 border-b border-line py-1.5 text-[11.5px] last:border-0">
             <span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${e.severity === 'danger' ? 'bg-critical' : e.severity === 'warning' ? 'bg-warning' : 'bg-civic'}`} />
@@ -174,8 +187,8 @@ function Tables({ live, tasks, quick, onPick }) {
 }
 
 const CATALOGUE = [
-  ['heatmap', 'Contamination risk'], ['flood', 'Flood-prone ground (our estimate)'], ['buildings', 'Real 3D buildings'], ['labels', 'Roads and place names'],
-  ['streams', 'Streams'], ['pipes', 'Gravity pipelines'], ['particles', 'River flow'], ['catchment', 'Watershed boundary'],
+  ['flood', 'Flood-prone ground (our estimate)'], ['heatmap', 'Contamination risk'], ['buildings', 'Real 3D buildings'], ['labels', 'Roads and place names'],
+  ['streams', 'Streams'], ['pipes', 'Gravity pipelines'], ['particles', 'Water flow'], ['catchment', 'Watershed'],
 ];
 
 function LayerMenu({ layers, setLayers, onClose }) {
@@ -212,6 +225,55 @@ function SearchBox({ live, tasks, onPick, go }) {
           {jobs.map((t) => <button key={t.id} onMouseDown={() => go('maintenance')} className="block w-full truncate rounded-lg px-2 py-1.5 text-left text-ink-2 hover:bg-panel-2">{t.station}: {t.title}</button>)}
         </div>
       )}
+    </div>
+  );
+}
+
+const FLOOD_CLASS = {
+  HIGH: ['High', 'pill-red', 'Very low ground right beside the river.'],
+  MEDIUM: ['Medium', 'pill-amber', 'Low ground near the river.'],
+  LOW: ['Low', 'pill-amber', 'A little above the river.'],
+  MINIMAL: ['Minimal', 'pill-good', 'Well above or far from the river.'],
+};
+
+/** Tap anywhere on the map to see what the terrain model says about that spot. */
+function HazardCard({ spot, onClose }) {
+  const c = spot?.flood_class ? FLOOD_CLASS[spot.flood_class] : null;
+  return (
+    <div className={`${card} p-3`}>
+      <div className="flex items-center justify-between">
+        <div className="font-display text-sm font-semibold">Check this location</div>
+        <button onClick={onClose} aria-label="Close location check" className="rounded p-0.5 text-muted hover:bg-panel-2"><X size={14} /></button>
+      </div>
+      {!spot && <p className="mt-1 text-xs text-muted">Checking…</p>}
+      {spot?.error && <p className="mt-1 text-xs text-ink-2">{spot.error}</p>}
+      {spot && !spot.error && (
+        <>
+          <div className="mt-1.5 flex items-center gap-2 text-xs">
+            <span className="text-muted">Flood-prone ground</span>
+            {c ? <span className={`pill ${c[1]}`}>{c[0]}</span> : <span className="pill pill-grey">Outside the watershed</span>}
+          </div>
+          {c && <p className="mt-1 text-xs text-ink-2">{c[2]}</p>}
+          <div className="mt-1">
+            <Row label="Elevation">{fmt(spot.elevation_m, 0)} m</Row>
+            {spot.height_above_river_m != null && <Row label="Height above river">{fmt(spot.height_above_river_m, 1)} m</Row>}
+            {spot.river_distance_m != null && <Row label="Distance to river">{spot.river_distance_m.toLocaleString()} m</Row>}
+            <Row label="Nearest water point">{spot.nearest_id} · {fmt(spot.nearest_km, 1)} km</Row>
+          </div>
+          <p className="mt-1.5 text-[10px] leading-snug text-muted">Estimate from a 90 m elevation model. Not an official hazard map.</p>
+        </>
+      )}
+    </div>
+  );
+}
+
+function FloodLegend() {
+  const items = [['#ffe05a', 'Low'], ['#fa9628', 'Medium'], ['#e0342c', 'High']];
+  return (
+    <div className={`${card} flex items-center gap-2.5 px-3 py-1.5 text-[11px] text-ink-2`}>
+      <span className="font-semibold text-ink">Flood-prone ground</span>
+      {items.map(([c, t]) => <span key={t} className="inline-flex items-center gap-1"><i className="h-2.5 w-3.5 rounded-sm" style={{ background: c }} />{t}</span>)}
+      <span className="text-muted">Our estimate</span>
     </div>
   );
 }
@@ -262,6 +324,13 @@ export default function CommandCenter({ live, forecast, tasks, staticData, heatm
   const [following, setFollowing] = useState(false);
   const [caption, setCaption] = useState(null);
   const { data: floodmap } = usePoll(layers.flood ? '/api/heatmap?index=flood' : null, 15000);
+  const [probe, setProbe] = useState(null);
+  const [spot, setSpot] = useState(null);
+  const checkSpot = useMemo(() => (at) => {
+    setProbe(at);
+    setSpot(null);
+    get(`/api/hazard?lat=${at.lat}&lon=${at.lon}`).then(setSpot).catch(() => setSpot({ error: 'That spot is outside the modelled area.' }));
+  }, []);
   const selected = live?.stations.find((s) => s.id === selectedId);
   const danger = live ? exposure(live) : null;
 
@@ -288,7 +357,7 @@ export default function CommandCenter({ live, forecast, tasks, staticData, heatm
         <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-muted">Building the watershed…</div>}>
           <TwinMapScene
             staticData={staticData} live={live} heatmap={heatmap} floodmap={floodmap} atTime={time.atTime} tauStep={time.tauStep} selectedId={selectedId}
-            onPick={pick} onInspect={onInspect} crewTask={crewTask} layers={layers} controls={controls} onTour={setTouring} onCaption={setCaption}
+            onPick={pick} onInspect={onInspect} crewTask={crewTask} layers={layers} controls={controls} onTour={setTouring} onCaption={setCaption} onProbe={checkSpot} probe={probe}
           />
         </Suspense>
       </div>
@@ -341,9 +410,11 @@ export default function CommandCenter({ live, forecast, tasks, staticData, heatm
               <div className="text-xs text-ink-2">{live.stations.find((s) => s.id === caption)?.note}</div>
             </div>
           )}
-          <div className="z-10 p-2 lg:absolute lg:left-3 lg:top-[146px] lg:w-[330px] lg:p-0">
+          <div className="z-10 grid gap-2 p-2 lg:absolute lg:left-3 lg:top-[146px] lg:w-[330px] lg:p-0">
             <ActionCard live={live} act={act} quick={quick} onPick={focus} />
+            {probe && <HazardCard spot={spot} onClose={() => { setProbe(null); setSpot(null); }} />}
           </div>
+          {layers.flood && <div className="absolute bottom-[34px] left-1/2 z-[9] hidden -translate-x-1/2 xl:block"><FloodLegend /></div>}
 
           {showInspector && selected && (
             <div className="z-10 p-2 lg:absolute lg:right-3 lg:top-[62px] lg:w-[296px] lg:p-0">

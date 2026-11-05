@@ -56,7 +56,8 @@ def compute_forecast(inp, profile=None):
     if profile is None:                                   # worker side: rebuild from the DEM
         from .hydrology import Terrain
         T = Terrain()
-        profile = T.path_profile(T.trace(*T.rc(*C.MAIN_STEM_HEAD)))
+        from . import rivers
+        profile = rivers.main_profile(T)
     fch = _forecast_channel(C.SITE_ID, profile)
     fch.n_mult = np.array(inp["n_mult"])
     fch.update(inp["runoff"])
@@ -475,8 +476,8 @@ class Twin:
     # =============================================================== heatmap
     def _prep_grid(self):
         T = self.terrain
-        outlet = T.rc(float(self.ch.lat[-1]), float(self.ch.lon[-1]))
-        self.catchment = T.catchment_mask(outlet)
+        from . import rivers
+        self.catchment = rivers.catchment(T, self.ch)
         rr, cc = np.nonzero(self.catchment)
         lat = T.north - rr * T.step
         lon = T.west + cc * T.step
@@ -549,6 +550,27 @@ class Twin:
         grid[self._grid_idx] = np.clip(val * 254 + 1, 1, 255).astype(np.uint8)
         return dict(index=index, north=T.north, south=T.south, west=T.west, east=T.east,
                     nrows=T.nrows, ncols=T.ncols, data=base64.b64encode(grid.tobytes()).decode())
+
+    def hazard_at(self, lat, lon):
+        """What the terrain model says about one spot. A screening estimate, not an official map."""
+        T = self.terrain
+        r = int(round((T.north - lat) / T.step))
+        c = int(round((lon - T.west) / T.step))
+        if not (0 <= r < T.nrows and 0 <= c < T.ncols):
+            raise ValueError("That spot is outside the modelled area.")
+        rr, cc = self._grid_idx
+        hit = np.nonzero((rr == r) & (cc == c))[0]
+        near = min(self.stations.values(), key=lambda s: np.hypot((s.lat - lat) * T.dy / T.step, (s.lon - lon) * T.dx / T.step))
+        out = dict(lat=lat, lon=lon, elevation_m=round(float(T.elev[r, c]), 1), slope_deg=round(float(T.slope_deg[r, c]), 1),
+                   in_catchment=bool(hit.size), nearest_id=near.id, nearest_name=near.cfg["name"],
+                   nearest_km=round(float(np.hypot((near.lat - lat) * T.dy / T.step, (near.lon - lon) * T.dx / T.step)) / 1000, 1))
+        if not hit.size:
+            return dict(out, flood_class=None, height_above_river_m=None, river_distance_m=None, drains_km2=None)
+        i = hit[0]
+        hand, dist = float(self._hand[i]), float(self._near_dist[i])
+        cls = "MINIMAL" if dist > 1500 or hand >= 8 else "HIGH" if hand < 2 else "MEDIUM" if hand < 5 else "LOW"
+        return dict(out, flood_class=cls, height_above_river_m=round(hand, 1), river_distance_m=int(round(dist, -1)),
+                    drains_km2=round(float(T.area_km2(r, c)), 2))
 
     def terrain_grid(self):
         """Elevation (int16 decimetres) and height above the river (uint8 quarter-metres,

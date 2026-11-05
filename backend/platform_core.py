@@ -16,6 +16,7 @@ from collections import deque
 from . import config as C
 from .edge import CMD, decode_uplink
 from .hydraulics import hazen_williams_q, pipe_route
+from . import rivers
 from .hydrology import Terrain
 from .ingest import DEV_EUI, normalise
 from .notify import Notifier
@@ -33,9 +34,8 @@ class Platform:
         self.mode = mode
         self.speed = C.SIM_SPEED
         self.terrain = Terrain()
-        head = self.terrain.rc(*C.MAIN_STEM_HEAD)
-        self.stem = self.terrain.trace(*head)
-        self.profile = self.terrain.path_profile(self.stem)
+        self.profile = rivers.main_profile(self.terrain)
+        self.stem = [self.terrain.rc(p["lat"], p["lon"]) for p in self.profile]
         self.events = deque(maxlen=300)
         self.notifier = Notifier()
         self.store = Store() if store else None
@@ -280,7 +280,10 @@ class Platform:
         out = []
         for p in C.PIPES:
             a, b = self.twin.stations[p["src"]], self.twin.stations[p["dst"]]
-            coords, length = pipe_route(self.terrain, (a.lat, a.lon), (b.lat, b.lon))
+            if rivers.main_line():
+                coords, length = rivers.pipe_along_river(self.terrain, self.profile, a.cfg["stem_index"], b.cfg["stem_index"])
+            else:
+                coords, length = pipe_route(self.terrain, (a.lat, a.lon), (b.lat, b.lon))
             head = a.elev + p.get("tank_head_m", 0.0) - b.elev - self.RESIDUAL_HEAD_M
             out.append(dict(p, coords=coords, length_m=round(length), static_head_m=round(head, 1)))
         return out
@@ -337,7 +340,7 @@ class Platform:
                          nrows=T.nrows, ncols=T.ncols, cell_m=[round(T.dx, 1), round(T.dy, 1)],
                          min_m=float(T.elev.min()), max_m=float(T.elev.max())),
                 catchment=dict(ring=ring, area_km2=round(float(self.twin.catchment.sum()) * T.cell_area / 1e6, 2)),
-                streams=T.stream_network(mask=self.twin.catchment),
+                streams=rivers.streams(T, self.twin.catchment, self.profile),
                 main_stem=[[p["lon"], p["lat"], p["z"], p["s"]] for p in self.profile],
                 rain_gauge=C.RAIN_GAUGE,
                 pnsdw=C.PNSDW,

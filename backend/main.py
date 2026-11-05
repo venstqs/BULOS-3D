@@ -79,6 +79,14 @@ async def heatmap(index: str = "risk"):
         _400(e)
 
 
+@app.get("/api/hazard")
+async def hazard(lat: float, lon: float):
+    try:
+        return P.twin.hazard_at(lat, lon)
+    except ValueError as e:
+        _400(e)
+
+
 @app.get("/api/terrain")
 async def terrain():
     return P.twin.terrain_grid()

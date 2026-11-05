@@ -29,6 +29,23 @@ void main(){
   gl_FragColor = vec4(c, smoothstep(1.0, 0.72, across));
 }`;
 
+/** A round pipe seen from above, with pulses of water moving along it. */
+export const PIPE_FRAG = `
+precision highp float;
+uniform float uTime; uniform float uFlow; uniform vec3 uTint;
+varying vec2 vUv;
+void main(){
+  float a = abs(vUv.y - 0.5) * 2.0;
+  float round_ = sqrt(max(0.0, 1.0 - a * a));
+  vec3 c = mix(vec3(0.12, 0.2, 0.42), vec3(0.74, 0.84, 0.97), round_ * round_);
+  float band = smoothstep(0.03, 0.0, abs(fract(vUv.x * 0.09) - 0.5));
+  c = mix(c, vec3(0.28, 0.36, 0.52), band * 0.7);
+  float p = fract(vUv.x * 0.32 - uTime * uFlow * 0.55);
+  float pulse = smoothstep(0.2, 0.0, abs(p - 0.5)) * step(0.001, uFlow) * round_;
+  c = mix(c, uTint, pulse);
+  gl_FragColor = vec4(c, smoothstep(1.0, 0.86, a));
+}`;
+
 export const RAIN_VERT = `
 attribute float aSeed; uniform float uTime; uniform float uTop; varying float vA;
 void main(){

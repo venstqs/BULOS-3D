@@ -68,6 +68,8 @@ SITES = {
         title="Naga City, Camarines Sur",
         subtitle="Mt. Isarog west slope → Naga City",
         main_stem_head=(13.6575, 123.3700),
+        # Real river (OpenStreetMap): Isarog slope to the Naga-Bicol confluence, as (lon, lat)
+        river=dict(head=(123.3228, 13.6578), outlet=(123.1803, 13.6164), max_area_km2=120.0),
         pipes=[
             dict(id="GL-1", name="Spring gravity line", src="IN-01", dst="KS-03", diameter_m=0.10,
                  material="HDPE", hw_c=140, source_yield_lps=6.0, control=None,

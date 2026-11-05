@@ -58,7 +58,7 @@ export default function App() {
   const [page, setPage] = useState(deepLink ? 'points' : 'home');
   const [selectedId, setSelectedId] = useState(deepLink ?? 'KS-03');
   const [inspectId, setInspectId] = useState(deepLink);
-  const [layers, setLayers] = useState({ heatmap: true, flood: false, particles: true, streams: true, pipes: true, columns: true, catchment: true, buildings: true, labels: true });
+  const [layers, setLayers] = useState({ heatmap: true, flood: true, particles: true, streams: true, pipes: true, columns: true, catchment: true, buildings: true, labels: true });
   const [dialog, setDialog] = useState(null);           // { kind, arg }
   const [toast, setToast] = useState(null);
   // Lite mode: no 3D map (for slow PCs or a crashing graphics driver). Remembered in this browser.
@@ -200,7 +200,7 @@ export default function App() {
 
       <footer className="mx-auto mt-8 max-w-[1560px] px-6 text-xs leading-relaxed text-muted">
         Bulos 3D prototype for the Xylem Global Student Innovation Challenge, Camarines Sur National High School. Not an official
-        government system. Elevation: Copernicus GLO-90 (ESA). Imagery © Esri. Water-point locations are an illustrative pilot layout;
+        government system. Elevation: Copernicus GLO-90 (ESA). Waterways and buildings © OpenStreetMap contributors. Imagery © Esri. Water-point locations are an illustrative pilot layout;
         standards follow PNSDW 2017.
       </footer>
       </>

@@ -53,13 +53,15 @@ All are **simulated**, from 12 randomised runs per case. Say "in simulation" eve
 
 | Event, recommended plan (sentinel + low-cost nodes) | Contaminated minutes blocked | Closed before arrival |
 |---|---|---|
-| Piggery lagoon spill | 88.9% | 86.1% |
-| Monsoon cloudburst | 95.2% | 84.8% |
+| Piggery lagoon spill | 93.1% | 91.7% |
+| Monsoon cloudburst | 97.8% | 95.8% |
 
-- The twin is what makes cheap sensors work: for spills, the same sensors block **49.2%** with node-only protection and **88.9%** with the twin.
-- The sentinel plan comes close to a biological sensor at every site (98.1%), with one sensor instead of five.
-- Without any biological sensor, spill blocking is only **52.6%**.
-- Median spill warning: **92 minutes** ahead, with a median arrival-time error of 17 minutes.
+- The twin is what makes cheap sensors work: for spills, the same sensors block **51.1%** with node-only protection and **93.1%** with the twin.
+- The sentinel plan comes close to a biological sensor at every site (98.7%), with one sensor instead of five.
+- Without any biological sensor, spill blocking is only **58.9%**.
+- Median spill warning: **99 minutes** ahead, with a median arrival-time error of 24 minutes.
+- Monsoon warning is shorter: a median of **19 minutes**, because rain reaches the whole river quickly.
+- The twin runs on the real Naga River (OpenStreetMap, 29.7 km), with elevation from the Copernicus 90 m model.
 - **0 false shut-offs** in 36 quiet runs and 36 dirty-sensor runs; all 36 dirty sensors were correctly identified.
 
 **Be upfront about:**
@@ -103,7 +105,7 @@ A quote or short letter from a barangay health worker, the City Health Office or
 | 1:10 | Simulate spill; AG-02 alert, ETA, SMS | "A piggery lagoon fails. The sentinel sees it. Before the plume reaches the kiosk, the twin predicts its arrival, warns the health worker and closes the intake." |
 | 1:45 | **Real bench node:** add soil, LED, valve closes, dashboard reacts | "This is real hardware. Dirty water, and the valve closes by itself, even with no internet." |
 | 2:10 | Dirty-sensor case | "A dirty probe looks like pollution. Bulos 3D tells them apart, so nobody loses water because of a false alarm." |
-| 2:25 | Results table | "In simulation, this affordable design blocked 89% of contaminated water time from a spill, with no false shut-offs in our tests. Next, we test against lab samples." |
+| 2:25 | Results table | "In simulation, this affordable design blocked 93% of contaminated water time from a spill, with no false shut-offs in our tests. Next, we test against lab samples." |
 | 2:45 | Phone app, rollout | "It runs on a phone, and a new river is a configuration change. Water safety shouldn't depend on being near a city." |
 
 ## 8. Put it online
