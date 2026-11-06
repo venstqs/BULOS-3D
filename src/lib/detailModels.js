@@ -67,9 +67,14 @@ const solarTex = () => canvasTex(256, 256, (g, w, h) => {
 const signTex = (text, bg, fg, sub) => canvasTex(512, 128, (g, w, h) => {
   g.fillStyle = bg; g.fillRect(0, 0, w, h);
   g.fillStyle = fg; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.font = `700 ${sub ? 50 : 62}px Sora, Arial, sans-serif`;
+  let size = sub ? 50 : 62;
+  do { g.font = `700 ${size}px Sora, Arial, sans-serif`; size -= 2; } while (g.measureText(text).width > w - 28 && size > 16);
   g.fillText(text, w / 2, sub ? 46 : h / 2);
-  if (sub) { g.font = '500 30px Inter, Arial, sans-serif'; g.fillText(sub, w / 2, 96); }
+  if (sub) {
+    size = 30;
+    do { g.font = `500 ${size}px Inter, Arial, sans-serif`; size -= 2; } while (g.measureText(sub).width > w - 28 && size > 12);
+    g.fillText(sub, w / 2, 96);
+  }
 });
 
 /* ---------------- shared materials, made once ---------------- */
@@ -448,14 +453,6 @@ function valveWheel(g, x, y, z, m) {
   return mat;
 }
 
-function sensorNode(g, x, z, m) {
-  add(g, cylinder(0.04, 0.05, 2.6, 10), m.steel, x, 1.3, z);
-  add(g, rbox(0.5, 0.62, 0.22, 0.04), m.tankWhite, x, 1.4, z + 0.13);
-  const p = add(g, new THREE.BoxGeometry(0.8, 0.03, 0.55), m.solar, x, 2.72, z);
-  p.rotation.x = 0.5;
-  add(g, cylinder(0.012, 0.012, 0.9, 6), m.darkSteel, x + 0.2, 3.1, z);
-}
-
 function kiosk(ctx) {
   const { g, m, people } = ctx;
   add(g, new THREE.CircleGeometry(15, 56).rotateX(-Math.PI / 2), m.concrete, 0, 0.03, 2);
@@ -489,7 +486,7 @@ function kiosk(ctx) {
   }
   add(g, rbox(6.4, 0.08, 1.2, 0.02), m.concrete, 2, 0.05, 7.2);
   ctx.valve = valveWheel(g, -4.2, 0.1, 5.2, m);
-  sensorNode(g, 6.6, 3.4, m);
+  sensorNode(ctx, 7.2, 1.2);
   // Bench
   add(g, rbox(2.4, 0.08, 0.5, 0.02), m.wood, 6.2, 0.5, 6.6);
   for (const x of [5.2, 7.2]) add(g, rbox(0.08, 0.46, 0.45, 0.01), m.darkSteel, x, 0.24, 6.6);
@@ -525,13 +522,114 @@ function springBox(ctx) {
   const pool = add(g, new THREE.CircleGeometry(3, 40).rotateX(-Math.PI / 2), m.water, -5.8, 0.05, 2);
   pool.scale.set(1, 1, 0.7);
   rocks(g, [[-8.6, 1, 1.1], [-8.4, 3.4, 0.8], [-6, -1, 1.2], [-3.4, 3.8, 0.7], [8, -3.2, 1.3], [6.5, 4.6, 0.8], [-9.6, -2.2, 1.5]]);
-  sensorNode(g, 5.2, -2.4, m);
+  sensorNode(ctx, 6.4, -3.4);
   ctx.valve = valveWheel(g, 4.4, 0.04, 2.6, m);
   const t = person({ shirt: '#f28c28', pants: '#37424f', hat: 'hard', mode: 'work' });
   t.position.set(4.3, 0.03, 3.3); t.rotation.y = Math.PI; people.push(t); g.add(t);
   const w = person({ shirt: '#3f7fd6', hat: 'farmer', carry: 'pack', mode: 'walk', path: [[-12, 8], [10, 10], [11, -6], [-12, 8]] });
   people.push(w); g.add(w);
   for (const [x, z, s] of [[-12, -6, 1.3], [-6, -9, 1.1], [3, -10, 1.4], [11, -8, 1.2], [14, 2, 1], [-14, 4, 1.1]]) broadTree(g, x, z, s);
+}
+
+/** The sensor bank at a water point: probes in a flow-through tray, with a live screen. */
+const PROBES = [['TURB', '#f0872e'], ['pH', '#34b36b'], ['ORP', '#8a63d2'], ['TDS', '#2f7fe0'], ['TEMP', '#d9483b']];
+
+function sensorNode(ctx, x, z, withBio = false) {
+  const { g, m } = ctx;
+  const s = new THREE.Group();
+  s.position.set(x, 0, z);
+  s.scale.setScalar(1.7);
+  add(s, rbox(3.1, 0.16, 1.9, 0.03), m.concrete, 0, 0.08, 0);
+  // Cabinet with a live screen
+  add(s, rbox(0.95, 1.45, 0.42, 0.04), m.steel, -0.95, 0.9, -0.5);
+  add(s, rbox(0.82, 0.08, 0.5, 0.02), m.darkSteel, -0.95, 1.66, -0.5);
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 200;
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  add(s, new THREE.PlaneGeometry(0.76, 0.6), new THREE.MeshBasicMaterial({ map: tex }), -0.95, 1.12, -0.285);
+  ctx.display = { c, tex };
+  for (let i = 0; i < 3; i += 1) add(s, new THREE.SphereGeometry(0.018, 8, 6), new THREE.MeshBasicMaterial({ color: ['#35e06a', '#35e06a', '#ffc533'][i] }), -1.22 + i * 0.07, 0.72, -0.285);
+  // Tray with sample water flowing through it
+  add(s, rbox(2, 0.2, 0.56, 0.02), m.steel, 0.5, 0.62, 0.3);
+  add(s, new THREE.BoxGeometry(1.86, 0.02, 0.42), m.water, 0.5, 0.72, 0.3);
+  for (const px of [-0.35, 1.35]) add(s, cylinder(0.03, 0.03, 0.55, 8), m.steel, px, 0.3, 0.3);
+  // Rail with one probe per measurement
+  const rail = add(s, cylinder(0.022, 0.022, 2.1, 8), m.darkSteel, 0.5, 1.25, 0.3);
+  rail.rotation.z = Math.PI / 2;
+  for (const px of [-0.5, 1.5]) add(s, cylinder(0.02, 0.02, 0.6, 8), m.darkSteel, px, 0.97, 0.3);
+  const list = withBio ? [...PROBES, ['TLF', '#f6c32c']] : PROBES;
+  list.forEach(([name, color], i) => {
+    const px = -0.3 + (1.6 / (list.length - 1)) * i;
+    const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.35, emissive: color, emissiveIntensity: name === 'TLF' ? 0.6 : 0.15 });
+    add(s, cylinder(0.024, 0.024, 0.46, 12), m.steel, px, 0.92, 0.3);
+    add(s, cylinder(0.042, 0.042, 0.13, 14), mat, px, 1.19, 0.3);
+    add(s, cylinder(0.008, 0.008, 0.34, 6), m.rubber, px, 1.4, 0.2).rotation.x = -0.4;
+    const tag = new THREE.MeshBasicMaterial({ map: signTex(name, color, '#ffffff'), transparent: false });
+    add(s, new THREE.PlaneGeometry(0.34, 0.085), tag, px, 1.42, 0.34);
+  });
+  // Pump, sample tube, power and telemetry
+  add(s, rbox(0.4, 0.3, 0.3, 0.04), m.pipeBlue, 1.3, 0.3, -0.5);
+  pipeRun(s, [[1.3, 0.3, -0.35], [1.5, 0.5, 0.05], [1.2, 0.76, 0.3]], 0.016, m.rubber);
+  pipeRun(s, [[1.3, 0.2, -0.65], [2.6, 0.1, -0.9], [5.5, 0.06, -1]], 0.022, m.rubber);
+  add(s, cylinder(0.05, 0.06, 3.6, 10), m.steel, -1.45, 1.8, -0.75);
+  const panel = add(s, rbox(1.3, 0.04, 0.85, 0.01), m.solar, -1.45, 3.45, -0.5);
+  panel.rotation.x = 0.5;
+  add(s, cylinder(0.012, 0.012, 1.1, 6), m.darkSteel, -1.2, 4, -0.75);
+  add(s, new THREE.SphereGeometry(0.035, 8, 6), new THREE.MeshBasicMaterial({ color: '#ff3b30' }), -1.2, 4.56, -0.75);
+  const tech = add(s, rbox(0.5, 0.05, 0.3, 0.01), m.pipeBlue, 0.5, 0.25, -0.5);
+  tech.visible = false;
+  g.add(s);
+  ctx.sensorAt = [x, z];
+}
+
+/** Redraw the screen on a sensor bank. */
+export function updateDisplay(ctx, st) {
+  const d = ctx.display;
+  if (!d || !st?.reading) return;
+  const g = d.c.getContext('2d');
+  const r = st.reading;
+  g.fillStyle = '#071a2f'; g.fillRect(0, 0, 256, 200);
+  g.fillStyle = '#35e06a'; g.font = '700 21px monospace'; g.fillText(`${st.id}  SIM`, 12, 26);
+  const rows = [['TURB', `${r.turbidity?.toFixed(1)} NTU`], ['pH', r.ph?.toFixed(2)], ['ORP', `${Math.round(r.orp)} mV`], ['TDS', `${Math.round(r.tds)} mg/L`], ['TEMP', `${r.temp?.toFixed(1)} C`]];
+  if (r.bio != null) rows.push(['TLF', `${r.bio.toFixed(1)} ppb`]);
+  g.font = '500 19px monospace';
+  rows.forEach(([k, v], i) => {
+    const y = 52 + i * 24;
+    g.fillStyle = '#7fd0ff'; g.fillText(k, 12, y);
+    g.fillStyle = '#ffffff'; g.fillText(v, 96, y);
+  });
+  d.tex.needsUpdate = true;
+}
+
+/** A pumping station of the real water district, placed at its mapped location. */
+function pumpStation(ctx) {
+  const { g, m } = ctx;
+  add(g, new THREE.CircleGeometry(9, 40).rotateX(-Math.PI / 2), m.concrete, 0, 0.03, 0);
+  building(g, 6, 4.4, 2.8, m.wallBlue, m.roofBlue, m, { winFront: 2, winBack: 1 });
+  door(g, 0, 2.23, 0, m);
+  polyTank(g, 1.3, 3.1, -5.2, 0.1, -0.5, m.tank);
+  add(g, cylinder(0.45, 0.55, 0.5, 18), m.concrete, 4.6, 0.25, 2.2);
+  add(g, rbox(1, 0.6, 0.7, 0.05), m.pipeBlue, 4.6, 0.8, 2.2);
+  pipeRun(g, [[3.2, 0.5, 1.8], [1.5, 0.5, 2.8], [-4, 0.5, 2], [-5.2, 0.5, 0.6]], 0.08, m.pipeBlue);
+  fence(g, [[-8, -5], [8, -5], [8, 6], [-8, 6], [-8, -5]], m);
+}
+
+/** An elevated water tower, placed at its mapped location. */
+function waterTower(ctx) {
+  const { g, m } = ctx;
+  add(g, new THREE.CircleGeometry(6, 36).rotateX(-Math.PI / 2), m.concrete, 0, 0.03, 0);
+  const H = 12;
+  for (const [x, z] of [[-1.8, -1.8], [1.8, -1.8], [-1.8, 1.8], [1.8, 1.8]]) add(g, cylinder(0.12, 0.17, H, 10), m.steel, x, H / 2, z);
+  for (const y of [3, 6, 9]) for (const [dx, dz, ry] of [[0, -1.8, 0], [0, 1.8, 0], [-1.8, 0, Math.PI / 2], [1.8, 0, Math.PI / 2]]) {
+    const b = add(g, cylinder(0.04, 0.04, 3.6, 8), m.steel, dx, y, dz);
+    b.rotation.z = Math.PI / 2;
+    b.rotation.y = ry;
+  }
+  add(g, cylinder(2.7, 2.7, 3.6, 30), m.tankWhite, 0, H + 1.8, 0);
+  add(g, new THREE.ConeGeometry(2.8, 0.9, 30), m.tank, 0, H + 4.05, 0);
+  add(g, cylinder(0.11, 0.11, H, 10), m.pipeBlue, 0, H / 2, 0);
+  ladder(g, 2.1, 0, 0, H + 3.6, Math.PI / 2, m);
 }
 
 /** Chain-link fence along a closed list of corner points. */
@@ -641,6 +739,7 @@ function sentinel(ctx) {
   anemometer(ctx, 5.6, 11.8, -3.6);
 
   // Instruments in the yard
+  sensorNode(ctx, -5.6, 3, true);
   rainGaugeUnit(g, -1.6, 3.2, m);
   dataCabinet(g, 1.2, 1.2, m);
   dataCabinet(g, 2.4, 1.2, m);
@@ -734,7 +833,7 @@ function solarWell(ctx) {
   add(g, cylinder(0.75, 0.85, 0.7, 20), m.concrete, -2, 0.35, 2.2);
   add(g, cylinder(0.18, 0.18, 1, 12), m.darkSteel, -2, 1.1, 2.2);
   ctx.valve = valveWheel(g, -0.8, 0.04, 2.2, m);
-  sensorNode(g, 7.4, 2.8, m);
+  sensorNode(ctx, 8.2, 4.2);
   signBoard(g, 'MB-04 SOLAR WELL', 'Barangay Water Association', 0.8, 1.6, 3.4, 2.8, '#f7f7f2', '#20335e');
   for (const x of [-1, 2.6]) add(g, cylinder(0.04, 0.04, 1.6, 8), m.wood, x - 0.3, 0.8, 3.4);
   const a = person({ shirt: '#3fa676', pants: '#5b4b3a', hat: 'farmer', mode: 'work' });
@@ -743,32 +842,6 @@ function solarWell(ctx) {
   people.push(b); g.add(b);
   for (const [x, z, h] of [[13, -7, 9], [-14, 2, 8], [11, 9, 10]]) coconut(g, x, z, h, 0.5);
   broadTree(g, -9, -10, 1.15);
-}
-
-function ambulance(g, x, z, rot, m) {
-  const a = new THREE.Group();
-  add(a, rbox(4.8, 1.75, 1.95, 0.22), m.white, 0, 1.3, 0);
-  add(a, rbox(1.6, 1.15, 1.9, 0.26), m.white, 2.7, 1.02, 0);
-  for (const s of [1, -1]) {
-    add(a, new THREE.BoxGeometry(0.75, 0.5, 0.03), m.glass, 2.85, 1.35, s * 0.96);
-    add(a, new THREE.BoxGeometry(4.6, 0.16, 0.03), m.red, 0, 1.02, s * 0.985);
-    add(a, new THREE.BoxGeometry(0.16, 0.56, 0.03), m.red, -0.6, 1.62, s * 0.985);
-    add(a, new THREE.BoxGeometry(0.56, 0.16, 0.03), m.red, -0.6, 1.62, s * 0.985);
-  }
-  add(a, new THREE.BoxGeometry(0.03, 0.55, 1.6), m.glass, 3.5, 1.38, 0);
-  add(a, rbox(0.9, 0.16, 0.3, 0.04), m.red, 1.1, 2.25, 0);
-  for (const [wx, wz] of [[2.2, 1], [2.2, -1], [-1.4, 1], [-1.4, -1]]) wheel(a, wx, wz, 0.4, m);
-  a.position.set(x, 0, z);
-  a.rotation.y = rot;
-  g.add(a);
-}
-
-function wheel(g, x, z, r, m) {
-  const t = add(g, cylinder(r, r, 0.26, 28), m.rubber, x, r, z);
-  t.rotation.x = Math.PI / 2;
-  const h = add(g, cylinder(r * 0.56, r * 0.56, 0.28, 18), m.steel, x, r, z);
-  h.rotation.x = Math.PI / 2;
-  return t;
 }
 
 function healthUnit(ctx) {
@@ -799,10 +872,9 @@ function healthUnit(ctx) {
   flag.position.set(-14, 8.4, 9);
   g.add(flag);
   ctx.flag = flag;
-  ambulance(g, 6.5, 8.5, 0.2, m);
   polyTank(g, 1.2, 2.2, 15.6, 0.1, 6.8, m.tank);
   ctx.valve = valveWheel(g, 13.5, 0.04, 7.8, m);
-  sensorNode(g, 15.8, 9.8, m);
+  sensorNode(ctx, 17, 11);
   const nurse = (x, z, ry, mode, path) => {
     const p = person({ shirt: '#7dd0c3', pants: '#7dd0c3', long: Math.random() > 0.4, carry: 'clipboard', mode, path, speed: 1 });
     p.position.set(x, 0.03, z); p.rotation.y = ry; people.push(p); g.add(p);
@@ -846,39 +918,16 @@ function farm(ctx) {
   for (const [x, z, h] of [[12, -3, 9], [-8, -6, 8]]) coconut(g, x, z, h, 0.6);
 }
 
-export const BUILDERS = { 'IN-01': springBox, 'AG-02': sentinel, 'KS-03': kiosk, 'MB-04': solarWell, 'RH-05': healthUnit, FARM: farm, RAIN: rainStation, BPT: breakTank, CHAMBER: valveChamber };
+export const BUILDERS = { 'IN-01': springBox, 'AG-02': sentinel, 'KS-03': kiosk, 'MB-04': solarWell, 'RH-05': healthUnit, FARM: farm, RAIN: rainStation, BPT: breakTank, CHAMBER: valveChamber, PUMP: pumpStation, TOWER: waterTower };
 
 /** Build a facility. Returns its group and the parts the scene animates. */
 export function buildSite(id) {
   const m = materials();
   const g = new THREE.Group();
   const ctx = { g, m, people: [], taps: [], spin: [], valve: null, flag: null, beacon: null, lagoon: null };
-  if (!['FARM', 'BPT', 'CHAMBER'].includes(id)) pad(g, id === 'RH-05' ? 34 : id === 'RAIN' ? 10 : 19, m);
+  if (!['FARM', 'BPT', 'CHAMBER', 'PUMP', 'TOWER'].includes(id)) pad(g, id === 'RH-05' ? 34 : id === 'RAIN' ? 10 : 19, m);
   (BUILDERS[id] ?? kiosk)(ctx);
   return ctx;
-}
-
-/** A service pickup with a water-crew bed and a flashing beacon. */
-export function crewTruck() {
-  const m = materials();
-  const g = new THREE.Group();
-  add(g, rbox(5.2, 0.55, 1.95, 0.1), m.white, 0, 0.72, 0);
-  add(g, rbox(2.25, 1.05, 1.9, 0.22), m.tank, 0.9, 1.45, 0);
-  for (const s of [1, -1]) add(g, new THREE.BoxGeometry(1.5, 0.52, 0.03), m.glass, 0.95, 1.55, s * 0.95);
-  add(g, new THREE.BoxGeometry(0.03, 0.56, 1.6), m.glass, 2.03, 1.55, 0);
-  add(g, rbox(2.5, 0.62, 0.08, 0.02), m.white, -1.5, 1.28, 0.93);
-  add(g, rbox(2.5, 0.62, 0.08, 0.02), m.white, -1.5, 1.28, -0.93);
-  add(g, rbox(0.08, 0.62, 1.9, 0.02), m.white, -2.72, 1.28, 0);
-  polyTank(g, 0.55, 0.85, -1.5, 0.98, 0, m.tank);
-  for (const [x, z] of [[1.7, 1], [1.7, -1], [-1.5, 1], [-1.5, -1]]) wheel(g, x, z, 0.42, m);
-  const beacon = add(g, rbox(0.8, 0.12, 0.24, 0.05), new THREE.MeshBasicMaterial({ color: '#ffb300' }), 0.9, 2.04, 0);
-  const headlights = new THREE.MeshBasicMaterial({ color: '#fff4c2' });
-  for (const s of [0.68, -0.68]) add(g, new THREE.SphereGeometry(0.11, 12, 10), headlights, 2.6, 0.86, s);
-  const driver = person({ shirt: '#f28c28', hat: 'hard', mode: 'idle' });
-  driver.position.set(0.9, 0.42, 0.34);
-  driver.rotation.y = Math.PI / 2;
-  g.add(driver);
-  return { g, beacon, driver };
 }
 
 export function setNightGlow(k) {

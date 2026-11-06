@@ -150,3 +150,131 @@ def pipe_along_river(T, profile, a, b, n=40):
         pts.append((round(lon, 6), round(lat, 6), round(float(T.elev[r, c]), 1)))
     total = sum(_metres(p, q) for p, q in zip(pts, pts[1:])) * 1.10      # bends and fittings
     return pts, total
+
+
+@lru_cache(maxsize=1)
+def _roads():
+    """Largest connected piece of the mapped road network, as an adjacency dict."""
+    path = DATA / f"roads_{C.SITE_ID}.json"
+    if not path.exists():
+        return None
+    graph = {}
+    for w in json.loads(path.read_text(encoding="utf-8"))["ways"]:
+        cost = 1.35 if w["kind"] in ("service", "track") else 1.0     # mains favour proper streets
+        for a, b in zip(w["coords"], w["coords"][1:]):
+            ka, kb = tuple(a), tuple(b)
+            d = _metres(a, b) * cost
+            graph.setdefault(ka, {})[kb] = d
+            graph.setdefault(kb, {})[ka] = d
+    seen, best = set(), set()
+    for start in graph:
+        if start in seen:
+            continue
+        part, stack = {start}, [start]
+        while stack:
+            for v in graph[stack.pop()]:
+                if v not in part:
+                    part.add(v)
+                    stack.append(v)
+        seen |= part
+        if len(part) > len(best):
+            best = part
+    return {k: graph[k] for k in best}
+
+
+def road_route(a, b):
+    """Shortest road path between two (lon, lat) points, including the short links to the road."""
+    graph = _roads()
+    if not graph:
+        return None
+    nearest = lambda p: min(graph, key=lambda k: (k[0] - p[0]) ** 2 + (k[1] - p[1]) ** 2)
+    start, goal = nearest(a), nearest(b)
+    dist, prev, queue = {start: 0.0}, {}, [(0.0, start)]
+    while queue:
+        d, u = heapq.heappop(queue)
+        if u == goal:
+            break
+        if d > dist[u]:
+            continue
+        for v, length in graph[u].items():
+            if d + length < dist.get(v, math.inf):
+                dist[v], prev[v] = d + length, u
+                heapq.heappush(queue, (d + length, v))
+    line = [goal]
+    while line[-1] != start:
+        line.append(prev[line[-1]])
+    return [tuple(a)] + line[::-1] + [tuple(b)]
+
+
+def pipe_along_roads(T, a, b):
+    """A water main laid along the real streets between two (lat, lon) points."""
+    line = road_route((a[1], a[0]), (b[1], b[0]))
+    if line is None:
+        return None
+    pts = []
+    for lon, lat in line:
+        r, c = _cell(T, lat, lon)
+        pts.append((round(lon, 6), round(lat, 6), round(float(T.elev[r, c]), 1)))
+    return pts, sum(_metres(p, q) for p, q in zip(pts, pts[1:])) * 1.05
+
+
+@lru_cache(maxsize=1)
+def water_assets():
+    path = DATA / f"water_assets_{C.SITE_ID}.json"
+    return json.loads(path.read_text(encoding="utf-8"))["assets"] if path.exists() else []
+
+
+@lru_cache(maxsize=1)
+def places():
+    path = DATA / f"places_{C.SITE_ID}.json"
+    return json.loads(path.read_text(encoding="utf-8"))["places"] if path.exists() else []
+
+
+REACH_M = 6000.0                         # a barangay further than this by road counts as unserved
+
+
+def _from_source(graph, start):
+    """Road distance from one node to everything within reach."""
+    dist, prev, queue = {start: 0.0}, {}, [(0.0, start)]
+    while queue:
+        d, u = heapq.heappop(queue)
+        if d > dist[u] or d > REACH_M:
+            continue
+        for v, length in graph[u].items():
+            if d + length < dist.get(v, math.inf):
+                dist[v], prev[v] = d + length, u
+                heapq.heappush(queue, (d + length, v))
+    return dist, prev
+
+
+def water_network(stations, assets):
+    """
+    A proposed distribution network: each barangay is joined along real roads to its nearest
+    water source. Returns (lines, access rows). No real pipe data exists for this layer.
+    """
+    graph = _roads()
+    if not graph:
+        return [], []
+    keys = list(graph)
+    arr = np.array(keys)
+    snap = lambda lon, lat: keys[int(np.argmin((arr[:, 0] - lon) ** 2 + (arr[:, 1] - lat) ** 2))]
+    sources = [(s.id, s.cfg["name"], s.lon, s.lat) for s in stations if s.cfg.get("valve")]
+    sources += [(a["name"] or a["kind"].replace("_", " ").title(), a["name"] or "Water facility", a["lon"], a["lat"])
+                for a in assets if a["kind"] in ("pumping_station", "water_tower")]
+    runs = [(sid, name, snap(lon, lat), _from_source(graph, snap(lon, lat))) for sid, name, lon, lat in sources]
+    lines, rows = [], []
+    for p in places():
+        node = snap(p["lon"], p["lat"])
+        reached = [(r[3][0][node], r) for r in runs if node in r[3][0]]
+        if not reached:
+            rows.append(dict(name=p["name"], lat=p["lat"], lon=p["lon"], source=None, road_km=None))
+            continue
+        d, (sid, name, start, (_, prev)) = min(reached, key=lambda x: x[0])
+        path = [node]
+        while path[-1] != start:
+            path.append(prev[path[-1]])
+        rows.append(dict(name=p["name"], lat=p["lat"], lon=p["lon"], source=sid, source_name=name, road_km=round(d / 1000, 1)))
+        if len(path) > 1:
+            lines.append(dict(to=p["name"], source=sid, coords=[[q[0], q[1]] for q in path]))
+    return lines, rows
+

@@ -142,3 +142,6 @@ main .grid > *, main .flex > * { min-width: 0; }
   .data th, .data td { padding: 8px; white-space: nowrap; }
   .data td:first-child { white-space: normal; min-width: 130px; }
 }
+
+/* The label button on the 3D map; the pin from a location check stays */
+.hide-map-labels .maplibregl-marker:not(.keep-on-map) { display: none !important; }

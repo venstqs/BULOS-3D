@@ -48,23 +48,24 @@ const SCENARIO_STARTED = {
 
 export default function App() {
   const { data: staticData } = usePoll('/api/static', 0);
-  const { data: live, status, refresh } = usePoll('/api/state', 1000);
-  const { data: forecast } = usePoll('/api/forecast', 4000);
+  // The page in view decides what is fetched: each request also redraws the app
+  const [page, setPage] = useState(() => (new URLSearchParams(window.location.search).get('inspect') ? 'points' : 'home'));
+  const { data: live, status, refresh } = usePoll('/api/state', page === 'home' ? 2500 : 1500);
+  const { data: forecast } = usePoll('/api/forecast', 8000);
   const [heatIndex, setHeatIndex] = useState('risk');
-  const { data: heatmap } = usePoll(`/api/heatmap?index=${heatIndex}`, 4000);
-  const { data: maint, refresh: refreshMaint } = usePoll('/api/maintenance', 3000);
-  const { data: trend } = usePoll('/api/trend?hours=12&bucket_min=30', 15000);
+  const { data: heatmap } = usePoll(page === 'map' ? `/api/heatmap?index=${heatIndex}` : null, 6000);
+  const { data: maint, refresh: refreshMaint } = usePoll('/api/maintenance', 10000);
+  const { data: trend } = usePoll(page === 'overview' ? '/api/trend?hours=12&bucket_min=30' : null, 15000);
   const deepLink = new URLSearchParams(window.location.search).get('inspect');
-  const [page, setPage] = useState(deepLink ? 'points' : 'home');
   const [selectedId, setSelectedId] = useState(deepLink ?? 'KS-03');
   const [inspectId, setInspectId] = useState(deepLink);
-  const [layers, setLayers] = useState({ heatmap: true, flood: true, particles: true, streams: true, pipes: true, columns: true, catchment: true, buildings: true, labels: true });
+  const [layers, setLayers] = useState({ heatmap: true, particles: true, streams: true, pipes: true, columns: true, catchment: true, buildings: true, labels: true, assets: true });
   const [dialog, setDialog] = useState(null);           // { kind, arg }
   const [toast, setToast] = useState(null);
   // Lite mode: no 3D map (for slow PCs or a crashing graphics driver). Remembered in this browser.
   const [lite, setLiteState] = useState(() => !hasWebGL || localStorage.getItem('bulos-lite') === '1');
   const setLite = useCallback((v) => { localStorage.setItem('bulos-lite', v ? '1' : '0'); setLiteState(v); }, []);
-  const { data: history } = usePoll(`/api/history/${selectedId}?minutes=360`, 5000);
+  const { data: history } = usePoll(page === 'points' ? `/api/history/${selectedId}?minutes=360` : null, 5000);
 
   const selected = useMemo(() => live?.stations.find((s) => s.id === selectedId), [live, selectedId]);
   const inspected = useMemo(() => live?.stations.find((s) => s.id === inspectId), [live, inspectId]);
@@ -124,8 +125,8 @@ export default function App() {
         <ErrorBoundary label="The 3D command view" onDisable={() => setLite(true)}>
           <Suspense fallback={<div className="flex h-screen items-center justify-center text-sm text-muted">Loading Bulos 3D…</div>}>
             <CommandCenter
-              live={live} forecast={forecast} tasks={maint?.tasks} staticData={staticData} heatmap={heatmap} layers={layers} setLayers={setLayers} status={status} selectedId={selectedId}
-              onSelect={setSelectedId} onInspect={onInspect} onDetails={openPoint} act={act} quick={quick} pages={PAGES} page={page} go={go}
+              live={live} forecast={forecast} tasks={maint?.tasks} staticData={staticData} layers={layers} setLayers={setLayers} status={status} selectedId={selectedId}
+              onSelect={setSelectedId} onInspect={onInspect} onDetails={openPoint} act={act} quick={quick} notify={notify} pages={PAGES} page={page} go={go}
               actions={(
                 <>
                   <AlertBell live={live} go={go} />

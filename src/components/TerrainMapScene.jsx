@@ -36,9 +36,8 @@ function rasterUrl(grid, ramp) {
   return canvas.toDataURL();
 }
 const riskRamp = (t) => [250 - 60 * t, 200 - 170 * t, 120 - 90 * t, t < 0.04 ? 0 : 40 + 190 * t ** 0.8];
-const floodRamp = (t) => [120 - 95 * t, 190 - 110 * t, 245, t < 0.12 ? 0 : 50 + 170 * t];
 
-export default function TerrainMapScene({ staticData, live, heatmap, floodmap, selectedId, onSelect, onInspect, layers, tauStep, atTime, controls, onTour }) {
+export default function TerrainMapScene({ staticData, live, heatmap, selectedId, onSelect, onInspect, layers, tauStep, atTime, controls, onTour }) {
   const host = useRef(null);
   const mapRef = useRef(null);
   const markers = useRef({});
@@ -209,8 +208,7 @@ export default function TerrainMapScene({ staticData, live, heatmap, floodmap, s
       map.addLayer({ id, type: 'raster', source: id, paint: { 'raster-opacity': opacity } }, 'catchment');
     };
     drape('heat', heatmap, riskRamp, layers.heatmap && tauStep === 0, 0.85);
-    drape('floodmap', floodmap, floodRamp, Boolean(layers.flood), 0.8);
-  }, [heatmap, floodmap, layers.heatmap, layers.flood, tauStep, ready]);
+  }, [heatmap, layers.heatmap, tauStep, ready]);
 
   return (
     <div className="absolute inset-0">

@@ -174,7 +174,7 @@ const seq = (t) => ['#f3f6f9', '#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#1c5
 
 export function MapPage({ live, staticData, map, layers, setLayers, onOpen, heatIndex, setHeatIndex }) {
   const toggle = (k) => setLayers((l) => ({ ...l, [k]: !l[k] }));
-  const items = [['heatmap', 'Contamination risk heatmap'], ['flood', 'Flood-prone ground (our estimate)'], ['particles', 'Animated water flow'], ['pipes', 'Gravity pipelines'], ['columns', 'Risk columns'], ['streams', 'Streams from the elevation model'], ['catchment', 'Watershed boundary']];
+  const items = [['heatmap', 'Contamination risk heatmap'], ['particles', 'Animated water flow'], ['pipes', 'Gravity pipelines'], ['columns', 'Risk columns'], ['streams', 'Streams from the elevation model'], ['catchment', 'Watershed boundary']];
   return (
     <div className="grid gap-4">
     <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">

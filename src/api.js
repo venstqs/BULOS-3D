@@ -37,7 +37,7 @@ export function usePoll(path, intervalMs) {
   const have = useRef(false);
 
   const refresh = useCallback(async () => {
-    if (!path || busy.current) return;
+    if (!path || busy.current || (document.hidden && have.current)) return;   // nothing to update on a hidden tab
     busy.current = true;
     try {
       setData(await get(path));

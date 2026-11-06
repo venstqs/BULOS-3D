@@ -4,6 +4,7 @@ Bulos 3D API.
     python -m uvicorn backend.main:app --port 8000
     BULOS_DATA_SOURCE=live  ...   to run on real uplinks only (no virtual field)
 """
+import numpy as np
 import asyncio
 import json
 import os
@@ -13,8 +14,10 @@ from typing import List, Literal, Optional
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from pydantic import BaseModel, Field
 
+from .weather import live_weather
 from . import config as C
 from . import ingest
 from .platform_core import Platform
@@ -43,6 +46,7 @@ async def lifespan(_app):
 
 app = FastAPI(title="Bulos 3D API", version="3.0.0", lifespan=lifespan,
               description="Water-quality digital twin for rural gravity-fed networks.")
+app.add_middleware(GZipMiddleware, minimum_size=1500)      # map data shrinks to a fraction of its size
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
@@ -83,6 +87,34 @@ async def heatmap(index: str = "risk"):
 async def hazard(lat: float, lon: float):
     try:
         return P.twin.hazard_at(lat, lon)
+    except ValueError as e:
+        _400(e)
+
+
+@app.get("/api/weather")
+async def weather():
+    lat, lon = float(np.mean(P.twin.ch.lat)), float(np.mean(P.twin.ch.lon))
+    return await asyncio.to_thread(live_weather, lat, lon)
+
+
+class SpillReq(BaseModel):
+    lat: float
+    lon: float
+
+
+@app.post("/api/spill")
+async def spill(req: SpillReq):
+    try:
+        km = P.spill_at(req.lat, req.lon)
+    except ValueError as e:
+        _400(e)
+    return dict(ok=True, km=round(km, 1), message=f"Spill simulated in the river at {km:.1f} km. Watch which sensors catch it.")
+
+
+@app.get("/api/layer/{name}")
+async def layer(name: str):
+    try:
+        return P.layer_grid(name)
     except ValueError as e:
         _400(e)
 

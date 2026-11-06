@@ -1,6 +1,5 @@
 import { Suspense, lazy, useCallback, useRef, useState } from 'react';
 import { Layers, Pause, Play, Plane, RotateCcw, X } from 'lucide-react';
-import { usePoll } from '../api';
 import { AHEAD_S, PAST_S, exposure, fmtOffset } from '../lib/twinField';
 import { useTwinTime } from '../lib/useTwinTime';
 
@@ -13,7 +12,7 @@ const ENGINES = {
 const ENGINE_KEY = 'bulos-engine';
 
 const CATALOGUE = [
-  ['Hazard', [['heatmap', 'Contamination risk'], ['flood', 'Flood-prone ground']]],
+  ['Water quality', [['heatmap', 'Contamination risk']]],
   ['Water', [['particles', 'River and pipe flow'], ['streams', 'Streams'], ['pipes', 'Gravity pipelines']]],
   ['Context', [['columns', 'Risk columns'], ['catchment', 'Watershed boundary']]],
 ];
@@ -39,11 +38,6 @@ function LayerPanel({ engine, layers, setLayers, onClose }) {
       <div className="mt-3 border-t border-line pt-2">
         <div className="h-1.5 rounded" style={{ background: 'linear-gradient(90deg, rgb(64,184,255), rgb(150,120,90), rgb(190,30,30))' }} />
         <div className="mt-0.5 flex justify-between text-[10px] text-muted"><span>clean water</span><span>polluted</span></div>
-        {layers.flood && (
-          <p className="mt-2 text-[10px] leading-snug text-muted">
-            Flood-prone ground is our estimate from the 90 m elevation model. It is not an official hazard map.
-          </p>
-        )}
         <p className="mt-2 text-[10px] leading-snug text-muted">
           {engine === 'water' ? 'Water widths, flow speed and terrain height are exaggerated so they can be seen.' : 'Flow is sped up so it can be seen.'}
         </p>
@@ -59,7 +53,6 @@ export default function TwinView({ staticData, live, forecast, heatmap, selected
   });
   const setEngine = useCallback((e) => { localStorage.setItem(ENGINE_KEY, e); setEngineState(e); }, []);
   const time = useTwinTime(live, forecast);
-  const { data: floodmap } = usePoll(layers.flood && engine !== 'water' ? '/api/heatmap?index=flood' : null, 15000);
   const [showLayers, setShowLayers] = useState(false);
   const [touring, setTouring] = useState(false);
   const controls = useRef({});                       // the active engine fills in home, startTour, stopTour
@@ -76,7 +69,7 @@ export default function TwinView({ staticData, live, forecast, heatmap, selected
     <div className="relative h-full w-full">
       <Suspense fallback={<div className="flex h-full items-center justify-center bg-panel-2 text-sm text-muted">Loading {ENGINES[engine].label}…</div>}>
         <Scene
-          key={engine} staticData={staticData} live={live} heatmap={heatmap} floodmap={floodmap} selectedId={selectedId}
+          key={engine} staticData={staticData} live={live} heatmap={heatmap} selectedId={selectedId}
           onSelect={onSelect} onInspect={onInspect} layers={layers} tauStep={tauStep} atTime={time.atTime}
           controls={controls} onTour={setTouring}
         />

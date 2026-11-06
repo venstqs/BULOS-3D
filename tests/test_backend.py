@@ -269,24 +269,12 @@ def test_reset_restores_the_demo():
     assert p.world.nodes["KS-03"]["tank_l"] > 0.8 * C.STATIONS[2]["tank"]["capacity_l"]
 
 
-def test_flood_layer_is_low_ground_beside_the_river():
-    p = Platform(store=False)
-    g = np.frombuffer(base64.b64decode(p.twin.risk_grid("flood")["data"]), np.uint8)
-    inside = g[g > 0]
-    assert inside.size and inside.max() > 100          # some ground is flagged
-    assert np.mean(inside > 100) < 0.5                 # but not the whole catchment
-    with pytest.raises(ValueError):
-        p.twin.risk_grid("nonsense")
-
-
 def test_terrain_grid_matches_the_dem():
     p = Platform(store=False)
     g = p.twin.terrain_grid()
     elev = np.frombuffer(base64.b64decode(g["elev"]), "<i2")
-    hand = np.frombuffer(base64.b64decode(g["hand"]), np.uint8)
-    assert elev.size == hand.size == g["nrows"] * g["ncols"]
+    assert elev.size == g["nrows"] * g["ncols"]
     assert elev.max() / 10 > 500                       # the mountain is there
-    assert (hand < 255).any() and (hand == 255).any()  # catchment cells and outside cells
 
 
 def test_reset_clears_the_twin_as_well_as_the_field():
@@ -305,7 +293,30 @@ def test_hazard_check_at_a_point():
     st = p.twin.stations["KS-03"]
     h = p.twin.hazard_at(st.lat, st.lon)
     assert h["in_catchment"] and h["nearest_id"] == "KS-03" and h["nearest_km"] < 0.2
-    assert h["flood_class"] in ("HIGH", "MEDIUM", "LOW", "MINIMAL")
+    assert h["river_distance_m"] is not None
     with pytest.raises(ValueError):
         p.twin.hazard_at(0.0, 0.0)
+
+
+def test_pipes_follow_real_roads_and_spill_anywhere():
+    p = Platform(store=False)
+    if C.SITE_ID == "naga":                            # only this site has a road file
+        for pipe in p.pipes:
+            assert len(pipe["coords"]) > 12 and pipe["length_m"] > 500
+    km = p.spill_at(float(p.twin.ch.lat[60]), float(p.twin.ch.lon[60]))
+    assert 0 < km < 29 and len(p.world.spills) == 1
+
+
+def test_screening_layers_and_network():
+    p = Platform(store=False)
+    for name in ("runoff", "wells", "access"):
+        g = p.layer_grid(name)
+        assert g["nrows"] * g["ncols"] == len(base64.b64decode(g["data"]))
+    with pytest.raises(ValueError):
+        p.layer_grid("nonsense")
+    wells = np.frombuffer(base64.b64decode(p.layer_grid("wells")["data"]), np.uint8).reshape(p.terrain.elev.shape)
+    assert not (wells[p.terrain.elev > 110] > 1).any()  # no well exposure high on the mountain
+    if C.SITE_ID == "naga":
+        lines, rows = p._network()
+        assert len(lines) > 20 and len(rows) > 50
 

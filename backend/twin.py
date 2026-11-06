@@ -490,11 +490,9 @@ class Twin:
         wet = np.log1p(T.acc[rr, cc]) / np.log1p(T.acc.max())
         steep = np.clip(T.slope_deg[rr, cc] / 30, 0, 1)
         self._runoff_potential = np.clip(0.5 * wet + 0.5 * steep, 0, 1)
-        # Height above the nearest river point: low ground beside the channel floods first.
-        # A terrain screening estimate from the 90 m DEM, not an official hazard map.
+        # Height above the nearest river point: shallow wells on low ground draw in river water
         hand = np.clip(T.elev[rr, cc] - self.ch.z[self._near_cell], 0, None)
         self._hand = hand
-        self._flood_potential = np.clip(1 - hand / 8.0, 0, 1) * np.exp(-self._near_dist / 1500)
 
     HEAT_INDICES = ("risk", "turbidity", "ph", "tds", "bio")
 
@@ -515,11 +513,9 @@ class Twin:
 
     def risk_grid(self, index="risk"):
         """uint8 hazard raster over the DEM grid (0 = none / outside catchment), base64."""
-        if index not in (*self.HEAT_INDICES, "flood"):
-            raise ValueError(f"index must be one of {self.HEAT_INDICES} or flood")
+        if index not in self.HEAT_INDICES:
+            raise ValueError(f"index must be one of {self.HEAT_INDICES}")
         T = self.terrain
-        if index == "flood":                       # brightens as rain falls on the catchment
-            return self._grid(index, self._flood_potential * (0.55 + 0.45 * np.clip(self.runoff_rain / 40, 0, 1)))
         creek = [st for st in self.stations.values() if not st.aquifer]
         if index == "risk":
             chan = 1 - (1 - np.clip(self.tr.c[TURB] / 40, 0, 1) * 0.7) * (1 - np.clip(self.tr.c[ORP] / 200, 0, 1) * 0.8) \
@@ -565,23 +561,18 @@ class Twin:
                    in_catchment=bool(hit.size), nearest_id=near.id, nearest_name=near.cfg["name"],
                    nearest_km=round(float(np.hypot((near.lat - lat) * T.dy / T.step, (near.lon - lon) * T.dx / T.step)) / 1000, 1))
         if not hit.size:
-            return dict(out, flood_class=None, height_above_river_m=None, river_distance_m=None, drains_km2=None)
+            return dict(out, height_above_river_m=None, river_distance_m=None, drains_km2=None)
         i = hit[0]
         hand, dist = float(self._hand[i]), float(self._near_dist[i])
-        cls = "MINIMAL" if dist > 1500 or hand >= 8 else "HIGH" if hand < 2 else "MEDIUM" if hand < 5 else "LOW"
-        return dict(out, flood_class=cls, height_above_river_m=round(hand, 1), river_distance_m=int(round(dist, -1)),
+        return dict(out, height_above_river_m=round(hand, 1), river_distance_m=int(round(dist, -1)),
                     drains_km2=round(float(T.area_km2(r, c)), 2))
 
     def terrain_grid(self):
-        """Elevation (int16 decimetres) and height above the river (uint8 quarter-metres,
-        255 = outside the catchment), both base64, for the Water 3D view."""
+        """Elevation (int16 decimetres, base64) for the Water 3D view."""
         T = self.terrain
-        hand = np.full((T.nrows, T.ncols), 255, np.uint8)
-        near = np.where(self._near_dist < 900, self._hand * 4, 255)      # floods stay close to the channel
-        hand[self._grid_idx] = np.clip(near, 0, 255).astype(np.uint8)
         elev = np.clip(T.elev * 10, -32000, 32000).astype("<i2")
         return dict(north=T.north, south=T.south, west=T.west, east=T.east, nrows=T.nrows, ncols=T.ncols,
-                    elev=base64.b64encode(elev.tobytes()).decode(), hand=base64.b64encode(hand.tobytes()).decode())
+                    elev=base64.b64encode(elev.tobytes()).decode())
 
     # ============================================================== snapshot
     def channel_state(self):

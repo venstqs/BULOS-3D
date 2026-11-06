@@ -17,7 +17,7 @@ export default function Embed({ mode, params }) {
   const { data: heatmap } = usePoll(mode === 'map' ? `/api/heatmap?index=${index}` : null, 5000);
   const { data: forecast } = usePoll(mode === 'map' ? '/api/forecast' : null, 4000);
   const [layers, setLayers] = useState(() => ({
-    heatmap: params.get('heatmap') !== '0', flood: false, particles: true, streams: true, pipes: true, columns: true, catchment: true,
+    heatmap: params.get('heatmap') !== '0', particles: true, streams: true, pipes: true, columns: true, catchment: true,
   }));
   const select = useCallback((id) => send({ type: 'select', id }), []);
   const st = live?.stations.find((s) => s.id === params.get('id'));

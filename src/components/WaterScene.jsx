@@ -4,7 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { get } from '../api';
 import { stationStatus } from '../lib/format';
 import { riverAt } from '../lib/twinField';
-import { NOISE, RAIN_FRAG, RAIN_VERT, RIBBON_VERT, RIVER_FRAG, paintRiver } from '../lib/waterShaders';
+import { RAIN_FRAG, RAIN_VERT, RIBBON_VERT, RIVER_FRAG, paintRiver } from '../lib/waterShaders';
 
 // The watershed as a physical model: real Copernicus elevation, a carved river channel,
 // and water drawn by shaders, so the water itself is what you look at.
@@ -34,7 +34,7 @@ function loadGrid(t) {
   const raw = bytes(t.elev);
   const i16 = new Int16Array(raw.buffer, raw.byteOffset, raw.length / 2);
   const elev = Float32Array.from(i16, (v) => v / 10);
-  return { elev, hand: bytes(t.hand) };
+  return { elev };
 }
 
 /** Stitch satellite tiles for the grid into one texture, with each vertex's place on it. */
@@ -209,22 +209,6 @@ function ribbonsToGeometry(list) {
   return g;
 }
 
-const FLOOD_VERT = `
-attribute float aHand; varying float vHand; varying vec3 vW;
-void main(){ vHand=aHand; vW=(modelMatrix*vec4(position,1.0)).xyz; gl_Position=projectionMatrix*viewMatrix*vec4(vW,1.0); }`;
-
-const FLOOD_FRAG = `
-precision highp float;
-uniform float uTime; uniform float uLevel; varying float vHand; varying vec3 vW;
-${NOISE}
-void main(){
-  if (vHand >= uLevel) discard;
-  float depth = clamp((uLevel - vHand) / 4.0, 0.0, 1.0);
-  float n = noise(vW.xz * 6.0 + uTime * 0.25);
-  vec3 c = mix(vec3(0.42, 0.74, 0.98), vec3(0.08, 0.36, 0.8), depth);
-  gl_FragColor = vec4(c + n * 0.08, 0.42 + depth * 0.4);
-}`;
-
 function dispose(root) {
   root.traverse((o) => {
     o.geometry?.dispose?.();
@@ -278,7 +262,7 @@ export default function WaterScene({ staticData, live, heatmap, selectedId, onSe
     scene.add(hemi, sun);
 
     const p = projector(terrain);
-    const { elev, hand } = loadGrid(terrain);
+    const { elev } = loadGrid(terrain);
     const stem = staticData.main_stem;
     const bigStreams = staticData.streams.filter((s) => s.area_km2 >= 0.5);
     carve(elev, terrain, stem, 1, 7);
@@ -327,20 +311,6 @@ export default function WaterScene({ staticData, live, heatmap, selectedId, onSe
       scene.add(m);
       return m;
     });
-
-    // Rising flood water on low ground beside the river
-    const handAttr = new Float32Array(hand.length);
-    for (let i = 0; i < hand.length; i += 1) handAttr[i] = hand[i] === 255 ? 999 : hand[i] / 4;
-    const sheet = ground.clone();
-    sheet.setAttribute('aHand', new THREE.BufferAttribute(handAttr, 1));
-    const floodLevel = { value: 0 };
-    const flood = new THREE.Mesh(sheet, new THREE.ShaderMaterial({
-      vertexShader: FLOOD_VERT, fragmentShader: FLOOD_FRAG, transparent: true, depthWrite: false,
-      uniforms: { uTime: time, uLevel: floodLevel }, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
-    }));
-    flood.renderOrder = 1;
-    flood.visible = false;
-    scene.add(flood);
 
     // Risk painted on the ground
     const heatData = new Uint8Array(terrain.nrows * terrain.ncols * 4);
@@ -445,7 +415,6 @@ export default function WaterScene({ staticData, live, heatmap, selectedId, onSe
       last = now;
       time.value = now / 1000;
 
-      floodLevel.value += (state.level - floodLevel.value) * Math.min(1, dt * 1.6);
       rainAmount.value += (state.rainTarget - rainAmount.value) * Math.min(1, dt * 2);
       rain.visible = rainAmount.value > 0.02;
       hemi.intensity = 1.5 - 0.55 * rainAmount.value;
@@ -514,7 +483,7 @@ export default function WaterScene({ staticData, live, heatmap, selectedId, onSe
     };
     clock();
 
-    world.current = { scene, state, points, posOf, field, river, streamMesh, pipes, flood, heat, heatTex, heatData, front, main };
+    world.current = { scene, state, points, posOf, field, river, streamMesh, pipes, heat, heatTex, heatData, front, main };
     return () => {
       gone = true;
       cancelAnimationFrame(raf);
@@ -546,7 +515,6 @@ export default function WaterScene({ staticData, live, heatmap, selectedId, onSe
 
     const rainNow = atTime[live.stations[0].id]?.rain ?? 0;
     w.state.rainTarget = Math.min(1, rainNow / 30);
-    w.state.level = layers.flood ? 1.5 + Math.min(1, rainNow / 45) * 5.5 : 0;
 
     const flows = Object.fromEntries((live.pipes ?? []).map((q) => [q.id, q]));
     for (const m of w.pipes) m.material.uniforms.uFlow.value = flows[m.userData.pipeId]?.flowing ? 1.8 : 0;
@@ -585,14 +553,13 @@ export default function WaterScene({ staticData, live, heatmap, selectedId, onSe
         tag.querySelector('button').style.outline = st.id === selectedId ? '2px solid #2f5be7' : 'none';
       }
     }
-  }, [live, atTime, tauStep, selectedId, layers.flood, layers.columns, terrain]);
+  }, [live, atTime, tauStep, selectedId, layers.columns, terrain]);
 
   /* ---------------- layers ---------------- */
   useEffect(() => {
     const w = world.current;
     if (!w) return;
     w.streamMesh.visible = layers.streams;
-    w.flood.visible = Boolean(layers.flood);
     for (const m of w.pipes) m.visible = layers.pipes !== false;
     const flow = layers.particles ? 1 : 0;
     w.river.material.uniforms.uFlow.value = 1.5 * flow;

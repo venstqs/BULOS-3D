@@ -22,13 +22,6 @@ function riskRGBA(v) {
   return [Math.round(250 - 60 * t), Math.round(200 - 170 * t), Math.round(120 - 90 * t), a];
 }
 
-/* Low ground beside the river: pale to deep blue. */
-function floodRGBA(v) {
-  const t = Math.min(1, Math.max(0, v));
-  const a = t < 0.12 ? 0 : Math.round(50 + 170 * t);
-  return [Math.round(120 - 95 * t), Math.round(190 - 110 * t), 245, a];
-}
-
 /* Turbidity excess (NTU) -> water colour: clear blue to sediment brown. */
 function waterColor(excess, orpDeficit, out = new Cesium.Color()) {
   const t = Math.min(1, excess / 30);
@@ -141,7 +134,7 @@ function placeAt(path, s, out) {
   return k;
 }
 
-export default function CesiumScene({ staticData, live, heatmap, floodmap, selectedId, onSelect, onInspect, layers, tauStep, atTime, controls, onTour }) {
+export default function CesiumScene({ staticData, live, heatmap, selectedId, onSelect, onInspect, layers, tauStep, atTime, controls, onTour }) {
   const host = useRef(null);
   const viewerRef = useRef(null);
   const refs = useRef({});
@@ -520,7 +513,6 @@ export default function CesiumScene({ staticData, live, heatmap, floodmap, selec
   }, []);
 
   useEffect(() => { drape('heat', heatmap, riskRGBA, 0.85, layers.heatmap && tauStep === 0); }, [drape, heatmap, layers.heatmap, tauStep]);
-  useEffect(() => { drape('floodLayer', layers.flood ? floodmap : null, floodRGBA, 0.8, layers.flood); }, [drape, floodmap, layers.flood]);
 
   /* ---------------- layer toggles ---------------- */
   useEffect(() => {

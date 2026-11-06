@@ -18,10 +18,10 @@ export const STATIONS = [
     "aquifer": false,
     "sms": null,
     "base": {
-      "turbidity": 0.7,
+      "turbidity": 0.8,
       "orp": 430,
-      "ph": 7.44,
-      "tds": 119,
+      "ph": 7.45,
+      "tds": 120,
       "temp": 21,
       "bio": 0.5
     },
@@ -47,10 +47,10 @@ export const STATIONS = [
     "base": {
       "turbidity": 2.1,
       "orp": 400,
-      "ph": 7.3,
-      "tds": 165,
+      "ph": 7.29,
+      "tds": 164,
       "temp": 24,
-      "bio": 3.4
+      "bio": 3.45
     },
     "valve": null,
     "tank": null
@@ -72,7 +72,7 @@ export const STATIONS = [
     "aquifer": false,
     "sms": "Barangay Health Worker",
     "base": {
-      "turbidity": 1.9,
+      "turbidity": 2,
       "orp": 410,
       "ph": 7.3,
       "tds": 169,
@@ -107,7 +107,7 @@ export const STATIONS = [
     "base": {
       "turbidity": 0.6,
       "orp": 380,
-      "ph": 7.09,
+      "ph": 7.1,
       "tds": 240,
       "temp": 25,
       "bio": 1.1
@@ -141,7 +141,7 @@ export const STATIONS = [
       "turbidity": 2.7,
       "orp": 395,
       "ph": 7.34,
-      "tds": 190,
+      "tds": 189,
       "temp": 26,
       "bio": 3.9
     },
@@ -162,7 +162,7 @@ export const PIPES = [
     "name": "Spring gravity line",
     "src": "IN-01",
     "dst": "KS-03",
-    "length_m": 10813,
+    "length_m": 9857,
     "diameter_m": 0.1,
     "material": "HDPE",
     "static_head_m": 135.3,
@@ -173,7 +173,7 @@ export const PIPES = [
     "name": "Well distribution main",
     "src": "MB-04",
     "dst": "RH-05",
-    "length_m": 4809,
+    "length_m": 3007,
     "diameter_m": 0.075,
     "material": "HDPE",
     "static_head_m": 8.1,

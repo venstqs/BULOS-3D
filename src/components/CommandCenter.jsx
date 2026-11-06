@@ -1,8 +1,8 @@
-import { Suspense, lazy, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Activity, Box, Check, Clock, Compass, Crosshair, Droplets, FlaskConical, Layers, Lock, LockOpen, Minus, Pause, Plane, Play, Plus, RotateCcw, Search, Send, ShieldCheck, TriangleAlert, Truck, Users, X,
+  Activity, Box, Check, Clock, CloudRain, Compass, Crosshair, Cpu, Database, Droplets, FlaskConical, Lock, LockOpen, Minus, Pause, Plane, Play, Plus, RotateCcw, Search, Send, ShieldCheck, SlidersHorizontal, Tag, TriangleAlert, Users, X,
 } from 'lucide-react';
-import { get, usePoll } from '../api';
+import { get, post, usePoll } from '../api';
 import { EDGE_LABEL, fmt, fmtClock, fmtMin, stationStatus } from '../lib/format';
 import { AHEAD_S, PAST_S, exposure, fmtOffset } from '../lib/twinField';
 import { useTwinTime } from '../lib/useTwinTime';
@@ -12,11 +12,11 @@ const card = 'rounded-2xl bg-white/95 shadow-[0_8px_26px_rgba(30,50,110,0.12)] b
 
 function Stat({ Icon, label, value, sub, tone = 'text-civic' }) {
   return (
-    <div className={`${card} flex min-w-[148px] items-center gap-2.5 px-3 py-2`}>
+    <div className={`${card} flex w-[172px] shrink-0 items-center gap-2.5 px-3 py-2`}>
       <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#e9efff] ${tone}`}><Icon size={17} /></span>
       <div className="min-w-0">
         <div className="text-[10.5px] text-muted">{label}</div>
-        <div className="font-display text-lg font-semibold leading-tight">{value}</div>
+        <div className="truncate font-display text-lg font-semibold leading-tight tabular-nums">{value}</div>
         <div className="truncate text-[10.5px] text-ink-2">{sub}</div>
       </div>
     </div>
@@ -27,7 +27,7 @@ function Row({ label, children }) {
   return <div className="flex items-center justify-between gap-3 border-b border-line py-1.5 text-xs last:border-0"><span className="text-muted">{label}</span><span className="text-right font-medium">{children}</span></div>;
 }
 
-function Inspector({ st, fc, act, quick, onInspect, onDetails, onClose, onStreet }) {
+function Inspector({ st, fc, act, quick, onInspect, onDetails, onClose, onStreet, onSensors }) {
   const status = stationStatus(st);
   const r = st.reading ?? {};
   const closed = st.valve && !st.valve.open;
@@ -50,11 +50,19 @@ function Inspector({ st, fc, act, quick, onInspect, onDetails, onClose, onStreet
       <div className="mt-2">
         <Row label="Health index">{st.wqhi.score} / 100</Row>
         <Row label="Contamination risk">{fmt(st.risk, 2)}</Row>
-        <Row label="Turbidity">{fmt(r.turbidity, 1)} NTU</Row>
-        <Row label="pH">{fmt(r.ph, 2)}</Row>
-        {r.bio != null && <Row label="Biological (TLF)">{fmt(r.bio, 1)} ppb</Row>}
         {st.tank && <Row label="Stored water">{st.tank.pct}% · {fmt(st.tank.reserve_h, 1)} h</Row>}
         <Row label="People served">{(st.population ?? 0).toLocaleString()}</Row>
+      </div>
+      <div className="mt-2 rounded-xl bg-panel-2 px-2.5 py-1.5">
+        <div className="flex items-center justify-between text-[11px] font-semibold"><span>Sensor bank</span><span className="pill pill-grey !text-[10px]">Simulated</span></div>
+        <Row label="Turbidity">{fmt(r.turbidity, 1)} NTU</Row>
+        <Row label="pH">{fmt(r.ph, 2)}</Row>
+        <Row label="ORP">{fmt(r.orp, 0)} mV</Row>
+        <Row label="TDS">{fmt(r.tds, 0)} mg/L</Row>
+        <Row label="Temperature">{fmt(r.temp, 1)} °C</Row>
+        {r.bio != null && <Row label="Biological (TLF)">{fmt(r.bio, 1)} ppb</Row>}
+      </div>
+      <div className="mt-1">
         <Row label="Node state">{EDGE_LABEL[st.edge_state] ?? st.edge_state}</Row>
       </div>
       {st.valve && (
@@ -65,7 +73,10 @@ function Inspector({ st, fc, act, quick, onInspect, onDetails, onClose, onStreet
                   className="flex items-center justify-center gap-1 rounded-xl border border-line bg-white px-2 py-1.5 text-xs font-semibold text-ink-2 disabled:opacity-40"><LockOpen size={13} />Re-arm</button>
         </div>
       )}
-      <button onClick={() => onStreet(st.id)} className="mt-1.5 flex w-full items-center justify-center gap-1 rounded-xl bg-[#e9efff] px-2 py-1.5 text-xs font-semibold text-civic"><Users size={13} />Street view</button>
+      <div className="mt-1.5 grid grid-cols-2 gap-1.5">
+        <button onClick={() => onSensors(st.id)} className="flex items-center justify-center gap-1 rounded-xl bg-[#e9efff] px-2 py-1.5 text-xs font-semibold text-civic"><Cpu size={13} />See sensors</button>
+        <button onClick={() => onStreet(st.id)} className="flex items-center justify-center gap-1 rounded-xl bg-[#e9efff] px-2 py-1.5 text-xs font-semibold text-civic"><Users size={13} />Street view</button>
+      </div>
       <div className="mt-1.5 grid grid-cols-3 gap-1.5">
         <button onClick={() => onInspect(st.id)} className="flex items-center justify-center gap-1 rounded-xl border border-line px-1 py-1.5 text-[11px] font-semibold text-ink-2 hover:text-civic"><Box size={12} />3D site</button>
         <button onClick={() => quick('test', st.id)} className="flex items-center justify-center gap-1 rounded-xl border border-line px-1 py-1.5 text-[11px] font-semibold text-ink-2 hover:text-civic"><FlaskConical size={12} />Test</button>
@@ -102,7 +113,7 @@ function Tracker({ live, danger, quick, time, onPick }) {
             </button>
             <div className="mt-1 text-[11px] font-semibold">{s.id}</div>
             <div className="truncate px-0.5 text-[10px] text-ink-2">{label}</div>
-            {closed && <div className="text-[10px] font-semibold text-[#a32626]">Closed</div>}
+            <div className="h-[15px] text-[10px] font-semibold text-[#a32626]">{closed ? 'Closed' : ''}</div>
           </li>
         ))}
       </ol>
@@ -120,22 +131,22 @@ function Tracker({ live, danger, quick, time, onPick }) {
   );
 }
 
-function Tables({ live, tasks, quick, onPick }) {
+function Tables({ live, tasks, quick, onPick, weather, access }) {
   const [tab, setTab] = useState('intakes');
   const open = (tasks ?? []).filter((t) => t.status !== 'COMPLETED');
   const feed = live.events.filter((e) => e.type !== 'TRANSIT_CALIBRATION').slice(0, 12);
-  const tabs = [['intakes', 'Intakes', live.stations.filter((s) => s.valve).length], ['sensors', 'Sensors', live.stations.length], ['crews', 'Crew', open.length], ['events', 'Events', feed.length], ['river', 'River', live.reaches.length]];
+  const tabs = [['intakes', 'Intakes', live.stations.filter((s) => s.valve).length], ['sensors', 'Sensors', live.stations.length], ['crews', 'Tasks', open.length], ['events', 'Events', feed.length], ['river', 'River', live.reaches.length], ['weather', 'Weather', ''], ['access', 'Access', access?.length ?? 0]];
   const line = 'flex w-full items-center gap-2 border-b border-line py-1.5 text-left text-xs last:border-0 hover:bg-panel-2';
   return (
     <div className={`${card} p-3`}>
-      <div className="mb-1 flex gap-3 border-b border-line text-xs font-semibold" role="tablist">
-        {tabs.map(([k, label, n]) => (
+      <div className="mb-1 flex gap-2 overflow-x-auto whitespace-nowrap border-b border-line text-[11px] font-semibold" role="tablist">
+        {tabs.map(([k, label]) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`-mb-px border-b-2 px-0.5 pb-1.5 ${tab === k ? 'border-civic text-civic' : 'border-transparent text-muted hover:text-ink'}`}>
-            {label} <span className="font-medium opacity-70">{n}</span>
+            {label}
           </button>
         ))}
       </div>
-      <div className="max-h-[118px] overflow-y-auto">
+      <div className="h-[118px] overflow-y-auto">
         {tab === 'intakes' && live.stations.filter((s) => s.valve).map((s) => (
           <button key={s.id} onClick={() => onPick(s.id)} className={line}>
             <span className="w-12 font-semibold">{s.id}</span>
@@ -152,6 +163,27 @@ function Tables({ live, tasks, quick, onPick }) {
             <span className="text-muted">{s.link?.rssi} dBm</span>
           </button>
         ))}
+        {tab === 'access' && (
+          <>
+            <p className="pb-1 text-[10px] text-muted">Barangays furthest from a water source by road, using the proposed network.</p>
+            {(access ?? []).slice(0, 40).map((a) => (
+              <div key={a.name} className="flex items-center gap-2 border-b border-line py-1 text-xs last:border-0">
+                <span className="min-w-0 flex-1 truncate font-semibold">{a.name}</span>
+                <span className={`pill !text-[10px] ${a.road_km == null ? 'pill-red' : a.road_km > 3 ? 'pill-amber' : 'pill-good'}`}>{a.road_km == null ? 'Over 6 km' : `${fmt(a.road_km, 1)} km`}</span>
+              </div>
+            ))}
+          </>
+        )}
+        {tab === 'weather' && (weather?.available ? (
+          <>
+            <div className="flex items-center justify-between py-1 text-xs"><b>{weather.condition}, {fmt(weather.temp_c, 0)}°C</b><span className="pill pill-good !text-[10px]">Real · live</span></div>
+            <Row label="Rain right now">{fmt(weather.rain_mm, 1)} mm</Row>
+            <Row label="Rain forecast, next 24 h">{fmt(weather.next24_mm, 1)} mm</Row>
+            <Row label="Wind">{fmt(weather.wind_kmh, 0)} km/h</Row>
+            {weather.discharge_m3s != null && <Row label="River flow estimate">{fmt(weather.discharge_m3s, 1)} m³/s</Row>}
+            <p className="pt-1 text-[10px] text-muted">Open-Meteo, updated every 15 minutes. Not used by the simulated field.</p>
+          </>
+        ) : <p className="py-3 text-center text-xs text-muted">{weather ? 'Live weather is not reachable right now.' : 'Loading live weather…'}</p>)}
         {tab === 'river' && (
           <>
             <div className="flex items-center justify-between border-b border-line py-1.5 text-xs"><span className="text-muted">Rain now</span><b>{fmt(live.rain_mm_hr, 1)} mm/h</b></div>
@@ -186,22 +218,88 @@ function Tables({ live, tasks, quick, onPick }) {
   );
 }
 
-const CATALOGUE = [
-  ['flood', 'Flood-prone ground (our estimate)'], ['heatmap', 'Contamination risk'], ['buildings', 'Real 3D buildings'], ['labels', 'Roads and place names'],
-  ['streams', 'Streams'], ['pipes', 'Gravity pipelines'], ['particles', 'Water flow'], ['catchment', 'Watershed'],
-];
+const HAZARDS = {
+  none: { label: 'None', group: 'Water quality' },
+  risk: { label: 'Overall contamination risk', group: 'Water quality', low: 'Low', high: 'Severe' },
+  turbidity: { label: 'Turbidity', group: 'Water quality', low: 'Clear', high: 'Cloudy' },
+  ph: { label: 'pH', group: 'Water quality', low: 'Normal', high: 'Off range' },
+  tds: { label: 'Total dissolved solids', group: 'Water quality', low: 'Low', high: 'High' },
+  bio: { label: 'Biological indicator', group: 'Water quality', low: 'Low', high: 'High' },
+  wells: { label: 'Shallow well exposure', group: 'Water access', low: 'Lower', high: 'Higher', note: 'Low ground near the river, where wells draw in river water. Our estimate.' },
+  runoff: { label: 'Runoff sources', group: 'Water access', low: 'Low', high: 'High', note: 'Wet, steep ground that sends rain and pollution into the river. Our estimate.' },
+  access: { label: 'Distance to water', group: 'Water access', low: 'Near', high: '5 km+', note: 'Straight-line distance to the nearest water point or district facility.' },
+};
+const HEAT = ['risk', 'turbidity', 'ph', 'tds', 'bio'];
+const PALETTE_CSS = { hazard: ['#ffe05a', '#fa9628', '#e0342c'], ocean: ['#bae6fd', '#3896f0', '#1432a0'], clear: ['#fde725', '#21918c', '#440154'] };
+const VIEW_KEY = 'bulos-view';
+const DEFAULT_VIEW = { mapLabels: true, hazard: 'risk', opacity: 0.7, palette: 'hazard', base: 'satellite', relief: 1.5 };
+const TOGGLES = [['buildings', 'Real 3D buildings'], ['labels', 'Roads and place names'], ['streams', 'Streams'], ['pipes', 'Main pipelines'], ['network', 'Proposed barangay network'], ['barangays', 'Barangay access dots'], ['assets', 'Water district facilities'], ['particles', 'Water flow'], ['catchment', 'Watershed']];
 
-function LayerMenu({ layers, setLayers, onClose }) {
+function CustomisePanel({ view, setView, layers, setLayers, onClose }) {
+  const set = (patch) => setView((v) => ({ ...v, ...patch }));
+  const pick = (k, options) => (
+    <div className="flex rounded-xl bg-panel-2 p-0.5">
+      {options.map(([v, label]) => (
+        <button key={v} onClick={() => set({ [k]: v })} aria-pressed={view[k] === v} className={`flex-1 rounded-[10px] px-1.5 py-1 text-[11px] font-semibold ${view[k] === v ? 'bg-civic text-white' : 'text-ink-2'}`}>{label}</button>
+      ))}
+    </div>
+  );
   return (
-    <div className={`${card} absolute right-14 top-[62px] z-20 w-[230px] p-3 text-xs text-ink-2`}>
-      <div className="mb-1 flex items-center justify-between font-display text-sm font-semibold text-ink">Layers
-        <button onClick={onClose} aria-label="Close layers" className="rounded p-0.5 hover:bg-panel-2"><X size={14} /></button>
+    <div className={`${card} absolute right-14 top-[62px] z-20 max-h-[calc(100vh-240px)] w-[262px] overflow-y-auto p-3 text-xs text-ink-2`}>
+      <div className="mb-1 flex items-center justify-between font-display text-sm font-semibold text-ink">Customise the map
+        <button onClick={onClose} aria-label="Close customise" className="rounded p-0.5 hover:bg-panel-2"><X size={14} /></button>
       </div>
-      {CATALOGUE.map(([k, label]) => (
+      {['Water quality', 'Water access'].map((group) => (
+        <div key={group}>
+          <div className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-muted">{group}</div>
+          {Object.entries(HAZARDS).filter(([, h]) => h.group === group).map(([k, h]) => (
+            <label key={k} className="flex items-center gap-2 py-0.5">
+              <input type="radio" name="hazard" checked={view.hazard === k} onChange={() => set({ hazard: k })} className="h-3.5 w-3.5 accent-[#2f5be7]" />{h.label}
+            </label>
+          ))}
+        </div>
+      ))}
+      <label className="mt-1 block">Layer opacity <b>{Math.round(view.opacity * 100)}%</b>
+        <input type="range" min={0.2} max={1} step={0.05} value={view.opacity} onChange={(e) => set({ opacity: Number(e.target.value) })} className="w-full accent-[#2f5be7]" />
+      </label>
+      <div className="mb-1 mt-2 text-[10px] font-semibold uppercase tracking-wider text-muted">Colours</div>
+      {pick('palette', [['hazard', 'Hazard'], ['ocean', 'Water'], ['clear', 'Colour-safe']])}
+      <div className="mb-1 mt-2 text-[10px] font-semibold uppercase tracking-wider text-muted">Base map</div>
+      {pick('base', [['satellite', 'Satellite'], ['light', 'Light'], ['dark', 'Dark']])}
+      <label className="mt-2 block">Terrain height <b>×{view.relief}</b>
+        <input type="range" min={1} max={3} step={0.25} value={view.relief} onChange={(e) => set({ relief: Number(e.target.value) })} className="w-full accent-[#2f5be7]" />
+      </label>
+      <div className="mb-1 mt-2 text-[10px] font-semibold uppercase tracking-wider text-muted">Show on the map</div>
+      {TOGGLES.map(([k, label]) => (
         <label key={k} className="flex items-center gap-2 py-0.5">
-          <input type="checkbox" checked={layers[k] !== false && Boolean(layers[k] ?? true)} onChange={() => setLayers((l) => ({ ...l, [k]: !(l[k] ?? true) }))} className="h-3.5 w-3.5 accent-[#2f5be7]" />{label}
+          <input type="checkbox" checked={layers[k] !== false} onChange={() => setLayers((l) => ({ ...l, [k]: l[k] === false }))} className="h-3.5 w-3.5 accent-[#2f5be7]" />{label}
         </label>
       ))}
+      <button onClick={() => setView(DEFAULT_VIEW)} className="mt-2 w-full rounded-xl border border-line py-1 text-[11px] font-semibold text-ink-2">Reset to default</button>
+    </div>
+  );
+}
+
+const SOURCES = [
+  ['Real', 'pill-good', ['Terrain: Copernicus GLO-90 elevation', 'Satellite imagery: Esri', 'River, streams, roads, buildings: OpenStreetMap', 'Water district facilities and barangay names: OpenStreetMap', 'Weather right now: Open-Meteo, live']],
+  ['Computed', 'pill-blue', ['River speed and travel time, from real slope', 'Well exposure and runoff layers, from the 90 m elevation model', 'Forecasts and risk scores, from the twin']],
+  ['Simulated', 'pill-amber', ['All sensor readings at the five water points', 'Spills, storms in Simulate, valves, tanks and SMS']],
+  ['Illustrative', 'pill-grey', ['The five water points are a proposed layout, not existing sites', 'Pipelines and the barangay network follow real roads, but they are proposed routes', 'Building and people models, and the rain gauge position']],
+];
+
+function DataPanel({ onClose }) {
+  return (
+    <div className={`${card} absolute right-14 top-[62px] z-20 max-h-[calc(100vh-240px)] w-[318px] overflow-y-auto p-3 text-xs text-ink-2`}>
+      <div className="mb-1 flex items-center justify-between font-display text-sm font-semibold text-ink">What is real here
+        <button onClick={onClose} aria-label="Close data sources" className="rounded p-0.5 hover:bg-panel-2"><X size={14} /></button>
+      </div>
+      {SOURCES.map(([label, pill, items]) => (
+        <div key={label} className="mt-2">
+          <span className={`pill ${pill}`}>{label}</span>
+          <ul className="mt-1 grid list-disc gap-0.5 pl-4">{items.map((t) => <li key={t}>{t}</li>)}</ul>
+        </div>
+      ))}
+      <p className="mt-2 border-t border-line pt-2 text-[11px]">Real sensors can replace the simulated ones without changing the twin: they send readings to the same data server.</p>
     </div>
   );
 }
@@ -229,16 +327,10 @@ function SearchBox({ live, tasks, onPick, go }) {
   );
 }
 
-const FLOOD_CLASS = {
-  HIGH: ['High', 'pill-red', 'Very low ground right beside the river.'],
-  MEDIUM: ['Medium', 'pill-amber', 'Low ground near the river.'],
-  LOW: ['Low', 'pill-amber', 'A little above the river.'],
-  MINIMAL: ['Minimal', 'pill-good', 'Well above or far from the river.'],
-};
-
-/** Tap anywhere on the map to see what the terrain model says about that spot. */
-function HazardCard({ spot, onClose }) {
-  const c = spot?.flood_class ? FLOOD_CLASS[spot.flood_class] : null;
+/** Tap anywhere on the map: what the twin says about the water nearest that spot. */
+function HazardCard({ spot, live, onClose, onSpill }) {
+  const st = live.stations.find((x) => x.id === spot?.nearest_id);
+  const eta = st ? live.forecast.stations?.[st.id]?.arrival_s : null;
   return (
     <div className={`${card} p-3`}>
       <div className="flex items-center justify-between">
@@ -249,31 +341,32 @@ function HazardCard({ spot, onClose }) {
       {spot?.error && <p className="mt-1 text-xs text-ink-2">{spot.error}</p>}
       {spot && !spot.error && (
         <>
-          <div className="mt-1.5 flex items-center gap-2 text-xs">
-            <span className="text-muted">Flood-prone ground</span>
-            {c ? <span className={`pill ${c[1]}`}>{c[0]}</span> : <span className="pill pill-grey">Outside the watershed</span>}
-          </div>
-          {c && <p className="mt-1 text-xs text-ink-2">{c[2]}</p>}
           <div className="mt-1">
-            <Row label="Elevation">{fmt(spot.elevation_m, 0)} m</Row>
-            {spot.height_above_river_m != null && <Row label="Height above river">{fmt(spot.height_above_river_m, 1)} m</Row>}
-            {spot.river_distance_m != null && <Row label="Distance to river">{spot.river_distance_m.toLocaleString()} m</Row>}
             <Row label="Nearest water point">{spot.nearest_id} · {fmt(spot.nearest_km, 1)} km</Row>
+            {st && <Row label="Its water quality">{st.wqhi.score} / 100</Row>}
+            {st && <Row label="Contamination risk">{fmt(st.risk, 2)}</Row>}
+            {eta > 0 && <Row label="Plume arrives there in">{fmtMin(eta)}</Row>}
+            {spot.river_distance_m != null && <Row label="Distance to river">{spot.river_distance_m.toLocaleString()} m</Row>}
+            <Row label="In the watershed">{spot.in_catchment ? 'Yes' : 'No'}</Row>
           </div>
-          <p className="mt-1.5 text-[10px] leading-snug text-muted">Estimate from a 90 m elevation model. Not an official hazard map.</p>
+          <p className="mt-1.5 text-[10px] leading-snug text-muted">Water readings are simulated.</p>
+          {spot.in_catchment && onSpill && <button onClick={() => onSpill(spot)} className="mt-2 w-full rounded-xl bg-[#c9551f] px-2 py-1.5 text-xs font-semibold text-white">Simulate a spill near here</button>}
         </>
       )}
     </div>
   );
 }
 
-function FloodLegend() {
-  const items = [['#ffe05a', 'Low'], ['#fa9628', 'Medium'], ['#e0342c', 'High']];
+function Legend({ view }) {
+  const h = HAZARDS[view.hazard];
+  if (!h?.low) return null;
+  const [a, b, c] = PALETTE_CSS[view.palette];
   return (
-    <div className={`${card} flex items-center gap-2.5 px-3 py-1.5 text-[11px] text-ink-2`}>
-      <span className="font-semibold text-ink">Flood-prone ground</span>
-      {items.map(([c, t]) => <span key={t} className="inline-flex items-center gap-1"><i className="h-2.5 w-3.5 rounded-sm" style={{ background: c }} />{t}</span>)}
-      <span className="text-muted">Our estimate</span>
+    <div className={`${card} flex max-w-[460px] items-center gap-2 px-3 py-1.5 text-[11px] text-ink-2`} title={h.note}>
+      <span className="whitespace-nowrap font-semibold text-ink">{h.label}</span>
+      <span>{h.low}</span>
+      <i className="h-2.5 w-20 rounded-sm" style={{ background: `linear-gradient(90deg, ${a}, ${b}, ${c})` }} />
+      <span>{h.high}</span>
     </div>
   );
 }
@@ -315,15 +408,26 @@ function ActionCard({ live, act, quick, onPick }) {
   );
 }
 
-export default function CommandCenter({ live, forecast, tasks, staticData, heatmap, layers, setLayers, status, selectedId, onSelect, onInspect, onDetails, act, quick, pages, page, go, actions }) {
+export default function CommandCenter({ live, forecast, tasks, staticData, layers, setLayers, status, selectedId, onSelect, onInspect, onDetails, act, quick, notify, pages, page, go, actions }) {
   const time = useTwinTime(live, forecast);
   const controls = useRef({});
   const [showInspector, setShowInspector] = useState(false);
   const [showLayers, setShowLayers] = useState(false);
+  const [showData, setShowData] = useState(false);
+  const { data: weather } = usePoll('/api/weather', 600000);
   const [touring, setTouring] = useState(false);
   const [following, setFollowing] = useState(false);
   const [caption, setCaption] = useState(null);
-  const { data: floodmap } = usePoll(layers.flood ? '/api/heatmap?index=flood' : null, 15000);
+  const [view, setView] = useState(() => {
+    try {
+      const saved = { ...DEFAULT_VIEW, ...JSON.parse(localStorage.getItem(VIEW_KEY)) };
+      return HAZARDS[saved.hazard] ? saved : { ...saved, hazard: DEFAULT_VIEW.hazard };   // an older save may name a removed layer
+    } catch { return DEFAULT_VIEW; }
+  });
+  useEffect(() => { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); }, [view]);
+  const isHeat = HEAT.includes(view.hazard);
+  const hazardPath = view.hazard === 'none' ? null : isHeat ? `/api/heatmap?index=${view.hazard}` : `/api/layer/${view.hazard}`;
+  const { data: hazardGrid } = usePoll(hazardPath, isHeat ? 8000 : 0);
   const [probe, setProbe] = useState(null);
   const [spot, setSpot] = useState(null);
   const checkSpot = useMemo(() => (at) => {
@@ -336,14 +440,6 @@ export default function CommandCenter({ live, forecast, tasks, staticData, heatm
 
   const pick = useMemo(() => (id) => { onSelect(id); setShowInspector(true); }, [onSelect]);
   const focus = (id) => { pick(id); controls.current.focus?.(id); };
-  // the crew heads for the most pressing open task
-  const crewTask = useMemo(() => {
-    const open = (tasks ?? []).filter((t) => t.status !== 'COMPLETED');
-    const rank = (t) => (t.urgent ? 0 : t.status === 'OVERDUE' ? 1 : t.status === 'DUE_TODAY' ? 2 : 3);
-    const top = open.sort((a, b) => rank(a) - rank(b))[0];
-    return top && rank(top) < 3 ? { id: top.id, station: top.station } : null;
-  }, [tasks]);
-
   const total = live?.stations.reduce((a, s) => a + (s.population ?? 0), 0) ?? 0;
   const avg = live ? Math.round(live.stations.reduce((a, s) => a + s.wqhi.score, 0) / live.stations.length) : 0;
   const valves = live?.stations.filter((s) => s.valve) ?? [];
@@ -356,8 +452,8 @@ export default function CommandCenter({ live, forecast, tasks, staticData, heatm
       <div className="relative h-[62vh] min-h-[380px] lg:absolute lg:inset-0 lg:h-auto">
         <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-muted">Building the watershed…</div>}>
           <TwinMapScene
-            staticData={staticData} live={live} heatmap={heatmap} floodmap={floodmap} atTime={time.atTime} tauStep={time.tauStep} selectedId={selectedId}
-            onPick={pick} onInspect={onInspect} crewTask={crewTask} layers={layers} controls={controls} onTour={setTouring} onCaption={setCaption} onProbe={checkSpot} probe={probe}
+            staticData={staticData} live={live} hazard={hazardPath ? hazardGrid : null} view={view} atTime={time.atTime} tauStep={time.tauStep} selectedId={selectedId}
+            onPick={pick} onInspect={onInspect} layers={layers} controls={controls} onTour={setTouring} onCaption={setCaption} onProbe={checkSpot} probe={probe}
           />
         </Suspense>
       </div>
@@ -377,7 +473,12 @@ export default function CommandCenter({ live, forecast, tasks, staticData, heatm
           ))}
         </nav>
         <SearchBox live={live} tasks={tasks} onPick={focus} go={go} />
-        <span className={`hidden shrink-0 items-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-semibold md:inline-flex ${status === 'online' ? (isLive ? 'bg-[#e3f6ea] text-[#157a3e]' : 'bg-[#e7edff] text-civic') : 'bg-[#fde6e6] text-[#a32626]'}`}>
+        {weather?.available && (
+          <span title="Real weather in Naga, from Open-Meteo" className="hidden shrink-0 items-center gap-1.5 rounded-xl bg-[#e9efff] px-2.5 py-1 text-xs font-medium text-ink-2 2xl:inline-flex">
+            <CloudRain size={13} className="text-civic" />Naga now {fmt(weather.temp_c, 0)}°C · {fmt(weather.rain_mm, 1)} mm
+          </span>
+        )}
+        <span className={`hidden min-w-[122px] shrink-0 items-center justify-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-semibold tabular-nums md:inline-flex ${status === 'online' ? (isLive ? 'bg-[#e3f6ea] text-[#157a3e]' : 'bg-[#e7edff] text-civic') : 'bg-[#fde6e6] text-[#a32626]'}`}>
           <span className={`h-1.5 w-1.5 rounded-full ${status === 'online' ? 'bg-good' : 'bg-critical'}`} />
           {status !== 'online' ? 'Offline' : isLive ? `Live ${live ? fmtClock(live.clock.epoch_ms) : ''}` : `${time.tauStep > 0 ? 'Forecast' : 'Replay'} ${fmtOffset(time.tauStep)}`}
         </span>
@@ -393,17 +494,26 @@ export default function CommandCenter({ live, forecast, tasks, staticData, heatm
             <Stat Icon={Clock} label="Next arrival" value={danger.next ? fmtMin(danger.next.s) : 'None'} sub={danger.next ? `at ${danger.next.id}` : 'No plume forecast'} tone={danger.next ? 'text-[#c47a00]' : 'text-civic'} />
           </div>
 
-          <div className={`${card} absolute right-3 top-[62px] z-10 hidden flex-col p-1 lg:flex ${showInspector && selected ? 'lg:right-[316px]' : ''}`}>
+          <div className={`${card} absolute right-3 top-[62px] z-10 hidden flex-col p-1 lg:flex`}>
             <button onClick={() => controls.current.zoom?.(0.8)} aria-label="Zoom in" className={tool}><Plus size={16} /></button>
             <button onClick={() => controls.current.zoom?.(-0.8)} aria-label="Zoom out" className={tool}><Minus size={16} /></button>
             <button onClick={() => controls.current.tilt?.()} aria-label="Rotate view" title="Rotate" className={tool}><Compass size={15} /></button>
             <button onClick={() => { setFollowing(false); controls.current.home?.(); }} aria-label="Reset view" title="Back to the whole river" className={tool}><RotateCcw size={15} /></button>
-            <button onClick={() => setShowLayers((v) => !v)} aria-label="Layers" title="Layers" className={tool}><Layers size={15} /></button>
+            <button
+              onClick={() => setView((v) => ({ ...v, mapLabels: !v.mapLabels }))} aria-pressed={!view.mapLabels}
+              aria-label={view.mapLabels ? 'Hide map labels' : 'Show map labels'} title={view.mapLabels ? 'Hide the labels on the map' : 'Show the labels on the map'}
+              className={`${tool} ${view.mapLabels ? '' : 'bg-civic text-white hover:text-white'}`}
+            >
+              <Tag size={15} />
+            </button>
+            <button onClick={() => { setShowData(false); setShowLayers((v) => !v); }} aria-label="Customise" title="Customise the map" className={tool}><SlidersHorizontal size={15} /></button>
+            <button onClick={() => { setShowLayers(false); setShowData((v) => !v); }} aria-label="What is real" title="What is real here" className={tool}><Database size={15} /></button>
             <button onClick={() => (touring ? controls.current.stopTour?.() : controls.current.startTour?.())} aria-label="Tour" title="Guided tour of all five water points" className={`${tool} ${touring ? 'bg-civic text-white' : ''}`}><Plane size={15} /></button>
             <button onClick={() => { const on = !following; setFollowing(on); controls.current.setFollow?.(on); }} aria-label="Follow the plume" title="Follow the plume" className={`${tool} ${following ? 'bg-civic text-white' : ''}`}><Crosshair size={15} /></button>
           </div>
 
-          {showLayers && <LayerMenu layers={layers} setLayers={setLayers} onClose={() => setShowLayers(false)} />}
+          {showLayers && <CustomisePanel view={view} setView={setView} layers={layers} setLayers={setLayers} onClose={() => setShowLayers(false)} />}
+          {showData && <DataPanel onClose={() => setShowData(false)} />}
           {caption && (
             <div className={`${card} absolute bottom-[190px] left-1/2 z-10 hidden max-w-[440px] -translate-x-1/2 px-4 py-2 text-center lg:block`}>
               <div className="font-display text-sm font-semibold">{live.stations.find((s) => s.id === caption)?.name}</div>
@@ -412,13 +522,18 @@ export default function CommandCenter({ live, forecast, tasks, staticData, heatm
           )}
           <div className="z-10 grid gap-2 p-2 lg:absolute lg:left-3 lg:top-[146px] lg:w-[330px] lg:p-0">
             <ActionCard live={live} act={act} quick={quick} onPick={focus} />
-            {probe && <HazardCard spot={spot} onClose={() => { setProbe(null); setSpot(null); }} />}
+            {probe && (
+              <HazardCard
+                spot={spot} live={live} onClose={() => { setProbe(null); setSpot(null); }}
+                onSpill={live.clock.mode === 'sim' ? (at) => post('/api/spill', { lat: at.lat, lon: at.lon }).then((r) => { notify?.(true, r.message); setProbe(null); setSpot(null); }).catch((e) => notify?.(false, e.message)) : null}
+              />
+            )}
           </div>
-          {layers.flood && <div className="absolute bottom-[34px] left-1/2 z-[9] hidden -translate-x-1/2 xl:block"><FloodLegend /></div>}
+          <div className="absolute bottom-[34px] left-1/2 z-[9] hidden -translate-x-1/2 xl:block"><Legend view={view} /></div>
 
           {showInspector && selected && (
-            <div className="z-10 p-2 lg:absolute lg:right-3 lg:top-[62px] lg:w-[296px] lg:p-0">
-              <Inspector st={selected} fc={live.forecast.stations?.[selected.id]} act={act} quick={quick} onInspect={onInspect} onDetails={onDetails} onStreet={(id) => controls.current.street?.(id)} onClose={() => { setShowInspector(false); controls.current.home?.(); }} />
+            <div className="z-10 p-2 lg:absolute lg:right-14 lg:top-[62px] lg:max-h-[calc(100vh-272px)] lg:w-[296px] lg:overflow-y-auto lg:rounded-2xl lg:p-0">
+              <Inspector st={selected} fc={live.forecast.stations?.[selected.id]} act={act} quick={quick} onInspect={onInspect} onDetails={onDetails} onStreet={(id) => controls.current.street?.(id)} onSensors={(id) => controls.current.sensors?.(id)} onClose={() => { setShowInspector(false); controls.current.home?.(); }} />
             </div>
           )}
 
@@ -426,10 +541,10 @@ export default function CommandCenter({ live, forecast, tasks, staticData, heatm
             <Tracker live={live} danger={danger} quick={quick} time={time} onPick={focus} />
           </div>
           <div className="z-10 p-2 lg:absolute lg:bottom-3 lg:right-3 lg:w-[min(430px,36vw)] lg:p-0">
-            <Tables live={live} tasks={tasks} quick={quick} onPick={focus} />
+            <Tables live={live} tasks={tasks} quick={quick} onPick={focus} weather={weather} access={staticData?.access} />
           </div>
           <p className="px-3 pb-3 text-[10px] text-muted lg:absolute lg:bottom-[3px] lg:left-1/2 lg:z-[5] lg:-translate-x-1/2 lg:p-0 lg:text-center">
-            <Truck size={10} className="mr-1 inline" />Models are enlarged when zoomed out; site layouts are illustrative. Live data from a {live.clock.mode === 'sim' ? 'simulated field' : 'field network'}.
+            Everything is drawn at true size. Sensor readings come from a {live.clock.mode === 'sim' ? 'simulated field' : 'field network'}.
           </p>
         </>
       ) : (

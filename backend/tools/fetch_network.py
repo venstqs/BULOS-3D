@@ -60,7 +60,14 @@ out center tags;"""
         kind = tags.get("man_made") or tags.get("natural") or tags.get("amenity") or tags.get("office") or tags.get("waterway")
         found.append(dict(kind=kind, name=tags.get("name"), operator=tags.get("operator"), lat=round(c["lat"], 6), lon=round(c["lon"], 6)))
     (DATA / f"water_assets_{C.SITE_ID}.json").write_text(json.dumps(dict(source="OpenStreetMap contributors (ODbL)", assets=found)), encoding="utf-8")
-    print(f"{len(ways)} roads, {len(found)} water facilities")
+    places = []
+    for e in overpass(f'[out:json][timeout:60];node["place"~"^(city|town|village|suburb|hamlet|quarter|neighbourhood)$"]["name"]({b});out body;')["elements"]:
+        tags = e["tags"]
+        pop = tags.get("population", "")
+        places.append(dict(name=tags["name"], kind=tags["place"], lat=round(e["lat"], 6), lon=round(e["lon"], 6),
+                           population=int(pop) if pop.isdigit() else None))
+    (DATA / f"places_{C.SITE_ID}.json").write_text(json.dumps(dict(source="OpenStreetMap contributors (ODbL)", places=places)), encoding="utf-8")
+    print(f"{len(ways)} roads, {len(found)} water facilities, {len(places)} places")
 
 
 if __name__ == "__main__":

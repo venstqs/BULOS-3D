@@ -9,9 +9,12 @@ live mode: uplinks arrive through /api/ingest/* or MQTT; downlinks are queued
 from __future__ import annotations
 
 import base64
+import math
 import os
 import time
 from collections import deque
+
+import numpy as np
 
 from . import config as C
 from .edge import CMD, decode_uplink
@@ -34,6 +37,7 @@ class Platform:
         self.mode = mode
         self.speed = C.SIM_SPEED
         self.terrain = Terrain()
+        self._layers = {}
         self.profile = rivers.main_profile(self.terrain)
         self.stem = [self.terrain.rc(p["lat"], p["lon"]) for p in self.profile]
         self.events = deque(maxlen=300)
@@ -228,6 +232,55 @@ class Platform:
         self._emit(dict(t=self.t, station=None, type="SCENARIO", severity="info",
                         message=f"Field scenario injected: {SCENARIOS[name]}"), actor="demo")
 
+    def _network(self):
+        if not getattr(self, "_net", None):
+            lines, rows = rivers.water_network(list(self.twin.stations.values()), rivers.water_assets())
+            self._net = (lines, sorted(rows, key=lambda r: (r["road_km"] is not None, -(r["road_km"] or 0))))
+        return self._net
+
+    def layer_grid(self, name):
+        """Screening layers for the map, as a 0-1 raster over the elevation grid."""
+        T, tw = self.terrain, self.twin
+        rr, cc = tw._grid_idx
+        v = np.zeros((T.nrows, T.ncols))
+        if name == "runoff":
+            v[rr, cc] = tw._runoff_potential
+        elif name == "wells":
+            # Only the low valley floor has the riverbank sediments shallow wells draw from:
+            # height above a mountain stream says nothing about that, so true elevation gates it
+            lowland = np.clip((70 - T.elev[rr, cc]) / 40, 0, 1)
+            v[rr, cc] = np.clip(1 - tw._hand / 10, 0, 1) * np.exp(-tw._near_dist / 500) * lowland
+        elif name == "access":
+            key = "access"
+            if key not in self._layers:
+                lat = (T.north - np.arange(T.nrows) * T.step)[:, None]
+                lon = (T.west + np.arange(T.ncols) * T.step)[None, :]
+                pts = [(s.lat, s.lon) for s in tw.stations.values() if s.cfg.get("valve")]
+                pts += [(a["lat"], a["lon"]) for a in rivers.water_assets() if a["kind"] in ("pumping_station", "water_tower")]
+                d = np.min([np.hypot((lat - a) * T.dy / T.step, (lon - b) * T.dx / T.step) for a, b in pts], axis=0)
+                self._layers[key] = np.clip(d / 5000, 0, 1)
+            v = self._layers[key]
+        else:
+            raise ValueError("Unknown layer.")
+        grid = np.clip(v * 254 + 1, 1, 255).astype(np.uint8)
+        if name != "access":
+            grid[v <= 0] = 0
+        return dict(index=name, north=T.north, south=T.south, west=T.west, east=T.east, nrows=T.nrows, ncols=T.ncols,
+                    data=base64.b64encode(grid.tobytes()).decode())
+
+    def spill_at(self, lat, lon):
+        """What-if: a 30-minute spill entering the river nearest this spot."""
+        if not self.world:
+            raise ValueError("Spills can only be simulated in sim mode.")
+        ch = self.world.ch
+        k = math.cos(math.radians(lat))
+        cell = int(np.argmin(np.hypot((ch.lat - lat) * 111_320, (ch.lon - lon) * 111_320 * k)))
+        self.world.spills.append((self.world.t, self.world.t + 1800, cell, 0.12 * float(ch.Q[cell]) * 100))
+        km = float(ch.s[cell]) / 1000
+        self._emit(dict(t=self.t, station=None, type="SCENARIO", severity="info",
+                        message=f"Spill simulated in the river at {km:.1f} km from the top of the channel."), actor="demo")
+        return km
+
     # -------------------------------------------------------- maintenance
     def add_task(self, sid, kind, due_ms, title=None, by="operator"):
         if sid not in self.twin.stations:
@@ -280,7 +333,10 @@ class Platform:
         out = []
         for p in C.PIPES:
             a, b = self.twin.stations[p["src"]], self.twin.stations[p["dst"]]
-            if rivers.main_line():
+            routed = rivers.pipe_along_roads(self.terrain, (a.lat, a.lon), (b.lat, b.lon))
+            if routed:
+                coords, length = routed
+            elif rivers.main_line():
                 coords, length = rivers.pipe_along_river(self.terrain, self.profile, a.cfg["stem_index"], b.cfg["stem_index"])
             else:
                 coords, length = pipe_route(self.terrain, (a.lat, a.lon), (b.lat, b.lon))
@@ -342,6 +398,9 @@ class Platform:
                 catchment=dict(ring=ring, area_km2=round(float(self.twin.catchment.sum()) * T.cell_area / 1e6, 2)),
                 streams=rivers.streams(T, self.twin.catchment, self.profile),
                 main_stem=[[p["lon"], p["lat"], p["z"], p["s"]] for p in self.profile],
+                water_assets=rivers.water_assets(),
+                network=self._network()[0],
+                access=self._network()[1],
                 rain_gauge=C.RAIN_GAUGE,
                 pnsdw=C.PNSDW,
                 thresholds=dict(suspect=C.RISK_SUSPECT, trip=C.RISK_TRIP, persistence_s=C.PERSISTENCE_S),

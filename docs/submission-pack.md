@@ -17,6 +17,15 @@ Judging: **Impact**, **Challenge Fit & Feasibility**, **Innovation**.
 > A river-wide early warning for rural water: one shared lab-grade sensor upstream and low-cost nodes at every
 > water point, joined by a digital twin that closes intakes before contaminated water arrives.
 
+### What is real and what is simulated
+
+Be exact about this. Judges will ask, and the twin has a "What is real here" panel on the map.
+
+- **Real:** Copernicus elevation, Esri satellite imagery, OpenStreetMap river, streams, roads, buildings and Metropolitan Naga Water District facility locations, and live Open-Meteo weather.
+- **Computed by the twin:** river speed and travel time, well exposure and runoff layers, forecasts and risk scores.
+- **Simulated:** every sensor reading at the five water points, spills, storms, valves, tanks and SMS.
+- **Illustrative:** the five water points are a proposed layout, and pipelines are proposed routes along real roads. No real pipe data was used.
+
 ### What we mean by "digital twin"
 
 > A digital twin is a virtual copy of a real system that stays in step with it through live data, uses physics to
@@ -28,8 +37,8 @@ ask: the two-way loop runs against a simulated field that sends real-format pack
 tested with a software stand-in until a physical node is connected.
 
 Design references: the 3D-plus-time view and layer catalogue of spatial twins such as the NSW Spatial Digital Twin, and
-the community hazard focus of Project NOAH. Our flood-prone layer is a terrain estimate from the 90 m elevation model,
-not an official hazard map, and Bulos 3D is not affiliated with either project.
+the community hazard mapping style of Project NOAH, applied here to water quality. Bulos 3D is not affiliated with either
+project.
 
 ## 3. Changes to make in the concept paper
 
