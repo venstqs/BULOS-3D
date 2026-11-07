@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import Text from '../components/Text';
 import { Card, CardHead, Dot, Empty, Screen } from '../components/ui';
 import { apiGet } from '../lib/api';
 import { useData } from '../lib/data';
@@ -23,10 +24,10 @@ export default function Reports() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Dot id={s.station_id} />
               <Text style={[FONT.body, { fontWeight: '700', flex: 1 }]}>{s.station_id}</Text>
-              <Text style={FONT.small}>{s.samples} samples · WQHI {s.wqhi_avg}</Text>
+              <Text style={FONT.small}>{s.samples} samples, WQHI {s.wqhi_avg}</Text>
             </View>
             <Text style={[FONT.small, { marginTop: 3, color: C.ink2 }]}>
-              Turbidity {s.turbidity_pct}% · pH {s.ph_pct}% · TDS {s.tds_pct}% · intake closed {s.intake_closed_pct}%
+              Turbidity {s.turbidity_pct}%, pH {s.ph_pct}%, TDS {s.tds_pct}%, intake closed {s.intake_closed_pct}%
             </Text>
           </View>
         ))}
@@ -38,7 +39,7 @@ export default function Reports() {
         {!live?.sms.length && <Empty text="No messages yet." />}
         {live?.sms.map((m, i) => (
           <View key={`${m.t}-${i}`} style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: C.line }}>
-            <Text style={FONT.small}>To {m.role} · {m.status}</Text>
+            <Text style={FONT.small}>To {m.role}, {m.status}</Text>
             <Text style={FONT.body}>{m.message}</Text>
           </View>
         ))}
@@ -48,7 +49,7 @@ export default function Reports() {
         <CardHead title="Event log" />
         {live?.events.slice(0, 40).map((e, i) => (
           <View key={`${e.t_ms}-${i}`} style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: C.line }}>
-            <Text style={FONT.small}>{fmtDate(e.t_ms)} {fmtClock(e.t_ms)} · {e.station ?? 'system'} · {e.type.replaceAll('_', ' ').toLowerCase()}</Text>
+            <Text style={FONT.small}>{fmtDate(e.t_ms)} {fmtClock(e.t_ms)}, {e.station ?? 'system'}, {e.type.replaceAll('_', ' ').toLowerCase()}</Text>
             <Text style={[FONT.body, { color: SEV[e.severity] ?? C.ink }]}>{e.message}</Text>
           </View>
         ))}

@@ -94,16 +94,16 @@ export default function AboutPage({ live, go }) {
   const people = live?.stations.reduce((a, s) => a + (s.population || 0), 0);
   return (
     <div className="about grid gap-3">
-      <section className="grid items-center gap-6 rounded-xl bg-civic p-7 text-white md:grid-cols-[auto_minmax(0,1fr)]">
-        <span className="flex h-28 w-28 items-center justify-center rounded-full bg-white"><img src="/favicon.svg" alt="" className="h-24 w-24" /></span>
+      <section className="glass grid items-center gap-6 p-7 md:grid-cols-[auto_minmax(0,1fr)]">
+        <img src="/favicon.svg" alt="" className="h-24 w-24" />
         <div>
-          <h1 className="font-display text-[36px] font-semibold leading-[1.1]">Know the water is safe before it reaches the tap</h1>
-          <p className="mt-2 max-w-[66ch] text-[15px] leading-relaxed opacity-90">
+          <h2 className="font-display text-[34px] font-semibold leading-[1.1]">Know the water is safe before it reaches the tap</h2>
+          <p className="mt-2 max-w-[66ch] text-[15px] leading-relaxed text-ink-2">
             Bulos 3D is a water quality digital twin for rural water networks. The pilot follows the Naga River, from the Mt. Isarog slope to Naga City,
             {people ? ` with ${live.stations.length} water points serving about ${people.toLocaleString()} people.` : '.'} Built for the Xylem Global
             Student Innovation Challenge by Camarines Sur National High School.
           </p>
-          <button onClick={() => go('home')} className="mt-3 rounded-lg bg-white px-4 py-2 text-[13px] font-semibold text-civic">Open the map</button>
+          <button onClick={() => go('home')} className="btn-primary mt-3">Open the map</button>
         </div>
       </section>
 

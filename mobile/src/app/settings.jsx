@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Text, TextInput, View } from 'react-native';
+import { View } from 'react-native';
+import Text, { TextInput } from '../components/Text';
 import { Button, Card, Pill, Screen } from '../components/ui';
 import { Label } from '../components/Choice';
 import { apiGet, defaultServers } from '../lib/api';

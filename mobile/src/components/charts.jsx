@@ -1,8 +1,10 @@
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import Text from './Text';
 import Svg, { Circle, G, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 import { C, STATION_COLOR } from '../lib/theme';
 import { fmtMin, stationStatus } from '../lib/format';
+import { waterCss } from '../lib/water';
 
 function useWidth(initial = 300) {
   const [w, setW] = useState(initial);
@@ -109,15 +111,6 @@ export function Gauge({ label, value, unit, min, max, status = 'info', digits = 
   );
 }
 
-function water(te, od) {
-  const t = Math.min(1, (te ?? 0) / 60);
-  const o = Math.min(1, (od ?? 0) / 200);
-  const r = Math.round(255 * Math.min(1, 0.25 + 0.55 * t + 0.25 * o));
-  const g = Math.round(255 * Math.max(0, 0.75 - 0.35 * t - 0.4 * o));
-  const b = Math.round(255 * Math.max(0, 1 - 0.7 * t - 0.4 * o));
-  return `rgb(${r},${g},${b})`;
-}
-
 /** The DEM long profile as a river line: polluted reaches recoloured, stations, ETA chips. */
 export function RiverDiagram({ live, forecast, onSelect, height = 140 }) {
   const [width, onLayout] = useWidth();
@@ -134,7 +127,7 @@ export function RiverDiagram({ live, forecast, onSelect, height = 140 }) {
     const j = Math.min(i + 2, ch.chainage_m.length - 1);
     segs.push(
       <Line key={i} x1={sx(ch.chainage_m[i])} y1={sy(ch.elev_m[i])} x2={sx(ch.chainage_m[j])} y2={sy(ch.elev_m[j])}
-            stroke={water(ch.turb_excess[i], ch.orp_deficit[i])} strokeWidth={5} strokeLinecap="round" />,
+            stroke={waterCss(ch.turb_excess[i], ch.orp_deficit[i])} strokeWidth={5} strokeLinecap="round" />,
     );
   }
   return (

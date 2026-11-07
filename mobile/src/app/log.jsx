@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Text, TextInput } from 'react-native';
+import Text, { TextInput } from '../components/Text';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Button, Card, Empty, Pill, Screen } from '../components/ui';
 import { Label, Options } from '../components/Choice';
@@ -44,7 +44,7 @@ export default function LogMaintenance() {
           options={open.slice(0, 12).map((t) => {
             const [label, kind] = TASK_PILL[t.status];
             return {
-              value: t.id, label: t.title, sub: `${name(t.station)} · due ${fmtDate(t.due_ms)}`,
+              value: t.id, label: t.title, sub: `${name(t.station)}, due ${fmtDate(t.due_ms)}`,
               right: <Pill text={t.urgent ? 'Urgent' : label} kind={t.urgent ? 'red' : kind} />,
             };
           })}

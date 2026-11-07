@@ -1,12 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Alert, Text, View } from 'react-native';
+import { Alert, Share, View } from 'react-native';
+import Text from '../../components/Text';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Button, Card, CardHead, Empty, Meter, Pill, Row, Screen, StatusBadge, Tile } from '../../components/ui';
+import { Button, Card, CardHead, Empty, Meter, MyPointStar, NextHours, Pill, Row, Screen, StatusBadge } from '../../components/ui';
 import { Gauge, LineChart } from '../../components/charts';
+import WaterDisc from '../../components/WaterDisc';
 import { apiGet } from '../../lib/api';
 import { useData } from '../../lib/data';
 import { C, FONT } from '../../lib/theme';
+import { shareText, waterVerdict } from '../../lib/safety';
+import { waterAt, waterLabel, waterRgb } from '../../lib/water';
 import { BAND, CLASS_LABEL, EDGE_LABEL, fmt, fmtClock, fmtMin, isRealNode, notFitted } from '../../lib/format';
 
 function gaugeStatus(k, r, b) {
@@ -55,25 +59,32 @@ export default function PointDetail() {
 
   return (
     <Screen edges={[]} advisory={false}>
-      <Stack.Screen options={{ title: `${st.id} · ${st.name}` }} />
+      <Stack.Screen options={{ title: st.id }} />
 
       <Card>
         <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-          <Tile style={{ width: 78, height: 78, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ fontSize: 28, fontWeight: '700', color: C.primary }}>{st.wqhi.score}</Text>
-            <Text style={FONT.small}>WQHI</Text>
-          </Tile>
+          <WaterDisc size={92} rgb={waterRgb(...waterAt(live, st.chainage_m))}>
+            <Text style={{ fontSize: 28, fontWeight: '700', color: '#fff' }}>{st.wqhi.score}</Text>
+          </WaterDisc>
           <View style={{ flex: 1, gap: 5 }}>
-            <Text style={FONT.h2}>{st.name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+              <Text style={[FONT.h2, { flex: 1 }]}>{st.name}</Text>
+              <MyPointStar id={st.id} />
+            </View>
             <StatusBadge st={st} />
             {isRealNode(st) && <Pill text="Real sensor" kind="good" icon="radio" />}
-            <Text style={FONT.small}>{CLASS_LABEL[st.classification]} · risk {fmt(st.risk, 2)}</Text>
+            <Text style={FONT.small}>{waterLabel(...waterAt(live, st.chainage_m))}, {CLASS_LABEL[st.classification].toLowerCase()}, risk {fmt(st.risk, 2)}</Text>
           </View>
         </View>
         <Text style={[FONT.body, { color: C.ink2, marginTop: 10 }]}>{st.note}</Text>
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
           <Button title="3D site view" icon="cube" onPress={() => router.push(`/site/${st.id}`)} style={{ flex: 1 }} />
+          <Button title="Is it safe?" kind="ghost" icon="shield-checkmark" onPress={() => router.push({ pathname: '/safe', params: { id: st.id } })} style={{ flex: 1 }} />
+        </View>
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
           <Button title="Water test" kind="ghost" icon="flask" onPress={() => router.push({ pathname: '/water-test', params: { id: st.id } })} style={{ flex: 1 }} />
+          <Button title="Share" kind="ghost" icon="share-outline" style={{ flex: 1 }}
+                  onPress={() => Share.share({ message: shareText(st, waterVerdict(st, live, forecast?.stations ?? {})) }).catch(() => {})} />
         </View>
       </Card>
 
@@ -90,7 +101,7 @@ export default function PointDetail() {
       )}
 
       <Card>
-        <CardHead title="Live telemetry" sub={`Baseline ORP ${fmt(b.orp, 0)} mV · updated ${fmtClock(live.clock.epoch_ms)}`} />
+        <CardHead title="Live telemetry" sub={`Baseline ORP ${fmt(b.orp, 0)} mV, updated ${fmtClock(live.clock.epoch_ms)}`} />
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
           <Gauge label="Turbidity" unit="NTU" value={r.turbidity} min={0} max={50} status={gaugeStatus('turbidity', r, b)} />
           {!notFitted(st, 'ph') && <Gauge label="pH" unit="" value={r.ph} min={4} max={10} digits={2} status={gaugeStatus('ph', r, b)} />}
@@ -119,6 +130,7 @@ export default function PointDetail() {
             : f.arrival_s === 0 ? `Contaminated now. Peak risk ${fmt(f.peak_risk, 2)}${f.clear_s ? `, clears in ${fmtMin(f.clear_s)}` : ''}.`
               : `Polluted water arrives in ${fmtMin(f.arrival_s)}. Peak risk ${fmt(f.peak_risk, 2)}${f.clear_s ? `, clears in ${fmtMin(f.clear_s)}` : ''}.`}
         </Text>
+        {f?.series?.length > 0 && <View style={{ marginTop: 12 }}><NextHours now={st.risk} series={f.series} /></View>}
         {st.aquifer && <Text style={[FONT.small, { marginTop: 6 }]}>Shallow well: groundwater follows the river later and weaker (riverbank filtration).</Text>}
       </Card>
 
@@ -148,7 +160,7 @@ export default function PointDetail() {
         <Card>
           <CardHead title="Stored-water reserve" />
           <Meter pct={st.tank.pct ?? 0} height={10} />
-          <Text style={[FONT.small, { marginTop: 6 }]}>{fmt(st.tank.pct, 0)}% of {(st.tank.capacity_l / 1000).toFixed(1)} m³ · about {fmt(st.tank.reserve_h, 1)} h of supply</Text>
+          <Text style={[FONT.small, { marginTop: 6 }]}>{fmt(st.tank.pct, 0)}% of {(st.tank.capacity_l / 1000).toFixed(1)} m³, about {fmt(st.tank.reserve_h, 1)} h of supply</Text>
         </Card>
       )}
 

@@ -1,13 +1,18 @@
 import { Suspense, lazy, useCallback, useMemo, useState, useEffect, useRef } from 'react';
-import { Bell, ChevronDown, PlayCircle, TriangleAlert, X } from 'lucide-react';
+import { ChevronDown, CloudRain, FlaskConical, PlayCircle, Sun, TriangleAlert, X } from 'lucide-react';
 import Home, { MaintenancePage } from './components/Home';
 import { FlowPage, MapPage, ReportsPage, WaterPointsPage } from './components/Pages';
 import AboutPage from './components/About';
 import { AdvisoryModal, LogMaintenanceModal, ReminderModal, WaterTestModal } from './components/Actions';
+import { AlertBell } from './components/Alerts';
 import ErrorBoundary from './components/ErrorBoundary';
 import PageShell from './components/PageShell';
+import { SafeModal } from './components/SafeCheck';
+import WaterDisc from './components/WaterDisc';
 import { post, usePoll } from './api';
 import { fmtClock, fmtMin } from './lib/format';
+import { moodOf } from './lib/safety';
+import { waterAt, waterName, waterRgb } from './lib/waterColour';
 
 // Heavy 3D libraries load on demand so the page itself appears immediately.
 const WatershedTwin = lazy(() => import('./components/WatershedTwin'));
@@ -55,8 +60,15 @@ export default function App() {
   const { data: forecast } = usePoll('/api/forecast', 8000);
   const { data: maint, refresh: refreshMaint } = usePoll('/api/maintenance', 10000);
   const { data: trend } = usePoll(page === 'overview' ? '/api/trend?hours=12&bucket_min=30' : null, 15000);
+  const { data: weather } = usePoll('/api/weather', 600000);
   const deepLink = new URLSearchParams(window.location.search).get('inspect');
-  const [selectedId, setSelectedId] = useState(deepLink ?? 'KS-03');
+  const [myPoint, setMyPoint] = useState(() => localStorage.getItem('bulos-my-point'));
+  const toggleMine = useCallback((id) => setMyPoint((now) => {
+    const next = now === id ? null : id;
+    if (next) localStorage.setItem('bulos-my-point', next); else localStorage.removeItem('bulos-my-point');
+    return next;
+  }), []);
+  const [selectedId, setSelectedId] = useState(() => deepLink ?? localStorage.getItem('bulos-my-point') ?? 'KS-03');
   const [inspectId, setInspectId] = useState(deepLink);
   const [layers, setLayers] = useState({ heatmap: true, particles: true, streams: true, pipes: true, columns: true, catchment: true, buildings: true, labels: true, assets: true });
   const [dialog, setDialog] = useState(null);           // { kind, arg }
@@ -113,10 +125,18 @@ export default function App() {
     points: { title: 'Water points', sub: 'Readings, controls and history for each site, from the spring to the city.' },
     maintenance: { title: 'Maintenance', sub: 'Recurring tasks reschedule themselves when you mark them done.' },
     reports: { title: 'Reports', sub: 'Compliance, events and messages from the last 24 hours.' },
-    about: {},
+    about: { title: 'About Bulos 3D', sub: 'The problem, the solution, and how the twin works.' },
   };
   introByPage.overview = introByPage.home;
   const intro = introByPage[page] ?? {};
+  const fcNow = forecast?.stations ?? live?.forecast.stations ?? {};
+  const mood = moodOf(live, fcNow);
+  // Stays on one point unless something needs attention, so it does not jump with every reading
+  const homeDisc = live && (mood !== 'calm' ? [...live.stations].sort((a, b) => b.risk - a.risk)[0]
+    : live.stations.find((s) => s.id === (myPoint ?? 'KS-03')) ?? live.stations[0]);
+  const disc = !live ? null : page === 'points' ? selected : page === 'overview' || page === 'home' ? homeDisc : null;
+  const discWater = disc ? waterAt(live, disc.chainage_m) : null;
+  const rainy = /rain|shower|drizzle|thunder/i.test(weather?.condition ?? '');
 
   return (
     <div className={command ? 'min-h-full' : 'min-h-full pb-8'}>
@@ -128,7 +148,7 @@ export default function App() {
               onSelect={setSelectedId} onInspect={onInspect} onDetails={openPoint} act={act} quick={quick} notify={notify} pages={PAGES} page={page} go={go}
               actions={(
                 <>
-                  <AlertBell live={live} go={go} />
+                  <AlertBell live={live} go={go} onOpen={openPoint} />
                   {live?.clock.mode === 'sim' && <SimulationMenu speed={live.clock.speed} onScenario={runScenario} onSpeed={setSpeed} />}
                 </>
               )}
@@ -137,10 +157,22 @@ export default function App() {
         </ErrorBoundary>
       ) : (
       <PageShell
-        pages={PAGES} page={page} go={go} status={status} lite={lite} setLite={setLite} title={intro.title} sub={intro.sub}
+        pages={PAGES} page={page} go={go} status={status} lite={lite} setLite={setLite} title={intro.title} sub={intro.sub} mood={mood}
+        chips={page === 'about' ? null : (
+          <>
+            {live?.clock.mode === 'sim' && <span className="sky-chip"><FlaskConical size={12} />Simulated</span>}
+            {weather?.available && <span className="sky-chip" title={`Live weather from ${weather.source}`}>{rainy ? <CloudRain size={13} /> : <Sun size={13} />}{Math.round(weather.temp_c)}°C, {weather.condition}</span>}
+          </>
+        )}
+        side={disc && (
+          <WaterDisc key={disc.id} size={108} rgb={waterRgb(...discWater)} className="hidden shrink-0 border-[3px] border-white sm:block">
+            <b className="font-display text-[29px] leading-none">{disc.wqhi.score}</b>
+            <span className="mt-0.5 text-[11px] leading-tight">{disc.id} health<br />{waterName(...discWater)}</span>
+          </WaterDisc>
+        )}
         actions={(
           <>
-            <AlertBell live={live} go={go} />
+            <AlertBell live={live} go={go} onOpen={openPoint} />
             {live?.clock.mode === 'sim' && <SimulationMenu speed={live.clock.speed} onScenario={runScenario} onSpeed={setSpeed} />}
           </>
         )}
@@ -164,7 +196,7 @@ export default function App() {
         )}
         {page === 'flow' && <FlowPage live={live} forecast={forecast} staticData={staticData} onPreempt={setPreempt} onOpen={openPoint} />}
         {page === 'points' && (
-          <WaterPointsPage live={live} selected={selected} history={history} staticData={staticData}
+          <WaterPointsPage live={live} selected={selected} history={history} staticData={staticData} quick={quick} myPoint={myPoint} onToggleMine={toggleMine}
                            onSelect={setSelectedId} onInspect={setInspectId} onChanged={refresh} />
         )}
         {page === 'maintenance' && <MaintenancePage live={live} tasks={maint?.tasks} quick={quick} />}
@@ -183,6 +215,9 @@ export default function App() {
       {dialog?.kind === 'log' && live && (
         <LogMaintenanceModal live={live} tasks={maint?.tasks} initialTaskId={dialog.arg} act={act} onClose={() => setDialog(null)} />
       )}
+      {dialog?.kind === 'safe' && live && (
+        <SafeModal live={live} forecast={forecast} initialId={dialog.arg} myPoint={myPoint} onToggleMine={toggleMine} onOpen={openPoint} notify={notify} onClose={() => setDialog(null)} />
+      )}
       {dialog?.kind === 'advisory' && live && (
         <AdvisoryModal live={live} forecast={forecast} act={act} onClose={() => setDialog(null)} />
       )}
@@ -199,40 +234,6 @@ export default function App() {
             <span>{toast.text}</span>
             <button onClick={() => setToast(null)} aria-label="Dismiss" className="opacity-60 hover:opacity-100"><X size={15} /></button>
           </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------- alerts bell */
-function AlertBell({ live, go }) {
-  const [open, setOpen] = useState(false);
-  if (!live) return null;
-  const recent = live.events.filter((e) => (e.severity === 'danger' || e.severity === 'warning') && e.t_ms > live.clock.epoch_ms - 6 * 3600e3);
-  return (
-    <div className="relative">
-      <button onClick={() => setOpen((o) => !o)} aria-label={`${recent.length} alerts`} aria-expanded={open}
-              className="relative rounded-xl bg-white/70 p-2 text-ink-2 hover:bg-white hover:text-ink">
-        <Bell size={18} />
-        {recent.length > 0 && <span className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-critical px-1 text-center text-[10px] font-bold leading-[18px] text-white">{Math.min(99, recent.length)}</span>}
-      </button>
-      {open && (
-        <div className="site-panel absolute right-0 top-11 z-40 w-96 p-3">
-          <div className="mb-2 flex items-center justify-between px-1">
-            <span className="font-semibold">Alerts, last 6 hours</span>
-            <button onClick={() => { setOpen(false); go('reports'); }} className="link">See all</button>
-          </div>
-          {!recent.length ? <p className="px-1 py-2 text-sm text-muted">No alerts. All water points are normal.</p> : (
-            <ul className="max-h-80 divide-y divide-line overflow-y-auto">
-              {recent.slice(0, 12).map((e, i) => (
-                <li key={`${e.t_ms}-${i}`} className="px-1 py-2 text-sm">
-                  <div className="flex justify-between gap-2 text-xs text-muted"><span>{e.station ?? 'System'}</span><span>{fmtClock(e.t_ms)}</span></div>
-                  <div className={e.severity === 'danger' ? 'text-[#a32626]' : 'text-ink'}>{e.message}</div>
-                </li>
-              ))}
-            </ul>
-          )}
         </div>
       )}
     </div>

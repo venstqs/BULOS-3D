@@ -52,6 +52,21 @@ function ramp(palette, stepped, floor) {
   };
 }
 
+/** A continuous wash for the regional layer: quiet ground stays see-through, so the land shows through it. */
+function wash(palette) {
+  const [a, b, c] = PALETTES[palette] ?? PALETTES.hazard;
+  const mix = (p, q, f) => p.map((v, i) => v + (q[i] - v) * f);
+  return (t) => {
+    if (t < 0.06) return [0, 0, 0, 0];
+    const u = Math.min(1, t ** 0.75 * 1.25);           // brighter for the eye; a rainy day still reaches the top of the scale
+    return [...(u < 0.5 ? mix(a, b, u * 2) : mix(b, c, (u - 0.5) * 2)), Math.round(35 + 215 * Math.min(1, (t - 0.06) / 0.34))];
+  };
+}
+
+// Cities to find your way by when the whole region is in view
+const BICOL_CITIES = [['Naga', 123.19, 13.62], ['Legazpi', 123.74, 13.14], ['Sorsogon', 124.0, 12.97], ['Daet', 122.96, 14.11], ['Virac', 124.23, 13.58], ['Masbate', 123.62, 12.37], ['Iriga', 123.41, 13.42], ['Tabaco', 123.73, 13.36]];
+const bicolCities = { type: 'FeatureCollection', features: BICOL_CITIES.map(([name, lon, lat]) => ({ type: 'Feature', properties: { name }, geometry: { type: 'Point', coordinates: [lon, lat] } })) };
+
 /** Ragged edge that lets a site's ground melt into the satellite image. */
 let edgeTexture = null;
 function softEdge() {
@@ -185,7 +200,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
             { id: 'barangay-dots', type: 'circle', source: 'barangays', minzoom: 11, paint: { 'circle-radius': 4, 'circle-stroke-width': 1.2, 'circle-stroke-color': '#ffffff', 'circle-color': ['step', ['get', 'km'], '#2eb872', 1.5, '#f2c200', 3, '#ec835a', 6, '#d03b3b'] } },
             { id: 'places', type: 'symbol', source: 'osm', 'source-layer': 'place', minzoom: 9, filter: ['in', ['get', 'class'], ['literal', ['city', 'town', 'village', 'suburb']]], layout: { 'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name']], 'text-font': ['Noto Sans Regular'], 'text-size': ['match', ['get', 'class'], 'city', 15, 'town', 13, 11.5] }, paint: { 'text-color': '#ffffff', 'text-halo-color': 'rgba(10,25,50,0.82)', 'text-halo-width': 1.5 } },
             { id: 'tag-dot', type: 'circle', source: 'tags', maxzoom: 17.5, filter: ['==', ['get', 'kind'], 'station'], paint: { 'circle-radius': ['case', ['get', 'picked'], 8, 6], 'circle-color': ['get', 'color'], 'circle-stroke-color': '#ffffff', 'circle-stroke-width': ['case', ['get', 'picked'], 2.5, 1.5], 'circle-pitch-alignment': 'viewport' } },
-            { id: 'tag-station', type: 'symbol', source: 'tags', maxzoom: 17.5, filter: ['==', ['get', 'kind'], 'station'], layout: { 'text-field': ['get', 'text'], 'text-font': ['Noto Sans Bold'], 'text-size': 12.5, 'text-anchor': 'bottom', 'text-offset': [0, -0.9], 'text-allow-overlap': true }, paint: { 'text-color': '#ffffff', 'text-halo-color': '#0b2231', 'text-halo-width': 2 } },
+            { id: 'tag-station', type: 'symbol', source: 'tags', minzoom: 9.5, maxzoom: 17.5, filter: ['==', ['get', 'kind'], 'station'], layout: { 'text-field': ['get', 'text'], 'text-font': ['Noto Sans Bold'], 'text-size': 12.5, 'text-anchor': 'bottom', 'text-offset': [0, -0.9], 'text-allow-overlap': true }, paint: { 'text-color': '#ffffff', 'text-halo-color': '#0b2231', 'text-halo-width': 2 } },
             { id: 'tag-close', type: 'symbol', source: 'tags', minzoom: 17.5, maxzoom: 20, filter: ['==', ['get', 'kind'], 'station'], layout: { 'text-field': ['get', 'detail'], 'text-font': ['Noto Sans Bold'], 'text-size': 12.5, 'text-anchor': 'bottom', 'text-offset': [0, -7], 'text-allow-overlap': true, 'text-line-height': 1.3, 'text-max-width': 34 }, paint: { 'text-color': '#ffffff', 'text-halo-color': '#0b2231', 'text-halo-width': 1.4 } },
             { id: 'tag-other', type: 'symbol', source: 'tags', minzoom: 12.2, filter: ['!=', ['get', 'kind'], 'station'], layout: { 'text-field': ['get', 'text'], 'text-font': ['Noto Sans Regular'], 'text-size': 11.5, 'text-anchor': 'top', 'text-offset': [0, 0.5], 'text-allow-overlap': false }, paint: { 'text-color': ['get', 'color'], 'text-halo-color': '#0b2231', 'text-halo-width': 1.8 } },
           ],
@@ -743,12 +758,15 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
     if (!map || !ready) return;
     const on = Boolean(hazard) && view.hazard !== 'none' && tauStep === 0;
     if (map.getLayer('hazard')) map.setLayoutProperty('hazard', 'visibility', on ? 'visible' : 'none');
+    for (const id of ['bicol-line', 'bicol-cities']) {
+      if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on && hazard.index === 'bicol' ? 'visible' : 'none');
+    }
     if (!on) return;
     const key = `${view.palette}|${hazard.index}|${hazard.data}`;
     if (map.hazardKey !== key) {
       map.hazardKey = key;
       const stepped = hazard.index === 'risk';
-      const url = rasterUrl(hazard, ramp(view.palette, stepped, stepped ? 0.25 : hazard.index === 'access' ? 0.02 : 0.06));
+      const url = rasterUrl(hazard, hazard.index === 'bicol' ? wash(view.palette) : ramp(view.palette, stepped, stepped ? 0.25 : hazard.index === 'access' ? 0.02 : 0.06));
       const coordinates = [[hazard.west, hazard.north], [hazard.east, hazard.north], [hazard.east, hazard.south], [hazard.west, hazard.south]];
       const src = map.getSource('hazard');
       if (src) src.updateImage({ url, coordinates });
@@ -756,10 +774,34 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
         map.addSource('hazard', { type: 'image', url, coordinates });
         map.addLayer({ id: 'hazard', type: 'raster', source: 'hazard', paint: { 'raster-opacity': 0.7 } }, 'catchment');
       }
+      if (hazard.outline && !map.getSource('bicol-line')) {
+        map.addSource('bicol-line', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: hazard.outline } });
+        map.addLayer({ id: 'bicol-line', type: 'line', source: 'bicol-line', paint: { 'line-color': '#ffffff', 'line-width': 1.4, 'line-opacity': 0.9 } }, 'catchment');
+        map.addSource('bicol-cities', { type: 'geojson', data: bicolCities });
+        map.addLayer({ id: 'bicol-cities', type: 'symbol', source: 'bicol-cities', maxzoom: 10, layout: { 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Bold'], 'text-size': 13, 'text-allow-overlap': true }, paint: { 'text-color': '#ffffff', 'text-halo-color': 'rgba(10,25,50,0.9)', 'text-halo-width': 1.6 } });
+      }
     }
-    // 90 m cells are too coarse to read up close, so colours fade as you zoom in
-    map.setPaintProperty('hazard', 'raster-opacity', ['interpolate', ['linear'], ['zoom'], 14, view.opacity, 16.5, 0]);
+    // Cells are too coarse to read up close, so colours fade as you zoom in
+    const [fadeFrom, fadeTo] = hazard.index === 'bicol' ? [12, 15] : [14, 16.5];
+    map.setPaintProperty('hazard', 'raster-opacity', ['interpolate', ['linear'], ['zoom'], fadeFrom, hazard.index === 'bicol' ? Math.max(view.opacity, 0.85) : view.opacity, fadeTo, 0]);
   }, [hazard, view.hazard, view.palette, view.opacity, tauStep, ready]);
+
+  // The regional layer needs the whole region in view; leaving it comes back to the river
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    const regional = view.hazard === 'bicol';
+    if (regional === Boolean(map.regionView)) return;
+    map.regionView = regional;
+    // The Philippine Trench drops past the camera's far limit, so a sea colour sits behind it
+    map.getContainer().parentElement.style.backgroundColor = regional ? '#02293c' : '';
+    if (!regional) { controls.current.home?.(); return; }
+    const wide = window.innerWidth >= 1024;
+    map.fitBounds([[122.25, 11.72], [124.5, 14.55]], {
+      padding: { left: (insets?.left ?? 12) + (wide ? 30 : 0), right: (insets?.right ?? 12) + 20, top: (insets?.top ?? 40) + 20, bottom: (insets?.bottom ?? 40) + 20 },
+      pitch: 0, bearing: 0, duration: 2600,
+    });
+  }, [view.hazard, ready, insets, controls]);
 
   useEffect(() => {
     const map = mapRef.current;

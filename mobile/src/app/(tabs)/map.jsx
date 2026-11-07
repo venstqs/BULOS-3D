@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Animated, Easing, PanResponder, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Easing, PanResponder, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import Text, { TextInput } from '../../components/Text';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,14 +8,14 @@ import { Button, Dot, Meter, Pill, PressScale, Reveal, StatusBadge, Toast } from
 import Logo from '../../components/Logo';
 import Web3D from '../../components/Web3D';
 import { useData } from '../../lib/data';
+import { dockSpace } from '../../lib/dock';
 import { fmt, fmtMin, stationStatus } from '../../lib/format';
 import { C, FONT, shadow } from '../../lib/theme';
 
-const LAYERS = { risk: 'Risk', turbidity: 'Turbidity', ph: 'pH', tds: 'TDS', bio: 'Biological', none: 'None' };
-const KEY = { risk: ['Moderate', 'Severe'], turbidity: ['Clear', 'Cloudy'], ph: ['Normal', 'Off range'], tds: ['Low', 'High'], bio: ['Low', 'High'] };
+const LAYERS = { bicol: 'Whole Bicol', risk: 'Risk', turbidity: 'Turbidity', ph: 'pH', tds: 'TDS', bio: 'Biological', none: 'None' };
+const KEY = { bicol: ['Lower', 'Higher'], risk: ['Moderate', 'Severe'], turbidity: ['Clear', 'Cloudy'], ph: ['Normal', 'Off range'], tds: ['Low', 'High'], bio: ['Low', 'High'] };
 const RAMP = ['#ffe05a', '#fa9628', '#e0342c'];
-const PEEK = 150;     // how much of the sheet shows when lowered
-const OPEN = 370;     // its height when raised
+const PEEK = 132;     // how much of the sheet shows when lowered
 
 function Fact({ label, value }) {
   return (
@@ -96,7 +97,17 @@ function SpotReport({ spot, near, onClose, onPoint }) {
         <Pressable onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Close report"><Ionicons name="close" size={20} color={C.muted} /></Pressable>
       </View>
       {spot.loading ? <Text style={[FONT.body, { marginTop: 10, color: C.ink2 }]}>Checking this spot…</Text>
-        : spot.error ? <Text style={[FONT.body, { marginTop: 10, color: C.ink2 }]}>This spot is outside the area the twin covers.</Text> : (
+        : spot.error ? <Text style={[FONT.body, { marginTop: 10, color: C.ink2 }]}>This spot is outside Bicol.</Text>
+          : spot.region ? (
+            <>
+              <View style={s.facts}>
+                <Fact label="Runoff risk" value={spot.level} />
+                <Fact label="Elevation" value={`${spot.elevation_m.toLocaleString()} m`} />
+                <Fact label="Rain, next 24 h" value={spot.rain_next24_mm == null ? 'No data' : `${fmt(spot.rain_next24_mm, 1)} mm`} />
+              </View>
+              <Text style={[FONT.small, { marginTop: 8 }]}>Outside the river twin, so there are no water readings here. An estimate from real terrain and live rain.</Text>
+            </>
+          ) : (
           <>
             <View style={s.facts}>
               <Fact label="Elevation" value={`${Math.round(spot.elevation_m ?? 0)} m`} />
@@ -123,7 +134,9 @@ function SpotReport({ spot, near, onClose, onPoint }) {
 export default function MapTab() {
   const { heatIndex, setHeatIndex, live, forecast, servers } = useData();
   const router = useRouter();
-  const top = useSafeAreaInsets().top;
+  const { top, bottom } = useSafeAreaInsets();
+  const space = dockSpace(bottom);
+  const OPEN = Math.min(350, useWindowDimensions().height * 0.48);   // its height when raised
   const [command, setCommand] = useState(null);
   const [query, setQuery] = useState('');
   const [picked, setPicked] = useState(null);
@@ -139,7 +152,7 @@ export default function MapTab() {
   const run = (js) => setCommand({ js, n: Date.now() });
 
   useEffect(() => {
-    Animated.timing(lift, { toValue: raised ? 1 : 0, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    Animated.timing(lift, { toValue: raised ? 1 : 0, duration: 260, easing: Easing.out(Easing.cubic), useNativeDriver: false }).start();
   }, [lift, raised]);
 
   const drag = useMemo(() => PanResponder.create({
@@ -205,13 +218,13 @@ export default function MapTab() {
         </Reveal>
       </View>
 
-      <Animated.View pointerEvents="box-none" style={[s.tools, { bottom: PEEK + 10, transform: [{ translateY: lift.interpolate({ inputRange: [0, 1], outputRange: [0, PEEK - OPEN] }) }] }]}>
+      <Animated.View pointerEvents="box-none" style={[s.tools, { bottom: lift.interpolate({ inputRange: [0, 1], outputRange: [space + PEEK + 10, space + OPEN + 10] }) }]}>
         <PressScale onPress={() => { close(); run('window.bulosHome && window.bulosHome(); true;'); }} style={s.round} accessibilityLabel="Back to the whole river">
           <Ionicons name="locate" size={20} color={C.primary} />
         </PressScale>
       </Animated.View>
 
-      <Animated.View style={[s.sheet, { height: OPEN, transform: [{ translateY: lift.interpolate({ inputRange: [0, 1], outputRange: [OPEN - PEEK, 0] }) }] }]}>
+      <Animated.View style={[s.sheet, { bottom: space, height: lift.interpolate({ inputRange: [0, 1], outputRange: [PEEK, OPEN] }) }]}>
         <Pressable {...drag.panHandlers} onPress={() => setRaised((v) => !v)} style={s.handleArea} accessibilityRole="button" accessibilityLabel={raised ? 'Lower the panel' : 'Raise the panel'}>
           <View style={s.handle} />
         </Pressable>
@@ -226,33 +239,34 @@ export default function MapTab() {
               <Text style={FONT.small}>{KEY[heatIndex][1]}</Text>
             </View>
           )}
+          {heatIndex === 'bicol' && <Text style={[FONT.small, { marginTop: 6 }]}>Where rain runoff collects, from real terrain and the live rain forecast. An estimate, not water quality.</Text>}
         </ScrollView>
       </Animated.View>
-      <Toast />
+      <Toast lift={space + PEEK + 10} />
     </View>
   );
 }
 
 const s = StyleSheet.create({
   top: { position: 'absolute', left: 10, right: 10, gap: 6 },
-  search: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderRadius: 14, paddingHorizontal: 10, height: 48, ...shadow },
+  search: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderRadius: 24, paddingHorizontal: 10, height: 48, ...shadow },
   input: { flex: 1, fontSize: 15, color: C.ink, paddingVertical: 0 },
-  results: { backgroundColor: '#fff', borderRadius: 14, paddingVertical: 4, ...shadow },
+  results: { backgroundColor: '#fff', borderRadius: 20, paddingVertical: 4, ...shadow },
   result: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 10 },
-  chip: { paddingHorizontal: 13, paddingVertical: 7, borderRadius: 10, backgroundColor: '#fff', ...shadow },
+  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999, backgroundColor: '#fff', ...shadow },
   chipOn: { backgroundColor: C.primary },
   chipText: { fontWeight: '700', color: C.ink2, fontSize: 13 },
   tools: { position: 'absolute', right: 10 },
   round: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', ...shadow },
-  sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: '#fff', borderTopLeftRadius: 18, borderTopRightRadius: 18, ...shadow },
+  sheet: { position: 'absolute', left: 10, right: 10, backgroundColor: '#fff', borderRadius: 24, ...shadow },
   handleArea: { alignItems: 'center', paddingVertical: 9 },
   handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#cdd6e4' },
-  point: { backgroundColor: C.panel2, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, minWidth: 104, gap: 2 },
+  point: { backgroundColor: C.card, borderRadius: 16, paddingHorizontal: 12, paddingVertical: 8, minWidth: 104, gap: 2 },
   status: { width: 10, height: 10, borderRadius: 5 },
   reportHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   facts: { flexDirection: 'row', gap: 8, marginTop: 12 },
-  fact: { flex: 1, backgroundColor: C.panel2, borderRadius: 12, padding: 10 },
-  nearest: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.panel2, borderRadius: 12, padding: 12, marginTop: 8 },
+  fact: { flex: 1, backgroundColor: C.card, borderRadius: 16, padding: 10 },
+  nearest: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: C.card, borderRadius: 16, padding: 12, marginTop: 8 },
   key: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
   ramp: { flex: 1, height: 7, borderRadius: 4, overflow: 'hidden', flexDirection: 'row' },
 });

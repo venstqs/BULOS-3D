@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Activity, Box, Check, ChevronDown, Eye, Layers as LayersIcon, LayoutPanelLeft, Shapes, SlidersHorizontal, Table2, ChevronUp, Clock, Crosshair, Cpu, Droplets, FlaskConical, Lock, LockOpen, Menu, Minus, Navigation, Pause, Plane, Play, Plus, RotateCcw, Search, Send, Tag, TriangleAlert, Users, X,
+  Activity, Box, Check, ShieldCheck, ChevronDown, Eye, Layers as LayersIcon, LayoutPanelLeft, Shapes, SlidersHorizontal, Table2, ChevronUp, Clock, Crosshair, Cpu, Droplets, FlaskConical, Lock, LockOpen, Menu, Minus, Navigation, Pause, Plane, Play, Plus, RotateCcw, Search, Send, Tag, TriangleAlert, Users, X,
 } from 'lucide-react';
 import { get, post, usePoll } from '../api';
 import { BAND, CLOSED_EARLY, EDGE_LABEL, fmt, fmtClock, fmtMin, stationStatus } from '../lib/format';
@@ -248,11 +248,12 @@ const HAZARDS = {
   ph: { label: 'pH', group: 'Water quality', low: 'Normal', high: 'Off range', note: 'How far the water is from a neutral level. The middle of the scale is the safe limit.' },
   tds: { label: 'Total dissolved solids', group: 'Water quality', low: 'Low', high: 'High', note: 'How much mineral and salt is dissolved in the water. The middle of the scale is the safe limit.' },
   bio: { label: 'Biological indicator', group: 'Water quality', low: 'Low', high: 'High', note: 'A sign of sewage or animal waste in the water.' },
+  bicol: { label: 'Bicol runoff risk', group: 'Whole Bicol', low: 'Lower', high: 'Higher', note: 'Where rain runoff is likely to collect across all of Bicol, from real terrain and the live rain forecast. An estimate of where water gathers, not a measurement of water quality.' },
   wells: { label: 'Shallow well exposure', group: 'Water access', low: 'Lower', high: 'Higher', note: 'Low ground near the river, where wells draw in river water. Our estimate.' },
   runoff: { label: 'Runoff sources', group: 'Water access', low: 'Low', high: 'High', note: 'Wet, steep ground that sends rain and pollution into the river. Our estimate.' },
   access: { label: 'Distance to water', group: 'Water access', low: 'Near', high: '5 km+', note: 'Straight-line distance to the nearest water point or district facility.' },
 };
-const HEAT = ['risk', 'turbidity', 'ph', 'tds', 'bio'];
+const HEAT = ['risk', 'turbidity', 'ph', 'tds', 'bio', 'bicol'];
 const PALETTE_CSS = { hazard: ['#ffe05a', '#fa9628', '#e0342c'], ocean: ['#bae6fd', '#3896f0', '#1432a0'], clear: ['#fde725', '#21918c', '#440154'] };
 const VIEW_KEY = 'bulos-view';
 const DEFAULT_VIEW = { mapLabels: true, hazard: 'risk', opacity: 0.7, palette: 'hazard', base: 'satellite', relief: 1.5 };
@@ -299,6 +300,7 @@ function LayersWindow({ view, setView, layers, setLayers }) {
   return (
     <div className="px-3 pb-3 text-[13px]">
       <h3 className="pt-0.5 font-display text-[13px] font-semibold">Colour the map by</h3>
+      {group('Whole Bicol')}
       {group('Water quality')}
       {group('Water access')}
       {HAZARDS[view.hazard]?.note && <p className="mt-2 rounded-lg bg-[#f2f6ff] px-2.5 py-2 text-[12.5px] leading-snug text-ink-2">{HAZARDS[view.hazard].note}</p>}
@@ -445,8 +447,8 @@ function LegendWindow({ view, layers }) {
 }
 
 const SOURCES = [
-  ['Real', 'pill-good', ['Elevation model: Copernicus GLO-90 (90 m cells)', '3D map terrain: open elevation tiles on AWS', 'Satellite imagery: Esri, with Mapbox as an option. Capture dates are not known, and photos can show clouds', 'River, streams, roads and building outlines: OpenStreetMap', 'Water district facilities and barangay names: OpenStreetMap', 'Weather right now: Open-Meteo weather model, not a local rain gauge', 'River flow estimate: global model through Open-Meteo, too coarse for this small river']],
-  ['Computed', 'pill-blue', ['River speed and travel time, from real slope', 'Watershed outline and drainage areas. These are rough in the flat lowlands near the city', 'Well exposure and runoff layers, from the 90 m elevation model', 'Forecasts and risk scores, from the twin']],
+  ['Real', 'pill-good', ['Elevation model: Copernicus GLO-90 (90 m cells)', 'Bicol boundary: geoBoundaries (NAMRIA, PSA, OCHA)', 'Rain across Bicol: Open-Meteo live forecast', '3D map terrain: open elevation tiles on AWS', 'Satellite imagery: Esri, with Mapbox as an option. Capture dates are not known, and photos can show clouds', 'River, streams, roads and building outlines: OpenStreetMap', 'Water district facilities and barangay names: OpenStreetMap', 'Weather right now: Open-Meteo weather model, not a local rain gauge', 'River flow estimate: global model through Open-Meteo, too coarse for this small river']],
+  ['Computed', 'pill-blue', ['River speed and travel time, from real slope', 'Watershed outline and drainage areas. These are rough in the flat lowlands near the city', 'Well exposure and runoff layers, from the 90 m elevation model', 'Bicol runoff risk, from the terrain and live rain. It is not calibrated and it is not a water test', 'Forecasts and risk scores, from the twin']],
   ['Simulated', 'pill-amber', ['All sensor readings at the five water points', 'The rain the twin uses, which does not follow the real weather', 'Spills, valves, tanks, text messages, signal strength and battery levels']],
   ['Illustrative', 'pill-grey', ['The five water points are a proposed layout, not existing sites', 'People served and household counts', 'AG-02 and the rain gauge show where government stations could connect. No DOST data is connected', 'Pipelines and the barangay network follow real roads, but they are proposed routes', 'Most building heights are a 5 m default', 'Facility and people models']],
 ];
@@ -509,7 +511,17 @@ function HazardCard({ spot, live, onClose, onSpill }) {
       </div>
       {!spot && <p className="mt-1 text-xs text-muted">Checking…</p>}
       {spot?.error && <p className="mt-1 text-xs text-ink-2">{spot.error}</p>}
-      {spot && !spot.error && (
+      {spot?.region && (
+        <>
+          <div className="mt-1">
+            <Row label="Runoff risk">{spot.level}</Row>
+            <Row label="Elevation">{spot.elevation_m.toLocaleString()} m</Row>
+            {spot.rain_next24_mm != null && <Row label="Rain, next 24 hours">{fmt(spot.rain_next24_mm, 1)} mm</Row>}
+          </div>
+          <p className="mt-1.5 text-[11px] leading-snug text-muted">Outside the river twin, so there are no water readings here. This is an estimate from real terrain and live rain.</p>
+        </>
+      )}
+      {spot && !spot.error && !spot.region && (
         <>
           <div className="mt-1">
             <Row label="Nearest water point">{spot.nearest_id} · {fmt(spot.nearest_km, 1)} km</Row>
@@ -635,11 +647,11 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
   useEffect(() => { localStorage.setItem(VIEW_KEY, JSON.stringify(view)); }, [view]);
   const isHeat = HEAT.includes(view.hazard);
   const hazardPath = view.hazard === 'none' ? null : isHeat ? `/api/heatmap?index=${view.hazard}` : `/api/layer/${view.hazard}`;
-  const { data: hazardGrid } = usePoll(hazardPath, isHeat ? 8000 : 0);
+  const { data: hazardGrid } = usePoll(hazardPath, view.hazard === 'bicol' ? 900000 : isHeat ? 8000 : 0);
   const checkSpot = useMemo(() => (at) => {
     setProbe(at);
     setSpot(null);
-    get(`/api/hazard?lat=${at.lat}&lon=${at.lon}`).then(setSpot).catch(() => setSpot({ error: 'That spot is outside the modelled area.' }));
+    get(`/api/hazard?lat=${at.lat}&lon=${at.lon}`).then(setSpot).catch(() => setSpot({ error: 'That spot is outside Bicol.' }));
   }, []);
   const selected = live?.stations.find((s) => s.id === selectedId);
   const danger = live ? exposure(live) : null;
@@ -700,7 +712,10 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
                     <Figure value={danger.next ? fmtMin(danger.next.s) : 'None'} label={danger.next ? `Next plume, ${danger.next.id}` : 'Next plume'} alert={Boolean(danger.next)} />
                   </dl>
                   <Tracker live={live} danger={danger} onPick={focus} />
-                  <button onClick={() => quick('advisory')} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-civic py-2 text-[13px] font-semibold text-white"><Send size={13} />Send advisory</button>
+                  <div className="mt-3 grid grid-cols-2 gap-1.5">
+                    <button onClick={() => quick('safe')} className="flex items-center justify-center gap-1.5 rounded-lg bg-[#e9efff] py-2 text-[13px] font-semibold text-civic"><ShieldCheck size={13} />Is it safe?</button>
+                    <button onClick={() => quick('advisory')} className="flex items-center justify-center gap-1.5 rounded-lg bg-civic py-2 text-[13px] font-semibold text-white"><Send size={13} />Send advisory</button>
+                  </div>
                 </div>
               )}
             </div>
@@ -757,6 +772,11 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
           )}
 
           <SimulationBar live={live} />
+          {view.hazard === 'bicol' && hazardGrid?.index === 'bicol' && (
+            <div role="status" className={`${card} sim-bar absolute bottom-3 left-1/2 z-[24] hidden max-w-[560px] -translate-x-1/2 px-3 py-1.5 text-center text-[12.5px] text-ink-2 lg:block`}>
+              <b className="text-ink">Bicol runoff risk.</b> {hazardGrid.rain.live ? `Live rain forecast: ${fmt(hazardGrid.rain.mean_mm, 1)} mm average in the next 24 hours, up to ${fmt(hazardGrid.rain.max_mm, 0)} mm.` : 'Live rain is unavailable, so this shows terrain only.'} An estimate, not water quality.
+            </div>
+          )}
           {guide && <GuidedDemo live={live} forecast={forecast} controls={controls} time={time} onClose={() => setGuide(false)} />}
           {welcome && !presenting && (
             <Welcome

@@ -8,7 +8,8 @@ const CREDITS = [
   '© OpenStreetMap contributors, OpenFreeMap',
   'Terrain: Mapzen and AWS open data',
   'Elevation model: Copernicus GLO-90 (ESA/Airbus)',
-  'Weather: Open-Meteo',
+  'Bicol boundary: geoBoundaries (NAMRIA, PSA, OCHA), CC BY 3.0 IGO',
+  'Weather and rain: Open-Meteo',
   'Textures: Poly Haven (CC0)',
   'Map engine: MapLibre GL',
 ];

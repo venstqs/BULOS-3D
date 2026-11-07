@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import Text from './Text';
 import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
 import { Button, Card, Dot, LoadingLogo, Meter, Pill, StatusBadge } from './ui';
@@ -139,8 +140,8 @@ function NativeMapSchematic({ live, onSelect }) {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
               <Dot id={st.id} size={10} />
               <View>
-                <Text style={[FONT.body, { fontWeight: '700' }]}>{st.id} · {st.name}</Text>
-                <Text style={FONT.small}>{fmt(st.elevation_m, 0)} m elev · chainage {(st.chainage_m / 1000).toFixed(1)} km</Text>
+                <Text style={[FONT.body, { fontWeight: '700' }]}>{st.id}, {st.name}</Text>
+                <Text style={FONT.small}>{fmt(st.elevation_m, 0)} m elev, chainage {(st.chainage_m / 1000).toFixed(1)} km</Text>
               </View>
             </View>
             <View style={{ alignItems: 'flex-end', gap: 2 }}>
@@ -168,7 +169,7 @@ function NativeSiteSchematic({ st }) {
         <Card style={{ marginVertical: 0, padding: 10 }}>
           <Text style={[FONT.small, { fontWeight: '700', marginBottom: 4 }]}>Telemetry & Optics</Text>
           <Text style={FONT.body}>
-            Turbidity: {st.reading.turbidity} NTU · ORP: {st.reading.orp} mV · pH: {st.reading.ph}
+            Turbidity: {st.reading.turbidity} NTU, ORP: {st.reading.orp} mV, pH: {st.reading.ph}
           </Text>
           <Text style={[FONT.small, { color: C.ink2 }]}>
             {st.classification === 'SENSOR_BIOFOULING' ? 'Optical probe has biofilm; drift compensator active.' : 'Sensor clean; readings at baseline.'}
@@ -199,7 +200,7 @@ function NativeSiteSchematic({ st }) {
       </View>
 
       <Text style={[FONT.small, { color: C.ink2, textAlign: 'center' }]}>
-        LoRaWAN edge node: {st.link.rssi} dBm · battery {st.link.battery_v} V
+        LoRaWAN edge node: {st.link.rssi} dBm, battery {st.link.battery_v} V
       </Text>
     </View>
   );

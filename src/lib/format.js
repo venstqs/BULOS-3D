@@ -48,6 +48,8 @@ export function stationStatus(st) {
 export const fmtClock = (ms) =>
   new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
+export const fmtDate = (ms) => new Date(ms).toLocaleDateString([], { month: 'short', day: 'numeric' });
+
 export const fmtMin = (s) => {
   if (s == null) return '—';
   const m = Math.round(s / 60);

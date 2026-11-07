@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, Box, Lock, LockOpen, MessageSquareText, Printer } from 'lucide-react';
+import { Download, Box, Lock, LockOpen, MessageSquareText, Printer, ShieldCheck, Star } from 'lucide-react';
 import LineChart from './charts/LineChart';
 import RiverSchematic from './RiverSchematic';
 import StationPanel, { StatusBadge } from './StationPanel';
@@ -177,7 +177,7 @@ export function FlowPage({ live, forecast, staticData, onPreempt, onOpen }) {
   return (
     <div className="grid gap-3">
       <section className="section grid lg:grid-cols-[300px_minmax(0,1fr)]">
-        <div className={`flex flex-col rounded-t-xl p-4 text-white lg:rounded-l-xl lg:rounded-tr-none ${next ? 'bg-[#b5302a]' : 'bg-civic'}`}>
+        <div className={`flex flex-col rounded-t-xl p-4 lg:rounded-l-xl lg:rounded-tr-none ${next ? 'bg-[#b5302a] text-white' : 'bg-[#e4ecff] text-ink'}`}>
           <p className="text-[13px] opacity-85">Next polluted water</p>
           <p className="mt-0.5 font-display text-[32px] font-semibold leading-tight">{next ? `${next.id} in ${fmtMin(next.arrival_s)}` : 'None expected'}</p>
           <p className="mt-1.5 text-sm leading-relaxed opacity-90">
@@ -185,7 +185,7 @@ export function FlowPage({ live, forecast, staticData, onPreempt, onOpen }) {
               : 'No polluted water is forecast to reach any intake in the next 4 hours.'}
           </p>
           <label className="mt-auto flex items-start gap-2 pt-4 text-[13px]">
-            <input type="checkbox" className="mt-0.5 h-4 w-4 accent-white" checked={live.auto_preempt} onChange={(e) => onPreempt(e.target.checked)} />
+            <input type="checkbox" className={`mt-0.5 h-4 w-4 ${next ? 'accent-white' : 'accent-[#2f5be7]'}`} checked={live.auto_preempt} onChange={(e) => onPreempt(e.target.checked)} />
             Close intakes automatically up to 30 minutes before contamination arrives
           </label>
         </div>
@@ -342,7 +342,7 @@ function CompareAll({ live, selected, onSelect }) {
   );
 }
 
-export function WaterPointsPage({ live, selected, history, staticData, onSelect, onInspect, onChanged }) {
+export function WaterPointsPage({ live, selected, history, staticData, onSelect, onInspect, onChanged, quick, myPoint, onToggleMine }) {
   if (!live || !selected) return <Wait />;
   const s = history?.series ?? [];
   const t0 = s[0]?.t_ms ?? 0;
@@ -356,7 +356,7 @@ export function WaterPointsPage({ live, selected, history, staticData, onSelect,
           return (
             <button key={st.id} role="tab" aria-selected={st.id === selected.id} onClick={() => onSelect(st.id)} className="point-tab">
               <span className="flex items-center justify-between gap-2">
-                <span className="text-[13px] font-semibold">{st.id}</span>
+                <span className="flex items-center gap-1 text-[13px] font-semibold">{st.id}{st.id === myPoint && <Star size={12} fill="#f2c200" className="text-advisory" aria-label="My water point" />}</span>
                 <span className="point-score font-display text-[17px] font-semibold tabular">{st.wqhi.score}</span>
               </span>
               <span className="mt-0.5 block truncate text-left text-[12px] opacity-80">{st.name}</span>
@@ -368,7 +368,15 @@ export function WaterPointsPage({ live, selected, history, staticData, onSelect,
       <CompareAll live={live} selected={selected} onSelect={onSelect} />
 
       <Section title={selected.name} note={`${selected.owner}. Sensor readings are simulated.`}
-               right={<button onClick={() => onInspect(selected.id)} className="btn-primary !py-1.5"><Box size={14} />Open 3D site view</button>} flush>
+               right={(
+                 <div className="flex flex-wrap justify-end gap-1.5">
+                   <button onClick={() => onToggleMine(selected.id)} aria-pressed={myPoint === selected.id} className="btn-ghost inline-flex items-center gap-1.5 !py-1.5">
+                     <Star size={14} fill={myPoint === selected.id ? '#f2c200' : 'none'} className={myPoint === selected.id ? 'text-advisory' : ''} />{myPoint === selected.id ? 'My water point' : 'Make this mine'}
+                   </button>
+                   <button onClick={() => quick('safe', selected.id)} className="btn-ghost inline-flex items-center gap-1.5 !py-1.5"><ShieldCheck size={14} />Is it safe?</button>
+                   <button onClick={() => onInspect(selected.id)} className="btn-primary !py-1.5"><Box size={14} />Open 3D site view</button>
+                 </div>
+               )} flush>
         <StationPanel key={selected.id} st={selected} history={history} forecast={live.forecast.stations} pnsdw={staticData?.pnsdw ?? {}} onChanged={onChanged} />
       </Section>
       {s.length > 1 && (

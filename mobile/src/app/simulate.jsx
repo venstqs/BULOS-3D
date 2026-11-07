@@ -1,4 +1,4 @@
-import { Text } from 'react-native';
+import Text from '../components/Text';
 import { useRouter } from 'expo-router';
 import { Card, Empty, Screen } from '../components/ui';
 import { Chips, Label, Options } from '../components/Choice';

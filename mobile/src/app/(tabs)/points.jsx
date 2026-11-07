@@ -1,48 +1,56 @@
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import Text from '../../components/Text';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Card, Dot, Screen, StatusBadge, Tile } from '../../components/ui';
+import { Card, CardHead, Empty, MyPointStar, Screen, StatusBadge, Tile } from '../../components/ui';
+import { LineChart } from '../../components/charts';
+import WaterDisc from '../../components/WaterDisc';
 import { useData } from '../../lib/data';
 import { C, FONT } from '../../lib/theme';
-import { KIND_ICON, fmt } from '../../lib/format';
+import { fmt, fmtClock, fmtMin } from '../../lib/format';
+import { waterAt, waterLabel, waterRgb } from '../../lib/water';
 
 export default function PointsTab() {
-  const { live, forecast } = useData();
+  const { live, forecast, trend } = useData();
   const router = useRouter();
   return (
-    <Screen title="Water points" subtitle="Springs, kiosks, wells and intakes">
+    <Screen dock sky title="Water points" subtitle="From the spring down to the health unit">
       {live?.stations.map((st) => {
         const f = forecast?.stations?.[st.id];
+        const [te, od] = waterAt(live, st.chainage_m);
         return (
-          <Tile key={st.id} onPress={() => router.push(`/point/${st.id}`)} style={{ padding: 14 }}>
+          <Tile key={st.id} onPress={() => router.push(`/point/${st.id}`)} style={{ padding: 14, borderWidth: 0, backgroundColor: C.card, borderRadius: 24 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View style={{ width: 46, height: 46, borderRadius: 14, backgroundColor: C.panel2, alignItems: 'center', justifyContent: 'center' }}>
-                <Ionicons name={KIND_ICON[st.kind] ?? 'water'} size={22} color={C.primary} />
-              </View>
-              <View style={{ flex: 1, gap: 3 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Dot id={st.id} size={8} />
-                  <Text style={FONT.small}>{st.id}</Text>
-                </View>
-                <Text style={[FONT.body, { fontWeight: '700' }]} numberOfLines={1}>{st.name}</Text>
+              <WaterDisc size={64} rgb={waterRgb(te, od)} still>
+                <Text style={{ fontSize: 20, fontWeight: '700', color: '#fff' }}>{st.wqhi.score}</Text>
+              </WaterDisc>
+              <View style={{ flex: 1, gap: 4 }}>
+                <Text style={[FONT.body, { fontWeight: '600' }]} numberOfLines={2}>{st.name}</Text>
                 <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                   <StatusBadge st={st} />
-                  {st.valve && !st.valve.open && <Text style={[FONT.small, { color: '#a32626', fontWeight: '700' }]}>intake closed</Text>}
-                  {f?.arrival_s > 0 && <Text style={[FONT.small, { color: '#7a5600', fontWeight: '700' }]}>plume in {Math.round(f.arrival_s / 60)} min</Text>}
+                  <Text style={FONT.small}>{waterLabel(te, od)}</Text>
                 </View>
+                {st.valve && !st.valve.open && <Text style={[FONT.small, { color: '#a32626', fontWeight: '600' }]}>Intake closed</Text>}
+                {f?.arrival_s > 0 && <Text style={[FONT.small, { color: '#7a5600', fontWeight: '600' }]}>Plume in {fmtMin(f.arrival_s)}</Text>}
+                <Text style={FONT.small} numberOfLines={1}>
+                  {st.id}, {fmt(st.elevation_m, 0)} m{st.population ? `, ${st.population.toLocaleString()} people` : ', monitoring only'}
+                </Text>
               </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={{ fontSize: 20, fontWeight: '700', color: C.primary }}>{st.wqhi.score}</Text>
-                <Text style={FONT.small}>WQHI</Text>
-              </View>
+              <MyPointStar id={st.id} size={22} color={C.muted} />
+              <Ionicons name="chevron-forward" size={18} color={C.muted} />
             </View>
-            <Text style={[FONT.small, { marginTop: 8 }]}>
-              {fmt(st.elevation_m, 0)} m · {st.population ? `serves ${st.population.toLocaleString()} people` : 'monitoring only'} · {st.owner}
-            </Text>
           </Tile>
         );
       })}
-      {!live && <Card><Text style={FONT.small}>Waiting for data…</Text></Card>}
+      {!live && <Empty text="Waiting for data…" />}
+
+      <Card>
+        <CardHead title="Water health over time" sub="Average of all points, last 12 hours" />
+        {trend?.length > 1 ? (
+          <LineChart series={[{ id: 'wq', label: 'Health', color: C.primary, area: true, points: trend.map((p) => ({ x: p.t_ms, y: p.avg })) }]}
+                     yDomain={[0, 100]} xFormat={fmtClock} yFormat={(y) => y.toFixed(0)} />
+        ) : <Empty text="Collecting history…" />}
+      </Card>
     </Screen>
   );
 }

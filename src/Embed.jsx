@@ -19,7 +19,7 @@ function EmbedMap({ staticData, live, forecast, heatmap, index, showHeat, id, on
   const controls = useRef({});
   const [probe, setProbe] = useState(null);
   useEffect(() => {
-    window.bulosFocus = (station) => { setProbe(null); controls.current.focus?.(station, { right: 12, top: 110, bottom: 340 }); };
+    window.bulosFocus = (station) => { setProbe(null); controls.current.focus?.(station, { right: 12, top: 110, bottom: 460 }); };
     window.bulosHome = () => { setProbe(null); controls.current.home?.(); };
   }, []);
   const time = useTwinTime(live, forecast);
@@ -28,7 +28,7 @@ function EmbedMap({ staticData, live, forecast, heatmap, index, showHeat, id, on
   return (
     <>
       <TwinMapScene staticData={staticData} live={live} hazard={showHeat && index !== 'none' ? heatmap : null} view={view} atTime={time.atTime} tauStep={0} selectedId={id}
-                    onPick={onSelect} onInspect={onSelect} layers={LAYERS} controls={controls} insets={{ left: 12, right: 12, top: 110, bottom: 160 }}
+                    onPick={onSelect} onInspect={onSelect} layers={LAYERS} controls={controls} insets={{ left: 12, right: 12, top: 110, bottom: 240 }}
                     probe={probe} onProbe={(at) => { setProbe(at); send({ type: 'probe', lat: at.lat, lon: at.lon }); }} />
       <MapCredits className="absolute right-3 top-[116px] z-10" drop="down" />
     </>
@@ -40,7 +40,7 @@ export default function Embed({ mode, params }) {
   useEffect(() => { window.bulosSetIndex = setIndex; }, []);
   const { data: staticData } = usePoll('/api/static', 0);
   const { data: live } = usePoll('/api/state', 2000);
-  const { data: heatmap } = usePoll(mode === 'map' && index !== 'none' ? `/api/heatmap?index=${index}` : null, 5000);
+  const { data: heatmap } = usePoll(mode === 'map' && index !== 'none' ? `/api/heatmap?index=${index}` : null, index === 'bicol' ? 900000 : 5000);
   const { data: forecast } = usePoll(mode === 'map' ? '/api/forecast' : null, 4000);
   const select = useCallback((id) => send({ type: 'select', id }), []);
   // Tell the app when there is something on screen, so it can lift its loading cover

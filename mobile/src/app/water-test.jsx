@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Share, Text, View } from 'react-native';
+import { Share, View } from 'react-native';
+import Text from '../components/Text';
 import { useLocalSearchParams } from 'expo-router';
 import { Button, Card, Empty, Pill, Screen } from '../components/ui';
 import { Chips, Label } from '../components/Choice';
@@ -38,7 +39,7 @@ export default function WaterTest() {
       <Chips options={live.stations.map((x) => ({ value: x.id, label: x.id }))} value={s.id} onChange={setId} />
       <Card>
         <Text style={FONT.h2}>{s.name}</Text>
-        <Text style={FONT.small}>Latest reading {fmtClock(live.clock.epoch_ms)} · Philippine National Standards for Drinking Water (PNSDW 2017)</Text>
+        <Text style={FONT.small}>Latest reading {fmtClock(live.clock.epoch_ms)}, Philippine National Standards for Drinking Water (PNSDW 2017)</Text>
         <View style={{ marginTop: 10 }}>
           {rows.map(([n, v, std, ok], i) => (
             <View key={n} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 9, borderBottomWidth: i === rows.length - 1 ? 0 : 1, borderBottomColor: C.line }}>
@@ -53,7 +54,7 @@ export default function WaterTest() {
         </View>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12, alignItems: 'center' }}>
           <Pill text={fails ? `${fails} outside the standard` : 'All within the standard'} kind={fails ? 'red' : 'good'} />
-          <Text style={FONT.small}>WQHI {s.wqhi.score}/100 · risk {fmt(s.risk, 2)}</Text>
+          <Text style={FONT.small}>WQHI {s.wqhi.score}/100, risk {fmt(s.risk, 2)}</Text>
         </View>
         <Text style={[FONT.small, { marginTop: 10 }]}>Raw intake water. Sensors are surrogates for bacteria; confirm suspected contamination with a lab E. coli test.</Text>
       </Card>

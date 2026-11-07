@@ -1,11 +1,15 @@
-import { ActivityIndicator, Animated, Easing, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Animated, Easing, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import Text from './Text';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { Children, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { C, FONT, PILL, STATION_COLOR, shadow } from '../lib/theme';
-import { fmtClock, fmtMin, stationStatus } from '../lib/format';
+import { riverSummary } from '../lib/water';
+import Sky, { moodOf } from './Sky';
+import { tickFeel } from './motion';
+import { BAND, bandOf, fmtClock, fmtMin, stationStatus } from '../lib/format';
+import { dockSpace } from '../lib/dock';
 import { useData } from '../lib/data';
 import Logo from './Logo';
 
@@ -72,37 +76,61 @@ export function LoadingLogo({ text, size = 64 }) {
   );
 }
 
-/** Scrollable screen with gradient background, pull-to-refresh, connection + advisory notices. */
-export function Screen({ title, subtitle, right, children, edges = ['top'], advisory = true, scroll = true }) {
-  const { refresh } = useData();
+/** Scrollable screen with pull-to-refresh and connection and advisory notices. dock leaves room for the round button. */
+export function Screen({ title, subtitle, right, children, edges = ['top'], advisory = true, scroll = true, dock = false, sky = null }) {
+  const { refresh, live, forecast } = useData();
+  const space = dockSpace(useSafeAreaInsets().bottom);
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = async () => { setRefreshing(true); await refresh(); setRefreshing(false); };
+  const banded = Boolean(sky);
   const body = (
     <>
-      {(title || right) && (
+      {!banded && (title || right) && (
         <View style={s.header}>
           <View style={{ flex: 1 }}>
-            {subtitle ? <Text style={FONT.small}>{subtitle}</Text> : null}
             {title ? <Text style={FONT.title}>{title}</Text> : null}
+            {subtitle ? <Text style={[FONT.small, { fontSize: 13, marginTop: 2 }]}>{subtitle}</Text> : null}
           </View>
           {right}
         </View>
       )}
       <ConnectionNotice />
       {advisory && <AdvisoryBanner />}
-      {scroll ? Children.toArray(children).map((child, i) => <Reveal key={child?.key ?? i} delay={Math.min(i, 5) * 55}>{child}</Reveal>) : children}
+      {children}
     </>
   );
+  if (banded) {
+    const heading = sky === true ? (
+      <View style={[s.header, { marginBottom: 0 }]}>
+        <View style={{ flex: 1 }}>
+          <Text style={[FONT.title, { color: '#fff' }]}>{title}</Text>
+          {subtitle ? <Text style={s.skySub}>{subtitle}</Text> : null}
+        </View>
+        {right}
+      </View>
+    ) : sky;
+    return (
+      <Background>
+        <ScrollView showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#fff" />}
+                    contentContainerStyle={{ paddingBottom: dock ? space + 34 : 44 }}>
+          <Sky mood={moodOf(riverSummary(live, forecast))}>{heading}</Sky>
+          <View style={s.under}>{body}</View>
+        </ScrollView>
+        <Toast lift={dock ? space + 22 : 18} />
+      </Background>
+    );
+  }
+
   return (
     <Background>
       <SafeAreaView edges={edges} style={{ flex: 1 }}>
         {scroll ? (
-          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />}>
+          <ScrollView contentContainerStyle={[s.scroll, dock && { paddingBottom: space + 30 }]} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.primary} />}>
             {body}
           </ScrollView>
         ) : <View style={[s.scroll, { flex: 1 }]}>{body}</View>}
       </SafeAreaView>
-      <Toast />
+      <Toast lift={dock ? space + 22 : 18} />
     </Background>
   );
 }
@@ -130,9 +158,9 @@ export function CardHead({ title, sub, icon, action, onAction }) {
 
 export function IconTile({ name, size = 42 }) {
   return (
-    <LinearGradient colors={[C.primaryLight, C.primary]} style={[s.iconTile, { width: size, height: size, borderRadius: size * 0.31 }]}>
+    <View style={[s.iconTile, { width: size, height: size, borderRadius: size / 2 }]}>
       <Ionicons name={name} size={size * 0.48} color="#fff" />
-    </LinearGradient>
+    </View>
   );
 }
 
@@ -160,19 +188,32 @@ export function Dot({ id, size = 10 }) {
   return <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: STATION_COLOR[id] ?? C.primary }} />;
 }
 
+/** Marks a water point as yours, so the app opens on it. */
+export function MyPointStar({ id, color = C.primary, size = 26 }) {
+  const { myPoint, toggleMyPoint } = useData();
+  const on = myPoint === id;
+  return (
+    <Pressable onPress={() => { tickFeel(); toggleMyPoint(id); }} hitSlop={12} accessibilityRole="button"
+               accessibilityLabel={on ? 'Remove as my water point' : 'Make this my water point'} accessibilityState={{ selected: on }}>
+      <Ionicons name={on ? 'star' : 'star-outline'} size={size} color={on ? C.advisory : color} />
+    </Pressable>
+  );
+}
+
 export function Button({ title, onPress, kind = 'primary', icon, disabled, busy, style }) {
   const primary = kind === 'primary';
   const danger = kind === 'danger';
+  const onLight = kind === 'light';
   const content = (
     <View style={s.btnInner}>
       {busy ? <ActivityIndicator color={primary || danger ? '#fff' : C.primary} size="small" />
-        : icon ? <Ionicons name={icon} size={16} color={primary || danger ? '#fff' : C.ink2} /> : null}
-      <Text style={[s.btnText, { color: primary || danger ? '#fff' : C.ink2 }]}>{title}</Text>
+        : icon ? <Ionicons name={icon} size={16} color={primary || danger ? '#fff' : onLight ? C.primary : C.ink2} /> : null}
+      <Text style={[s.btnText, { color: primary || danger ? '#fff' : onLight ? C.primary : C.ink2 }]}>{title}</Text>
     </View>
   );
   return (
     <PressScale onPress={onPress} disabled={disabled || busy} style={[{ opacity: disabled ? 0.45 : 1 }, style]}>
-      <View style={[s.btn, primary ? { backgroundColor: C.primary } : danger ? { backgroundColor: C.critical } : s.btnGhost]}>{content}</View>
+      <View style={[s.btn, primary ? { backgroundColor: C.primary } : danger ? { backgroundColor: C.critical } : onLight ? { backgroundColor: '#fff' } : s.btnGhost]}>{content}</View>
     </PressScale>
   );
 }
@@ -187,15 +228,71 @@ export function Row({ label, value, last }) {
   );
 }
 
+/** The four risk levels side by side, like a public hazard report, with today's level picked out. */
+export function RiskLevels({ band }) {
+  const levels = ['LOW', 'MODERATE', 'HIGH', 'SEVERE'];
+  return (
+    <View style={s.levels} accessibilityLabel={`Risk level: ${BAND[band]?.label ?? 'unknown'}`}>
+      {levels.map((k) => {
+        const on = k === band;
+        return (
+          <View key={k} style={{ flex: 1, gap: 5 }}>
+            <View style={{ height: on ? 10 : 6, marginTop: on ? 0 : 2, borderRadius: 5, backgroundColor: BAND[k].color, opacity: on ? 1 : 0.28 }} />
+            <Text style={[FONT.small, on && { color: C.ink, fontWeight: '600' }]} numberOfLines={1}>{BAND[k].label}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Risk at this point for the next four hours, an hour at a time. */
+export function NextHours({ now, series }) {
+  if (!series?.length) return null;
+  const at = (h) => series.reduce((a, p) => (Math.abs(p.tau - h * 3600) < Math.abs(a.tau - h * 3600) ? p : a), series[0]).risk;
+  const hours = [['Now', now], ['1 h', at(1)], ['2 h', at(2)], ['3 h', at(3)], ['4 h', at(4)]];
+  return (
+    <View style={{ flexDirection: 'row', gap: 6 }}>
+      {hours.map(([label, risk]) => {
+        const band = BAND[bandOf(risk)];
+        return (
+          <View key={label} style={s.hour} accessibilityLabel={`${label}: ${band.label}`}>
+            <Text style={[FONT.small, { color: C.ink2 }]}>{label}</Text>
+            <Ionicons name={band.icon} size={22} color={band.color} />
+            <Text style={[FONT.small, { fontSize: 11, color: C.ink }]} numberOfLines={1}>{band.label}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+/** A section that stays closed until someone wants the detail. */
+export function Fold({ title, sub, children }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Card>
+      <Pressable onPress={() => setOpen((v) => !v)} style={s.fold} accessibilityRole="button" accessibilityState={{ expanded: open }}>
+        <View style={{ flex: 1 }}>
+          <Text style={FONT.h2}>{title}</Text>
+          {sub ? <Text style={[FONT.small, { marginTop: 2 }]} numberOfLines={2}>{sub}</Text> : null}
+        </View>
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={20} color={C.ink2} />
+      </Pressable>
+      {open ? <View style={{ marginTop: 12 }}>{children}</View> : null}
+    </Card>
+  );
+}
+
 export function Empty({ text }) {
   return <Text style={[FONT.small, { fontSize: 13, paddingVertical: 6 }]}>{text}</Text>;
 }
 
-export function Toast() {
+export function Toast({ lift = 18 }) {
   const { toast, dismissToast } = useData();
   if (!toast) return null;
   return (
-    <Reveal key={toast.text} style={s.toast}>
+    <Reveal key={toast.text} style={[s.toast, { bottom: lift }]}>
       <Pressable onPress={dismissToast} style={[s.toastInner, { borderColor: toast.ok ? '#b7d7b7' : '#e9b4b4' }]}>
         <Ionicons name={toast.ok ? 'checkmark-circle' : 'alert-circle'} size={18} color={toast.ok ? C.good : C.critical} />
         <Text style={[FONT.body, { flex: 1, color: toast.ok ? '#157a3e' : '#a32626' }]}>{toast.text}</Text>
@@ -260,21 +357,26 @@ export function AdvisoryBanner() {
 }
 
 const s = StyleSheet.create({
-  scroll: { padding: 16, paddingBottom: 40, gap: 14 },
+  scroll: { padding: 18, paddingBottom: 40, gap: 18 },
+  under: { paddingHorizontal: 18, paddingTop: 10, gap: 20 },
+  skySub: { fontSize: 14, lineHeight: 19, color: '#e3ecff', marginTop: 3 },
+  levels: { flexDirection: 'row', gap: 6 },
+  hour: { flex: 1, alignItems: 'center', gap: 4, backgroundColor: '#fff', borderRadius: 16, paddingVertical: 10, paddingHorizontal: 2 },
+  fold: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 36 },
   header: { flexDirection: 'row', alignItems: 'flex-end', gap: 12, paddingHorizontal: 2, marginBottom: 2 },
-  card: { backgroundColor: C.card, borderRadius: 16, padding: 16, ...shadow },
+  card: { backgroundColor: C.card, borderRadius: 26, padding: 20 },
   cardHead: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12, minHeight: 36 },
-  iconTile: { alignItems: 'center', justifyContent: 'center' },
-  tile: { backgroundColor: C.tile, borderRadius: 16, padding: 12, shadowColor: '#2f5be7', shadowOpacity: 0.06, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 1 },
+  iconTile: { alignItems: 'center', justifyContent: 'center', backgroundColor: C.primary },
+  tile: { backgroundColor: C.tile, borderRadius: 18, padding: 12, borderWidth: 1, borderColor: C.line },
   pill: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, alignSelf: 'flex-start' },
   pillText: { fontSize: 12, fontWeight: '700' },
   link: { color: C.primary, fontWeight: '700', fontSize: 13 },
-  btn: { borderRadius: 14, paddingVertical: 11, paddingHorizontal: 16 },
+  btn: { borderRadius: 999, minHeight: 46, justifyContent: 'center', paddingVertical: 11, paddingHorizontal: 18 },
   btnGhost: { backgroundColor: '#fff', borderWidth: 1, borderColor: C.line },
   btnInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   btnText: { fontWeight: '700', fontSize: 14 },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12, paddingVertical: 9, borderBottomWidth: 1, borderBottomColor: C.line },
-  toast: { position: 'absolute', left: 16, right: 16, bottom: 18 },
+  toast: { position: 'absolute', left: 16, right: 16 },
   toastInner: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: '#fff', borderRadius: 14, borderWidth: 1, padding: 12, ...shadow },
   notice: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 6 },
   demoBar: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#fff3cf', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },

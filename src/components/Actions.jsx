@@ -4,8 +4,8 @@ import { fmt, fmtClock, notFitted } from '../lib/format';
 
 export function Modal({ title, onClose, children, width = 520 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#16204a]/30 p-4 backdrop-blur-[2px]" onClick={onClose}>
-      <div role="dialog" aria-label={title} className="glass max-h-[88vh] w-full overflow-y-auto bg-white/95 p-6"
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#16204a]/40 p-4" onClick={onClose}>
+      <div role="dialog" aria-label={title} className="glass max-h-[88vh] w-full overflow-y-auto p-6"
            style={{ maxWidth: width }} onClick={(e) => e.stopPropagation()}>
         <div className="mb-4 flex items-start justify-between gap-4">
           <h2 className="font-display text-lg font-semibold">{title}</h2>

@@ -320,3 +320,39 @@ def test_screening_layers_and_network():
         lines, rows = p._network()
         assert len(lines) > 20 and len(rows) > 50
 
+
+
+# ---------------------------------------------------------------- whole-region layer
+def _dry_region(monkeypatch, mm=0.0):
+    from backend import region
+    region._load()
+    region._cache.update(t=0.0, rain=None, payload=None, time=None)
+    monkeypatch.setattr(region, "_fetch_rain", lambda: np.full((region.ROWS, region.COLS), mm))
+    return region
+
+
+def test_bicol_layer_covers_the_region_and_follows_its_shape(monkeypatch):
+    region = _dry_region(monkeypatch)
+    g = region.grid()
+    cells = np.frombuffer(base64.b64decode(g["data"]), np.uint8)
+    assert g["index"] == "bicol" and cells.size == g["nrows"] * g["ncols"]
+    land_km2 = (cells > 0).sum() * (g["north"] - g["south"]) / g["nrows"] * (g["east"] - g["west"]) / g["ncols"] * 111.32 ** 2 * 0.97
+    assert 16_000 < land_km2 < 20_500            # Bicol is about 18,000 km2
+    assert 0 < (cells > 0).mean() < 0.5          # the sea stays empty, so it is not a rectangle
+
+
+def test_bicol_rain_raises_runoff_risk(monkeypatch):
+    region = _dry_region(monkeypatch)
+    dry = region.at(13.62, 123.19)["runoff"]
+    region = _dry_region(monkeypatch, 120.0)
+    wet = region.at(13.62, 123.19)
+    assert wet["runoff"] > dry and wet["rain_next24_mm"] == 120.0 and wet["level"] == "Higher"
+
+
+def test_bicol_layer_knows_lowland_from_summit_and_land_from_sea(monkeypatch):
+    region = _dry_region(monkeypatch)
+    assert region.at(13.62, 123.19)["runoff"] > region.at(13.257, 123.685)["runoff"]     # Naga lowland, Mayon summit
+    with pytest.raises(ValueError):
+        region.at(13.0, 124.45)                                                          # open sea
+    with pytest.raises(ValueError):
+        region.at(14.5, 121.0)                                                           # Metro Manila, not Bicol

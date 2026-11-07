@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Text, TextInput } from 'react-native';
+import Text, { TextInput } from '../components/Text';
 import { useRouter } from 'expo-router';
 import { Button, Card, Empty, Pill, Screen } from '../components/ui';
 import { Label, Options } from '../components/Choice';

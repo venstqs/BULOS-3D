@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 
 from .weather import live_weather
 from . import config as C
+from . import region
 from . import ingest
 from .platform_core import Platform
 
@@ -81,6 +82,8 @@ async def forecast():
 
 @app.get("/api/heatmap")
 async def heatmap(index: str = "risk"):
+    if index == "bicol":
+        return await asyncio.to_thread(region.grid)
     try:
         return P.twin.risk_grid(index)
     except ValueError as e:
@@ -91,6 +94,10 @@ async def heatmap(index: str = "risk"):
 async def hazard(lat: float, lon: float):
     try:
         return P.twin.hazard_at(lat, lon)
+    except ValueError:
+        pass
+    try:
+        return await asyncio.to_thread(region.at, lat, lon)     # beyond the river model: the regional layer still knows
     except ValueError as e:
         _400(e)
 

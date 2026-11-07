@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Text, TextInput } from 'react-native';
+import Text, { TextInput } from '../components/Text';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Button, Card, Empty, Screen } from '../components/ui';
 import { Chips, Label } from '../components/Choice';

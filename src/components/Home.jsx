@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BellPlus, CalendarDays, ClipboardCheck, Droplet, Droplets, FlaskConical, Gauge, MessageSquareWarning } from 'lucide-react';
+import { BellPlus, CalendarDays, ClipboardCheck, Droplet, Droplets, FlaskConical, Gauge, MessageSquareWarning, ShieldCheck } from 'lucide-react';
 import LineChart from './charts/LineChart';
 import RiverSchematic from './RiverSchematic';
 import { RiverLegend, Section, StatusTable } from './Pages';
@@ -81,6 +81,7 @@ export default function Home({ live, forecast, staticData, trend, tasks, onOpenP
             </ul>
           ) : <p className="text-sm text-muted">No open tasks.</p>}
           <div className="mt-2 grid grid-cols-2 gap-1.5 border-t border-line pt-3">
+            <button onClick={() => quick('safe')} className="btn-primary col-span-2 !py-2"><ShieldCheck size={15} />Is my water safe?</button>
             {[['test', 'Water test', FlaskConical], ['reminder', 'Add reminder', BellPlus], ['log', 'Log maintenance', ClipboardCheck], ['advisory', 'Send advisory', MessageSquareWarning]].map(([id, label, Icon]) => (
               <button key={id} onClick={() => quick(id)} className="btn-ghost flex items-center justify-center gap-1.5 !px-2 !py-1.5 !text-[12.5px]"><Icon size={14} />{label}</button>
             ))}

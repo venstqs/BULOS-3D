@@ -1,4 +1,5 @@
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import Text from '../components/Text';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { Button, Card, Screen } from '../components/ui';
@@ -87,7 +88,7 @@ export default function About() {
           ))}
         </View>
       </Card>
-      <Text style={[FONT.small, { textAlign: 'center' }]}>Camarines Sur National High School · Xylem Global Student Innovation Challenge. Water-point locations are an illustrative pilot layout.</Text>
+      <Text style={[FONT.small, { textAlign: 'center' }]}>Camarines Sur National High School, Xylem Global Student Innovation Challenge. Water-point locations are an illustrative pilot layout.</Text>
       <Button title="Open the 3D map" icon="map" onPress={() => router.push('/map')} />
     </Screen>
   );

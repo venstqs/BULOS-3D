@@ -1,7 +1,11 @@
 import { createContext, createElement, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { AppState, Vibration } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { DEMO_BASE, apiGet, apiPost, loadServers, saveServers, clearServers, defaultServers } from './api';
 import { demoTwin } from './demoEngine';
+
+const MY_POINT = 'bulos.mypoint';
+const ALERTS_SEEN = 'bulos.alerts-seen';
 
 const DataContext = createContext(null);
 export const useData = () => useContext(DataContext);
@@ -52,6 +56,15 @@ export function DataProvider({ children }) {
   const [heatIndex, setHeatIndex] = useState('risk');
   const [standalone, setStandaloneState] = useState(false);
   const seenDanger = useRef(null);
+  const [myPoint, setMyPointState] = useState(null);
+  const [alertsSeen, setAlertsSeen] = useState(0);
+
+  useEffect(() => {
+    AsyncStorage.multiGet([MY_POINT, ALERTS_SEEN]).then(([[, point], [, seen]]) => {
+      if (point) setMyPointState(point);
+      if (seen) setAlertsSeen(Number(seen) || 0);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     loadServers().then((sv) => {
@@ -78,6 +91,7 @@ export function DataProvider({ children }) {
   const forecast = usePoll(base, '/api/forecast', 4000, active);
   const maint = usePoll(base, '/api/maintenance', 4000, active);
   const trend = usePoll(base, '/api/trend?hours=12&bucket_min=30', 20000, active);
+  const weather = usePoll(base, '/api/weather', 600000, active);
 
   // Vibrate phone once when high-risk contamination arrives
   useEffect(() => {
@@ -133,12 +147,29 @@ export function DataProvider({ children }) {
     notify(true, nextVal ? 'Demo mode on: simulated data on this phone only.' : 'Connecting to the live data server.');
   }, [standalone, servers, notify]);
 
+  /** Tapping the star again clears it. */
+  const toggleMyPoint = useCallback((id) => {
+    setMyPointState((now) => {
+      const next = now === id ? null : id;
+      (next ? AsyncStorage.setItem(MY_POINT, next) : AsyncStorage.removeItem(MY_POINT)).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const latestEvent = live.data?.events?.[0]?.t_ms ?? 0;
+  const markAlertsSeen = useCallback(() => {
+    setAlertsSeen(latestEvent);
+    AsyncStorage.setItem(ALERTS_SEEN, String(latestEvent)).catch(() => {});
+  }, [latestEvent]);
+  const unread = (live.data?.events ?? []).filter((e) => e.t_ms > alertsSeen && e.severity !== 'info').length;
+
   const value = {
     servers, apiBase: base, setServers, resetServers, toggleStandalone, isStandalone: standalone,
     static: staticQ.data, live: live.data, forecast: forecast.data, tasks: maint.data?.tasks, trend: trend.data?.series,
     status: live.status, error: live.error, refresh: live.refresh,
     act, notify, toast, dismissToast: () => setToast(null),
     heatIndex, setHeatIndex,
+    weather: weather.data, myPoint, toggleMyPoint, alertsSeen, markAlertsSeen, unread,
   };
   return createElement(DataContext.Provider, { value }, children);
 }

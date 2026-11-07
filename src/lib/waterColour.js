@@ -19,6 +19,25 @@ export const waterCss = (te, od) => `rgb(${waterRgb(te, od).join(',')})`;
 /** How far from clean the water is, from 0 to 1. */
 export const waterDirt = (te = 0, od = 0) => Math.max(Math.min(1, Math.max(0, te / TURB_FULL)), Math.min(1, Math.max(0, od / ORP_FULL)));
 
+/** What the river is carrying, in words a person would use. */
+export function waterName(te = 0, od = 0) {
+  const muddy = (te ?? 0) / TURB_FULL >= 0.2;
+  const sewage = (od ?? 0) / ORP_FULL >= 0.2;
+  if (muddy && sewage) return 'Muddy and sewage';
+  if (muddy) return 'Muddy';
+  if (sewage) return 'Sewage';
+  return 'Clean';
+}
+
+/** Turbidity and ORP excess at one chainage on the river. */
+export function waterAt(live, chainage) {
+  const ch = live?.channel;
+  if (!ch?.chainage_m?.length || chainage == null) return [0, 0];
+  let best = 0;
+  ch.chainage_m.forEach((c, i) => { if (Math.abs(c - chainage) < Math.abs(ch.chainage_m[best] - chainage)) best = i; });
+  return [ch.turb_excess?.[best] ?? 0, ch.orp_deficit?.[best] ?? 0];
+}
+
 /** The legend for water. Each colour is what the river really turns. */
 export const WATER_KEY = [
   ['Clean', waterCss(0, 0)],
