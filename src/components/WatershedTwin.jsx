@@ -237,7 +237,7 @@ export default function WatershedTwin({ live, forecast, staticData, layers, lite
         <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-muted">Loading the twin…</div>}>
           <TwinMapScene
             staticData={staticData} live={live} hazard={index === 'none' ? null : grid} view={view} atTime={time.atTime} tauStep={0} selectedId=""
-            onPick={onInspect} onInspect={onInspect} layers={layers} controls={controls} insets={{ left: 24, right: 24, top: 16, bottom: 150 }}
+            onPick={onInspect} onInspect={onInspect} layers={layers} controls={controls} insets={{ left: 24, right: 24, top: 16, bottom: 150 }} watermark="bottom-[170px] left-5"
           />
         </Suspense>
       )}

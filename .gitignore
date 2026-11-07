@@ -32,7 +32,11 @@ _archive/
 backend/data/bulos.db*
 .env
 
-# Trailer raw footage & AE autosaves
+# Trailer footage & AE files
 docs/Adobe After Effects Auto-Save/
-docs/trailer/clips/
+docs/trailer/
+docs/*.aep
 
+
+# The phone-browser build, on its way into mobile/dist
+mobile/.hosted-app/

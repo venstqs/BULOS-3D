@@ -7,9 +7,29 @@ const lerp = (a, b, f) => a + (b - a) * f;
 const smooth = (v) => { v = clamp(v); return v * v * (3 - 2 * v); };
 const backOut = (v) => { v = clamp(v); const c = 1.9; return 1 + (c + 1) * (v - 1) ** 3 + c * (v - 1) ** 2; };
 const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const STOP = '<i class="stop"></i>';
 const fmtTime = (min) => { const m = Math.round(min); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`; };
 
 /* ---------------- parts of the page that need no 3D ---------------- */
+// The hosted site keeps this page at / and the twin at /twin/
+const TWIN = import.meta.env.VITE_TWIN_URL ?? '/';
+document.querySelectorAll('[data-twin]').forEach((a) => { a.href = TWIN; });
+if (import.meta.env.VITE_HOSTED === '1') {
+  import('qrcode-generator').then(({ default: qrcode }) => {
+    const code = qrcode(0, 'M');
+    code.addData(new URL('/app/', window.location.href).href);
+    code.make();
+    $('#qr').innerHTML = code.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+    $('#try-phone').hidden = false;
+  });
+  if (import.meta.env.VITE_APK_URL) { $('#apk').href = import.meta.env.VITE_APK_URL; $('#apk').hidden = false; }
+}
+
+const intro = $('#intro');
+const introWait = new Promise((done) => { setTimeout(done, calm ? 0 : 1250); });
+const liftIntro = () => intro.classList.add('out');
+setTimeout(liftIntro, 7000);   // a slow connection never leaves the page behind the logo
+
 const SCREENS = [
   ['Home', 'home-calm', 'The river at a glance', 'The Bulos 3D Home screen'],
   ['3D map', 'map-spill', 'Fly the real watershed', 'The 3D map during a simulated spill'],
@@ -72,6 +92,7 @@ function moveDrop() {
   const at = path.getPointAtLength(path.getTotalLength() * p);
   streamDrop.style.top = `${at.y / 6}%`;
   streamDrop.style.left = `${at.x - 8}px`;
+  $('.bar').classList.toggle('solid', scrollY > stops[3] - 70);
 }
 addEventListener('scroll', moveDrop, { passive: true });
 addEventListener('resize', moveDrop);
@@ -88,8 +109,9 @@ try {
 } catch {
   document.documentElement.classList.add('no3d');
 }
-if (renderer) start().catch(() => document.documentElement.classList.add('no3d'));
-else { $('#try').hidden = true; $('#lead').textContent = 'This is the real Naga River, from Mt. Isarog to Naga City. Open the twin to explore it in 3D.'; }
+if (renderer) start().catch(() => { document.documentElement.classList.add('no3d'); liftIntro(); });
+else {
+  liftIntro(); $('#try').hidden = true; $('#lead').textContent = 'This is the real Naga River, from Mt. Isarog to Naga City. Open the twin to explore it in 3D.'; }
 
 function relief({ rows, cols, height, inside, sx, sz, base, extra }) {
   const pos = []; const top = []; const more = [];
@@ -197,11 +219,11 @@ async function start() {
   const curve = new THREE.CatmullRomCurve3(path, false, 'centripetal');
   const SEG = 900; const RAD = 7;
   const tube = (radius, color) => { const m = new THREE.Mesh(new THREE.TubeGeometry(curve, SEG, radius, RAD, false), new THREE.MeshBasicMaterial({ color })); watershed.add(m); return m; };
-  tube(0.08, 0x2f8dff);
+  const water = tube(0.08, 0x2f8dff);
   const plume = tube(0.105, 0xd93a35);
   const ahead = tube(0.1, 0xf2a71b);
   const range = (mesh, a, b) => { const per = RAD * 6; const s = Math.floor(clamp(a) * SEG) * per; mesh.geometry.setDrawRange(s, Math.max(0, Math.floor(clamp(b) * SEG) * per - s)); };
-  range(plume, 0, 0); range(ahead, 0, 0);
+  range(water, 0, 0); range(plume, 0, 0); range(ahead, 0, 0);
   const samples = curve.getSpacedPoints(800);
   const fractionOf = (p) => { let best = 0; let far = 1e9; samples.forEach((q, i) => { const e = (q.x - p.x) ** 2 + (q.z - p.z) ** 2; if (e < far) { far = e; best = i; } }); return best / 800; };
 
@@ -236,6 +258,22 @@ async function start() {
   };
   const fracAt = (min) => { let lo = 0; let hi = 1; for (let i = 0; i < 24; i += 1) { const m = (lo + hi) / 2; if (minutesAt(m) < min) lo = m; else hi = m; } return lo; };
 
+  // The base carries the name, like a plaque on a scale model
+  const logo = new Image(); logo.src = '/favicon.svg';
+  await Promise.all([logo.decode().catch(() => {}), document.fonts.load('700 96px Sora').catch(() => {})]);
+  const sign = document.createElement('canvas'); sign.width = 1024; sign.height = 128;
+  const pen = sign.getContext('2d');
+  pen.drawImage(logo, 8, 8, 112, 112);
+  pen.fillStyle = '#fff'; pen.font = '700 88px Sora, Inter, sans-serif'; pen.textBaseline = 'middle';
+  pen.fillText('Bulos 3D', 136, 68);
+  const nameEnd = 136 + pen.measureText('Bulos 3D').width;
+  pen.font = '500 46px Inter, sans-serif'; pen.fillStyle = '#d9e4ff';
+  pen.fillText('Digital twin', nameEnd + 44, 72);
+  const map = new THREE.CanvasTexture(sign); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 8;
+  const plaque = new THREE.Mesh(new THREE.PlaneGeometry(8.8, 1.1), new THREE.MeshBasicMaterial({ map, transparent: true }));
+  plaque.position.set((-n.cols / 2) * sx - 0.03, -0.58, 2.5); plaque.rotation.y = -Math.PI / 2;
+  watershed.add(plaque);
+
   /* all of Bicol, whose colour follows the rain */
   const b = D.bicol;
   const bytes = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
@@ -251,8 +289,56 @@ async function start() {
   const cities = CITIES.map(([name, lon, lat]) => ({ el: makeTag(name, 'city'), p: new THREE.Vector3(((lon - b.west) / b.step - b.cols / 2) * bsx, 1.4, ((b.north - lat) / b.step - b.rows / 2) * bsz) }));
 
   const rainInput = $('#rain'); const rainValue = $('#rain-value');
-  const setRain = (v) => { rain.value = v; rainValue.textContent = `${Math.round(v)} mm`; };
-  rainInput.addEventListener('input', () => setRain(Number(rainInput.value)));
+  const presets = [...document.querySelectorAll('[data-rain]')];
+  let rainGoal = null;
+  const setRain = (v) => {
+    rain.value = v; rainValue.textContent = `${Math.round(v)} mm`;
+    presets.forEach((b) => b.setAttribute('aria-pressed', Math.abs(Number(b.dataset.rain) - v) < 1));
+  };
+  rainInput.addEventListener('input', () => { rainGoal = null; setRain(Number(rainInput.value)); });
+  presets.forEach((b) => b.addEventListener('click', () => { rainGoal = Number(b.dataset.rain); if (calm) { rainInput.value = rainGoal; setRain(rainGoal); rainGoal = null; } }));
+
+  // Rain you can see: the more millimetres, the more of these fall
+  const DROPS = small ? 500 : 1100;
+  const spanX = b.cols * bsx * 0.5; const spanZ = b.rows * bsz * 0.5;
+  const dropAt = new Float32Array(DROPS * 6);
+  const dropFall = Float32Array.from({ length: DROPS }, () => 16 + Math.random() * 12);
+  for (let i = 0; i < DROPS; i += 1) {
+    const x = (Math.random() * 2 - 1) * spanX; const y = Math.random() * 15; const z = (Math.random() * 2 - 1) * spanZ;
+    dropAt.set([x, y, z, x, y + 0.7, z], i * 6);
+  }
+  const dropGeo = new THREE.BufferGeometry();
+  dropGeo.setAttribute('position', new THREE.BufferAttribute(dropAt, 3));
+  const drops = new THREE.LineSegments(dropGeo, new THREE.LineBasicMaterial({ color: 0x6f95ee, transparent: true, opacity: 0.6 }));
+  drops.frustumCulled = false;
+  bicol.add(drops);
+  const stepRain = (dt) => {
+    const count = Math.round((rain.value / 120) * DROPS);
+    dropGeo.setDrawRange(0, count * 2);
+    if (calm) return;
+    for (let i = 0; i < count; i += 1) {
+      let y = dropAt[i * 6 + 1] - dropFall[i] * dt;
+      if (y < 0) y = 15;
+      dropAt[i * 6 + 1] = y; dropAt[i * 6 + 4] = y + 0.7;
+    }
+    dropGeo.attributes.position.needsUpdate = true;
+  };
+
+  // Point at Bicol to read any place, at the rain on the slider
+  const readout = makeTag('', 'read');
+  const sea = new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.25);
+  const seaHit = new THREE.Vector3();
+  function readPlace() {
+    ray.setFromCamera(mouse, camera);
+    if (!overMap || !ray.ray.intersectPlane(sea, seaHit)) return false;
+    const c = Math.floor(seaHit.x / bsx + b.cols / 2); const r = Math.floor(seaHit.z / bsz + b.rows / 2);
+    if (c < 0 || r < 0 || c >= b.cols || r >= b.rows || !wet[r * b.cols + c]) return false;
+    const risk = ((wet[r * b.cols + c] - 1) / 254) * (0.45 + 0.55 * clamp(rain.value / 80) ** 0.7);
+    const near = cities.reduce((best, x) => (x.p.distanceToSquared(seaHit) < best.p.distanceToSquared(seaHit) ? x : best));
+    readout.textContent = `${risk >= 0.55 ? 'Higher' : risk >= 0.3 ? 'Medium' : 'Lower'} runoff risk near ${near.el.textContent}`;
+    readout.style.transform = `translate(${pointerX + 14}px, ${pointerY - 34}px)`;
+    return true;
+  }
   fetch('https://api.open-meteo.com/v1/forecast?latitude=13.62&longitude=123.19&hourly=precipitation&forecast_days=2&timezone=Asia%2FManila')
     .then((r) => r.json()).then((w) => {
       const now = new Date(Date.now() + 8 * 3600e3).toISOString().slice(0, 13);
@@ -267,7 +353,9 @@ async function start() {
   const MIN_PER_SECOND = 30;
   const CLOSE_AHEAD = 30;
   let spill = null;
+  let twinOn = true;
   const headline = $('#headline'); const lead = $('#lead'); const log = $('#log'); const events = $('#events'); const clock = $('#clock');
+  const safeN = $('#safe-n'); const hitN = $('#hit-n'); const also = $('#also');
   const original = { head: headline.innerHTML, lead: lead.textContent };
 
   function note(text, kind = '', when = null) {
@@ -282,17 +370,18 @@ async function start() {
     spill = null;
     range(plume, 0, 0);
     pins.forEach((p) => { p.state = 'calm'; p.hit = false; p.tag.textContent = p.id; p.tag.className = 'tag'; });
-    log.hidden = true; events.textContent = ''; $('#reset').hidden = true; $('#try').hidden = false;
+    log.hidden = true; events.textContent = ''; $('#reset').hidden = true; $('#try').hidden = false; also.hidden = false;
     headline.innerHTML = original.head; headline.classList.remove('alarm'); lead.textContent = original.lead;
   }
   function startSpill(frac) {
     reset();
     const start = clamp(frac, 0.02, 0.93);
     const below = pins.filter((p) => p.frac > start);
-    spill = { start, t0: performance.now(), startMin: minutesAt(start), below, seen: false, saved: 0, done: false };
-    headline.innerHTML = 'Would you have known\u2060<i class="stop"></i>'; headline.classList.add('alarm');
+    spill = { start, t0: performance.now(), startMin: minutesAt(start), below, seen: false, saved: 0, reached: 0, late: null, done: false, twin: twinOn };
+    safeN.textContent = '0'; hitN.textContent = '0';
+    headline.innerHTML = 'Would you have known<i class="stop"></i>'; headline.classList.add('alarm');
     lead.textContent = 'Polluted water is moving down the river. The twin only knows what its sensors tell it.';
-    log.hidden = false; $('#reset').hidden = false; $('#try').hidden = true;
+    log.hidden = false; $('#reset').hidden = false; $('#try').hidden = true; also.hidden = true;
     note('Something enters the river', 'bad', 0);
     if (!below.length) note('No water points lie below this spot.');
   }
@@ -305,53 +394,85 @@ async function start() {
     clock.textContent = `+${fmtTime(elapsed)}`;
     const eta = (p) => minutesAt(p.frac) - s.startMin;
     const gates = s.below.filter((p) => p.valve);
-    if (!s.seen && s.below[0] && elapsed >= eta(s.below[0])) {
+    if (!s.twin && !s.seen && s.below[0] && elapsed >= eta(s.below[0])) {
+      s.seen = true;
+      headline.innerHTML = `Nobody noticed${STOP}`;
+      lead.textContent = 'With no sensor and no model, nothing warns anyone. The water still looks clean.';
+    }
+    if (s.twin && !s.seen && s.below[0] && elapsed >= eta(s.below[0])) {
       s.seen = true; s.detect = elapsed;
       note(`${s.below[0].id} detects it`, 'bad', elapsed);
       const next = gates.find((p) => eta(p) > elapsed);
       if (next) note(`Forecast: reaches ${next.id} in about ${fmtTime(eta(next) - elapsed)}`);
-      headline.innerHTML = 'The twin saw it first\u2060<i class="stop"></i>'; headline.classList.remove('alarm');
+      headline.innerHTML = 'The twin saw it first<i class="stop"></i>'; headline.classList.remove('alarm');
       lead.textContent = 'It already knows how fast this river moves, so it can warn the people downstream.';
     }
     s.below.forEach((p) => {
       const at = eta(p);
-      if (s.seen && p.valve && p.state === 'calm' && elapsed >= at - CLOSE_AHEAD) {
+      if (s.twin && s.seen && p.valve && p.state === 'calm' && elapsed >= at - CLOSE_AHEAD) {
         p.state = 'closed';
         p.tag.textContent = `${p.id} closed`; p.tag.className = 'tag safe';
         const early = at - elapsed;
-        if (early > 1) { note(`${p.id} intake closes ${fmtTime(early)} early`, 'good', elapsed); s.saved += p.people; } else note(`${p.id} intake closes as it arrives`, 'bad', elapsed);
+        if (early > 1) { note(`${p.id} intake closes ${fmtTime(early)} early`, 'good', elapsed); s.saved += p.people; } else { note(`${p.id} intake closes as it arrives`, 'bad', elapsed); s.reached += p.people; s.late = p; }
+        safeN.textContent = s.saved.toLocaleString(); hitN.textContent = s.reached.toLocaleString();
       }
       if (elapsed >= at && !p.hit) {
         p.hit = true;
-        if (p.state !== 'closed') { p.state = 'hit'; p.tag.className = 'tag hit'; }
+        if (p.state !== 'closed') {
+          p.state = 'hit'; p.tag.className = 'tag hit';
+          if (p.people) { s.reached += p.people; hitN.textContent = s.reached.toLocaleString(); note(`It reaches ${p.id}`, 'bad', elapsed); }
+        }
       }
     });
     if (!s.done && head >= 0.985) {
       s.done = true; s.end = elapsed;
-      if (s.saved) {
-        headline.innerHTML = 'Know before it reaches the tap\u2060<i class="stop"></i>';
-        lead.textContent = `In this simulation, ${s.saved.toLocaleString()} people were moved to stored water before the pollution arrived. The water points and people are an illustrative layout.`;
+      if (!s.twin) {
+        headline.innerHTML = `Nobody knew in time${STOP}`; headline.classList.add('alarm');
+        lead.textContent = s.reached ? `Without the twin, the spill reached every water point below it. That is ${s.reached.toLocaleString()} people in this simulation, using an illustrative layout.` : 'No water points lie below this spot.';
+      } else if (s.saved) {
+        headline.innerHTML = 'Know before it reaches the tap<i class="stop"></i>';
+        lead.textContent = `In this simulation, ${s.saved.toLocaleString()} people were moved to stored water before the pollution arrived.${s.late ? ` ${s.late.id} got almost no warning, which is why sensors sit upstream.` : ''} The layout is illustrative.`;
       } else {
-        headline.innerHTML = 'This spill was too close\u2060<i class="stop"></i>';
+        headline.innerHTML = 'This spill was too close<i class="stop"></i>';
         lead.textContent = 'A spill right beside an intake gives very little warning. Try one further upstream.';
       }
     }
   }
   $('#try').addEventListener('click', () => startSpill(pins[1].frac - 0.05));
+  const SPOTS = { spring: () => pins[0].frac - 0.03, kiosk: () => pins.find((p) => p.id === 'KS-03').frac - 0.012 };
+  document.querySelectorAll('[data-spill]').forEach((el) => el.addEventListener('click', () => startSpill(SPOTS[el.dataset.spill]())));
+  const setTwin = (on) => {
+    twinOn = on;
+    $('#with').setAttribute('aria-pressed', on); $('#without').setAttribute('aria-pressed', !on);
+    if (spill) startSpill(spill.start);
+  };
+  $('#with').addEventListener('click', () => setTwin(true));
+  $('#without').addEventListener('click', () => setTwin(false));
   $('#reset').addEventListener('click', reset);
 
   const hint = makeTag('', 'cue');
-  hint.append(Object.assign(document.createElement('span'), { textContent: `${touch ? 'Tap' : 'Click'} the river` }));
+  hint.append(Object.assign(document.createElement('span'), { textContent: touch ? 'Tap the river' : 'Click the river. Drag to turn it.' }));
   const cueAt = samples[Math.round(0.9 * 800)];
 
   const ray = new THREE.Raycaster(); const mouse = new THREE.Vector2(9, 9);
   const marker = new THREE.Mesh(new THREE.SphereGeometry(0.3, 16, 12), new THREE.MeshBasicMaterial({ color: 0xd93a35 }));
   marker.visible = false; watershed.add(marker);
   let hover = null; let px = 0; let py = 0; let inHero = true;
+  let pointerX = 0; let pointerY = 0; let overMap = false;
+  const orbit = { now: 0, goal: 0 };
+  let grab = null; let dragged = false;
+  canvas.addEventListener('pointerdown', (e) => { grab = { x: e.clientX, goal: orbit.goal }; dragged = false; });
   addEventListener('pointermove', (e) => {
     px = e.clientX / innerWidth - 0.5; py = e.clientY / innerHeight - 0.5;
     mouse.set(px * 2, -py * 2);
+    pointerX = e.clientX; pointerY = e.clientY; overMap = e.target === canvas;
+    if (!grab) return;
+    const dx = e.clientX - grab.x;
+    if (Math.abs(dx) > 6) dragged = true;
+    orbit.goal = clamp(grab.goal - dx * 0.005, -1.25, 1.25);
   }, { passive: true });
+  addEventListener('pointerup', () => { grab = null; });
+  addEventListener('pointercancel', () => { grab = null; });
   function pickRiver() {
     ray.setFromCamera(mouse, camera);
     const hit = ray.intersectObject(land, false)[0];
@@ -362,7 +483,7 @@ async function start() {
     return far < 2.6 ** 2 ? { frac: best / 800, point: samples[best] } : null;
   }
   addEventListener('click', (e) => {
-    if (!inHero || e.target.closest('a, button, input, .log, .card')) return;
+    if (!inHero || dragged || e.target.closest('a, button, input, .log, .card')) return;
     mouse.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
     const at = pickRiver();
     if (at) startSpill(at.frac);
@@ -402,8 +523,10 @@ async function start() {
   };
 
   const heroEl = $('#spill'); const bicolEl = $('#bicol'); const appEl = $('#app');
-  const born = performance.now();
-  let last = born;
+  let born = Infinity;
+  let last = performance.now();
+  let stage = 0;
+  introWait.then(() => { liftIntro(); born = performance.now(); });
   function frame(now) {
     requestAnimationFrame(frame);
     const dt = Math.min(0.05, (now - last) / 1000); last = now;
@@ -417,8 +540,14 @@ async function start() {
     const bTop = bicolEl.getBoundingClientRect().top;
     const toBicol = smooth((vh * 0.95 - bTop) / (vh * 0.75));
     inHero = heroEl.getBoundingClientRect().bottom > vh * 0.55;
-    const growing = calm ? 1 : smooth((now - born - 250) / 1300);
+    const growing = calm ? 1 : smooth((now - born - 150) / 1300);
+    const drawn = calm ? 1 : smooth((now - born - 900) / 1900);
+    range(water, 0, drawn);
     const howing = !inHero && toBicol < 0.05 ? step : -1;
+    const nextStage = inHero ? 0 : toBicol > 0.5 ? 2 : 1;
+    if (nextStage !== stage) { stage = nextStage; orbit.goal = 0; }
+    orbit.now = lerp(orbit.now, orbit.goal, 1 - Math.exp(-dt * 7));
+    $('#mark').style.opacity = 0.62 * clamp((toBicol - 0.6) / 0.4) * clamp(appTop / (vh * 0.5));
 
     watershed.visible = toBicol < 0.98;
     watershed.scale.set(1, Math.max(0.002, growing * (1 - toBicol)), 1);
@@ -427,12 +556,12 @@ async function start() {
 
     const shot = toBicol > 0.5 ? null : inHero ? HERO : SHOTS[clamp(step, 0, 4)];
     const portrait = innerWidth < 900;
-    const goal = { ...(shot ?? { theta: Math.PI * 1.5, radius: portrait ? 100 : 48, height: portrait ? 112 : 56, x: 0, z: 0, shift: 0.17 }), lift: portrait ? (shot ? 0.14 : 0.27) : 0 };
+    const goal = { ...(shot ?? { theta: Math.PI * 1.5, radius: portrait ? 100 : 48, height: portrait ? 112 : 56, x: 0, z: 0, shift: 0.17 }), lift: portrait ? (shot ? 0.14 : 0.2) : 0 };
     const ease = 1 - Math.exp(-dt * (calm ? 30 : 3.2));
     Object.keys(cam).forEach((k) => { cam[k] = lerp(cam[k], goal[k], ease); });
     const fit = portrait && shot ? 1.45 : 1;
     const wob = calm ? 0 : 0.05;
-    const a = cam.theta + px * wob * 2;
+    const a = cam.theta + orbit.now + px * wob * 2;
     camera.position.set(cam.x + Math.cos(a) * cam.radius * fit, cam.height * (portrait && shot ? 1.35 : 1) - py * 3, cam.z - Math.sin(a) * cam.radius * fit);
     camera.lookAt(cam.x, shot ? 0.6 : -2, cam.z);
     camera.setViewOffset(innerWidth, vh, portrait ? 0 : -innerWidth * cam.shift, -vh * cam.lift, innerWidth, vh);
@@ -461,20 +590,30 @@ async function start() {
       p.ring.material.opacity = ring;
       p.ring.material.color.copy(p.state === 'hit' ? RED : BLUE);
       p.ring.scale.setScalar(1 + clock01 * 2.4);
-      p.g.scale.setScalar(Math.max(0.001, backOut((growing - 0.55) / 0.45) * scale));
+      p.g.scale.setScalar(Math.max(0.001, backOut((drawn - p.frac * 0.9) / 0.12) * scale));
       if (p.tag.textContent !== text) p.tag.textContent = text;
       if (p.tag.className !== cls) p.tag.className = cls;
       tmp.copy(p.head.position); p.g.localToWorld(tmp);
-      place(p.tag, tmp.clone(), growing > 0.9 && toBicol < 0.3, i % 2 ? -1 : 1);
+      place(p.tag, tmp.clone(), drawn > p.frac * 0.9 + 0.1 && toBicol < 0.3, i % 2 ? -1 : 1);
     });
     cities.forEach((c) => place(c.el, c.p, toBicol > 0.85));
-    place(hint, cueAt, inHero && !spill && growing > 0.95, 1);
+    place(hint, cueAt, inHero && !spill && drawn > 0.98, 1);
+    if (toBicol > 0.85) {
+      if (rainGoal != null) {
+        const v = lerp(rain.value, rainGoal, 1 - Math.exp(-dt * 5));
+        const landed = Math.abs(v - rainGoal) < 0.4;
+        setRain(landed ? rainGoal : v); rainInput.value = rain.value;
+        if (landed) rainGoal = null;
+      }
+      stepRain(dt);
+    }
+    readout.style.display = toBicol > 0.85 && readPlace() ? '' : 'none';
 
     if (inHero && !spill && matchMedia('(hover: hover)').matches) {
       hover = pickRiver();
       marker.visible = Boolean(hover);
       if (hover) marker.position.copy(hover.point);
-      document.body.style.cursor = hover ? 'crosshair' : '';
+      document.body.style.cursor = grab ? 'grabbing' : hover ? 'crosshair' : 'grab';
     } else { marker.visible = false; document.body.style.cursor = ''; }
     renderer.render(scene, camera);
   }

@@ -67,7 +67,7 @@ export function Pulse({ children, style, min = 0.92 }) {
   return <Animated.View style={[style, { transform: [{ scale: a.interpolate({ inputRange: [0, 1], outputRange: [min, 1] }) }] }]}>{children}</Animated.View>;
 }
 
-export function LoadingLogo({ text, size = 64 }) {
+export function LoadingLogo({ text, size = 92 }) {
   return (
     <View style={{ alignItems: 'center', gap: 12 }}>
       <Pulse><Logo size={size} /></Pulse>

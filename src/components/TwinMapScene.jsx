@@ -1,3 +1,4 @@
+import MapWatermark from './MapWatermark';
 import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -111,7 +112,7 @@ const underModels = (material, order, mesh) => {
   mesh.renderOrder = order;
 };
 
-export default function TwinMapScene({ staticData, live, hazard, view, atTime, tauStep, selectedId, onPick, onInspect, layers, controls, onTour, onCaption, onProbe, probe, insets, readout, needle }) {
+export default function TwinMapScene({ watermark, staticData, live, hazard, view, atTime, tauStep, selectedId, onPick, onInspect, layers, controls, onTour, onCaption, onProbe, probe, insets, readout, needle }) {
   const host = useRef(null);
   const rainCanvas = useRef(null);
   const mapRef = useRef(null);
@@ -883,6 +884,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
       {/* inline style: MapLibre's stylesheet sets position: relative, which would collapse this box */}
       <div ref={host} style={{ position: 'absolute', inset: 0 }} />
       <canvas ref={rainCanvas} className="pointer-events-none absolute inset-0 h-full w-full" />
+      <MapWatermark className={watermark} />
     </div>
   );
 }

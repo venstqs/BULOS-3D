@@ -8,7 +8,7 @@ import { tapFeel, tickFeel } from './motion';
 import { HUB_INNER, hubY } from '../lib/dock';
 import { C } from '../lib/theme';
 
-const LOGO = 132;
+const LOGO = 176;
 const RIVER_H = 44;
 const STOPS = [0.12, 0.31, 0.5, 0.69, 0.88];     // the five water points, spring to town
 const FALL = 780;

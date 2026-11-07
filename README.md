@@ -209,3 +209,17 @@ _archive/  previous (pre-rewrite) version, zipped
 ## Credits
 
 Building, ground and sky textures in `public/textures/` are CC0 from [Poly Haven](https://polyhaven.com).
+
+## Public site
+
+The public build needs no server. `npm run build:hosted` writes it to `mobile/dist`:
+
+| Address | What it is |
+| --- | --- |
+| `/` | The landing page |
+| `/twin/` | The website. A simplified river runs in the browser, and the page says so |
+| `/app/` | The mobile app, for any phone browser |
+
+Terrain, map layers and evaluation results in `public/hosted` come from the real model. Refresh them with `python scripts/export_hosted.py`. The Mapbox token is left out of this build, so it uses the free map layers.
+
+`npm run deploy:hosted` builds the site and publishes it with Expo hosting. To make an installable Android app, run `eas build -p android --profile preview` in `mobile/`. Its `EXPO_PUBLIC_WEB_URL` in `eas.json` must match the published address.

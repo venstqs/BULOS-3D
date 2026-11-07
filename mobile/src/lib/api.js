@@ -12,17 +12,20 @@ export const DEMO_BASE = 'standalone';     // explicit, labelled on-phone demo; 
  * Order: EXPO_PUBLIC_API_URL / EXPO_PUBLIC_WEB_URL (a hosted deployment), then the PC
  * running Expo, whose Wi-Fi address is in hostUri ("192.168.0.12:8081").
  */
+const HOSTED = process.env.EXPO_PUBLIC_HOSTED === '1';
+
 export function defaultServers() {
   const hostUri = Constants.expoConfig?.hostUri ?? '';
   const host = hostUri.split(':')[0] || '192.168.0.12';
   return {
-    api: process.env.EXPO_PUBLIC_API_URL || `http://${host}:8000`,
+    api: HOSTED ? 'demo' : process.env.EXPO_PUBLIC_API_URL || `http://${host}:8000`,
     web: process.env.EXPO_PUBLIC_WEB_URL || `http://${host}:5173`,
-    mode: 'auto', // 'auto' | 'standalone'
+    mode: HOSTED ? 'standalone' : 'auto', // 'auto' | 'standalone'
   };
 }
 
 export async function loadServers() {
+  if (HOSTED) return defaultServers();
   try {
     const saved = JSON.parse((await AsyncStorage.getItem(KEY)) ?? 'null');
     return { ...defaultServers(), ...(saved ?? {}) };
@@ -41,10 +44,27 @@ export async function clearServers() {
 
 const clean = (u) => (u ? u.replace(/\/+$/, '') : '');
 
+async function hostedWeather() {
+  try {
+    const r = await fetch('https://api.open-meteo.com/v1/forecast?latitude=13.62&longitude=123.22&current=temperature_2m,precipitation,wind_speed_10m,weather_code&hourly=precipitation&forecast_days=2&timezone=Asia%2FManila');
+    const d = await r.json();
+    const c = d.current;
+    const start = Math.max(0, d.hourly.time.findIndex((h) => h >= c.time.slice(0, 13)));
+    const code = c.weather_code;
+    return {
+      available: true, source: 'Open-Meteo', time: c.time, temp_c: c.temperature_2m, rain_mm: c.precipitation, wind_kmh: c.wind_speed_10m,
+      condition: code <= 0 ? 'Clear' : code <= 3 ? 'Cloudy' : code <= 48 ? 'Fog' : code <= 67 ? 'Rain' : code <= 82 ? 'Rain showers' : 'Thunderstorm',
+      next24_mm: Number(d.hourly.precipitation.slice(start, start + 24).reduce((a, v) => a + (v ?? 0), 0).toFixed(1)),
+    };
+  } catch {
+    return { available: false };
+  }
+}
+
 function routeMock(path, method = 'GET', body = null) {
   if (method === 'POST') return demoTwin.act(path, body);
   if (path.startsWith('/api/health')) return { status: 'ok', mode: 'sim', engine: 'standalone' };
-  if (path.startsWith('/api/weather')) return { available: false };
+  if (path.startsWith('/api/weather')) return HOSTED ? hostedWeather() : { available: false };
   if (path.startsWith('/api/static')) return demoTwin.getStatic();
   if (path.startsWith('/api/state')) return demoTwin.getState();
   if (path.startsWith('/api/forecast')) return demoTwin.getForecast();

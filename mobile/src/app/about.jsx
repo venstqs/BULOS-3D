@@ -29,7 +29,7 @@ export default function About() {
   return (
     <Screen edges={[]} advisory={false}>
       <Card style={{ alignItems: 'center' }}>
-        <Logo size={72} />
+        <Logo size={112} />
         <Text style={[FONT.title, { marginTop: 8, textAlign: 'center' }]}>Bulos 3D: Water Quality Digital Twin</Text>
         <Text style={[FONT.body, { color: C.ink2, textAlign: 'center', marginTop: 4 }]}>Spatial telemetry and hydrodynamic simulation for rural and isolated water networks.</Text>
         <Text style={[FONT.small, { marginTop: 6 }]}>Pilot: {st?.site?.title ?? 'Naga City, Camarines Sur'}</Text>

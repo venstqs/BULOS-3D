@@ -24,7 +24,7 @@ export default function MoreTab() {
     <Screen dock sky title="More" subtitle="Tools, reports and settings">
       <Card>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <Logo size={52} />
+          <Logo size={76} />
           <View style={{ flex: 1 }}>
             <Text style={FONT.h2}>Bulos 3D</Text>
             <Text style={FONT.small}>Water quality digital twin for {st?.site?.title ?? 'Naga City'}</Text>

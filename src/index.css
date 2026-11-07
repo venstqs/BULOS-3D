@@ -289,3 +289,9 @@ main .grid > *, main .flex > * { min-width: 0; }
 @media (prefers-reduced-motion: reduce) {
   .page-wave, .water-fill, .water-wave, .verdict { animation: none; }
 }
+
+/* The Bulos 3D mark on the 3D twin: quiet, always readable over imagery, never in the way */
+.map-watermark { position: absolute; z-index: 5; display: flex; align-items: center; gap: 10px; pointer-events: none; user-select: none; color: #fff; opacity: 0.86; filter: drop-shadow(0 1px 5px rgba(22, 32, 74, 0.6)); }
+.map-watermark img { width: 46px; height: 46px; }
+.map-watermark b { display: block; font-family: Sora, Inter, sans-serif; font-size: 21px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em; }
+.map-watermark span { display: block; font-size: 12px; font-weight: 500; line-height: 1.2; }

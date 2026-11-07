@@ -1,5 +1,5 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { usePoll } from './api';
+import { HOSTED, get, usePoll } from './api';
 import { useTwinTime } from './lib/useTwinTime';
 import MapCredits from './components/MapCredits';
 
@@ -9,7 +9,11 @@ import MapCredits from './components/MapCredits';
 const TwinMapScene = lazy(() => import('./components/TwinMapScene'));
 const SiteScene = lazy(() => import('./components/AssetInspector').then((m) => ({ default: m.SiteScene })));
 
-const send = (msg) => window.ReactNativeWebView?.postMessage(JSON.stringify(msg));
+const send = (msg) => {
+  const text = JSON.stringify(msg);
+  if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(text);
+  else if (window.parent !== window) window.parent.postMessage(text, window.location.origin);
+};
 const Loading = ({ text }) => <div className="flex h-full items-center justify-center text-sm text-muted">{text}</div>;
 
 const LAYERS = { particles: true, streams: true, pipes: true, catchment: true, buildings: true, labels: true };
@@ -29,7 +33,13 @@ function EmbedMap({ staticData, live, forecast, heatmap, index, showHeat, id, on
     <>
       <TwinMapScene staticData={staticData} live={live} hazard={showHeat && index !== 'none' ? heatmap : null} view={view} atTime={time.atTime} tauStep={0} selectedId={id}
                     onPick={onSelect} onInspect={onSelect} layers={LAYERS} controls={controls} insets={{ left: 12, right: 12, top: 110, bottom: 240 }}
-                    probe={probe} onProbe={(at) => { setProbe(at); send({ type: 'probe', lat: at.lat, lon: at.lon }); }} />
+                    probe={probe} onProbe={(at) => {
+                      setProbe(at);
+                      // The hosted app has no server to ask, so the page answers for it
+                      if (HOSTED) get(`/api/hazard?lat=${at.lat}&lon=${at.lon}`).then((spot) => send({ type: 'probe', lat: at.lat, lon: at.lon, spot })).catch(() => send({ type: 'probe', lat: at.lat, lon: at.lon, spot: { error: true } }));
+                      else send({ type: 'probe', lat: at.lat, lon: at.lon });
+                    }}
+                    watermark="left-3 top-[156px]" />
       <MapCredits className="absolute right-3 top-[116px] z-10" drop="down" />
     </>
   );
@@ -38,10 +48,15 @@ function EmbedMap({ staticData, live, forecast, heatmap, index, showHeat, id, on
 export default function Embed({ mode, params }) {
   const [index, setIndex] = useState(params.get('index') ?? 'risk');
   useEffect(() => { window.bulosSetIndex = setIndex; }, []);
+  // In the app's demo mode its own twin is the one that counts, so it feeds this page
+  const [fed, setFed] = useState(null);
+  useEffect(() => { window.bulosFeed = (state, plan) => setFed({ state, plan }); }, []);
   const { data: staticData } = usePoll('/api/static', 0);
-  const { data: live } = usePoll('/api/state', 2000);
+  const { data: polled } = usePoll('/api/state', 2000);
+  const live = fed?.state ?? polled;
   const { data: heatmap } = usePoll(mode === 'map' && index !== 'none' ? `/api/heatmap?index=${index}` : null, index === 'bicol' ? 900000 : 5000);
-  const { data: forecast } = usePoll(mode === 'map' ? '/api/forecast' : null, 4000);
+  const { data: polledPlan } = usePoll(mode === 'map' ? '/api/forecast' : null, 4000);
+  const forecast = fed?.plan ?? polledPlan;
   const select = useCallback((id) => send({ type: 'select', id }), []);
   // Tell the app when there is something on screen, so it can lift its loading cover
   useEffect(() => {

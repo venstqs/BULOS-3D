@@ -7,7 +7,8 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.venstqs.bulos3d"
     },
     "android": {
       "adaptiveIcon": {
@@ -15,7 +16,8 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "package": "com.venstqs.bulos3d"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -25,6 +27,17 @@
       "expo-status-bar",
       "expo-font"
     ],
-    "scheme": "bulos3d"
+    "scheme": "bulos3d",
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "e9142e41-5c3c-4c62-9b1f-330733d52242"
+      }
+    },
+    "owner": "venstqs"
   }
 }

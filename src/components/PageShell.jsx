@@ -1,3 +1,4 @@
+import { HOSTED } from '../api';
 import { Compass, FileText, Gauge, Info, LineChart, MapPin, MapPinned, Mountain, Wrench } from 'lucide-react';
 
 const ICONS = { home: Compass, overview: Gauge, map: Mountain, flow: LineChart, points: MapPin, maintenance: Wrench, reports: FileText, about: Info };
@@ -18,8 +19,8 @@ export default function PageShell({ pages, page, go, status, lite, setLite, titl
     <div className="page-shell">
       <aside className="page-nav lg:fixed lg:bottom-3 lg:left-3 lg:top-3 lg:z-30 lg:w-[208px]">
         <button onClick={() => go('home')} className="flex shrink-0 items-center gap-2.5 px-2 py-1.5 text-left">
-          <img src="/favicon.svg" alt="" className="h-8 w-8" />
-          <span className="font-display text-[15px] font-semibold">Bulos 3D</span>
+          <img src="/favicon.svg" alt="" className="h-12 w-12" />
+          <span className="font-display text-[21px] font-semibold tracking-tight">Bulos 3D</span>
         </button>
         <nav aria-label="Main" className="flex min-w-0 flex-1 gap-0.5 overflow-x-auto lg:mt-3 lg:flex-col lg:overflow-visible">
           {pages.map(([id, label]) => {
@@ -33,6 +34,7 @@ export default function PageShell({ pages, page, go, status, lite, setLite, titl
         </nav>
         <div className="hidden border-t border-line px-2 pt-2 text-[12px] text-ink-2 lg:block">
           {status !== 'online' && <div className="mb-1 font-medium text-[#a32626]">Data server offline</div>}
+          {HOSTED && <div className="mb-1 leading-snug text-muted">Hosted demo. A simplified river runs in your browser.</div>}
           <button onClick={() => setLite(!lite)} title={lite ? 'Turn the 3D map on' : 'Turn the 3D map off for a faster, lighter app'} className="mt-1 flex items-center gap-1.5 text-muted hover:text-ink">
             <MapPinned size={13} />3D map {lite ? 'off' : 'on'}
           </button>

@@ -26,7 +26,7 @@ function Header({ place }) {
   const { unread } = useData();
   return (
     <View style={s.brand}>
-      <View style={s.logoRing}><Logo size={36} /></View>
+      <View style={s.logoRing}><Logo size={56} /></View>
       <View style={{ flex: 1 }}>
         <Text style={s.brandName}>Bulos 3D</Text>
         <Text style={s.place} numberOfLines={1}>{place}</Text>
@@ -221,8 +221,8 @@ export default function Home() {
 
 const s = StyleSheet.create({
   brand: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  logoRing: { borderRadius: 22, borderWidth: 2, borderColor: '#fff' },
-  brandName: { fontSize: 17, fontWeight: '700', color: '#fff' },
+  logoRing: { borderRadius: 30, borderWidth: 2, borderColor: '#fff' },
+  brandName: { fontSize: 23, lineHeight: 28, fontWeight: '700', color: '#fff' },
   place: { fontSize: 12, lineHeight: 17, color: '#e3ecff' },
   bell: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   bellBadge: { position: 'absolute', top: -3, right: -3, minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 4, backgroundColor: C.advisory, alignItems: 'center', justifyContent: 'center' },

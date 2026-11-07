@@ -174,9 +174,10 @@ export default function MapTab() {
     if (fly) run(`window.bulosFocus && window.bulosFocus(${JSON.stringify(id)}); true;`);
   };
   const close = () => { setPicked(null); setSpot(null); setRaised(false); };
-  const checkSpot = async ({ lat, lon }) => {
+  const checkSpot = async ({ lat, lon, spot: answered }) => {
     setPicked(null);
     setRaised(true);
+    if (answered) { setSpot({ lat, lon, ...answered }); return; }
     setSpot({ lat, lon, loading: true });
     try {
       const r = await fetch(`${servers.api}/api/hazard?lat=${lat}&lon=${lon}`);
@@ -194,7 +195,7 @@ export default function MapTab() {
 
       <View pointerEvents="box-none" style={[s.top, { paddingTop: top + 8 }]}>
         <Reveal style={s.search}>
-          <Logo size={28} />
+          <Logo size={36} />
           <TextInput value={query} onChangeText={setQuery} placeholder="Search water points" placeholderTextColor={C.muted} style={s.input} returnKeyType="search" accessibilityLabel="Search water points" />
           {query ? <Pressable onPress={() => setQuery('')} hitSlop={10} accessibilityLabel="Clear search"><Ionicons name="close-circle" size={18} color={C.muted} /></Pressable> : <Ionicons name="search" size={18} color={C.muted} />}
         </Reveal>

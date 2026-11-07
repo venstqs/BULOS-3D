@@ -7,13 +7,19 @@ export const API = new URLSearchParams(window.location.search).get('api')
   ?? `${window.location.protocol}//${window.location.hostname || '127.0.0.1'}:8000`;
 const TIMEOUT_MS = 8000;
 
+// The hosted site has no server: the twin runs in the browser instead (src/lib/browserTwin.js)
+export const HOSTED = API === 'demo';
+const browserTwin = HOSTED ? import('./lib/browserTwin') : null;
+
 export async function get(path) {
+  if (browserTwin) return (await browserTwin).get(path);
   const res = await fetch(`${API}${path}`, { signal: AbortSignal.timeout(TIMEOUT_MS) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 }
 
 export async function post(path, body) {
+  if (browserTwin) return (await browserTwin).post(path, body);
   const res = await fetch(`${API}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

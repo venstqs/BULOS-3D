@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Text from './Text';
 import { Ionicons } from '@expo/vector-icons';
-import { WebView } from 'react-native-webview';
+import { WebView } from './WebViewShim';
 import { Button, Card, Dot, LoadingLogo, Meter, Pill, StatusBadge } from './ui';
 import { useData } from '../lib/data';
 import { C, FONT } from '../lib/theme';
@@ -13,7 +13,7 @@ import { fmt } from '../lib/format';
  * If the data server cannot be reached, it offers a simple native list so testing is never blocked.
  */
 export default function Web3D({ query, onMessage, style, heatIndex, command }) {
-  const { servers, live, isStandalone } = useData();
+  const { servers, live, forecast, isStandalone } = useData();
   const [state, setState] = useState('loading');
   const [nonce, setNonce] = useState(0);
   const [useNativeFallback, setUseNativeFallback] = useState(false);
@@ -22,12 +22,17 @@ export default function Web3D({ query, onMessage, style, heatIndex, command }) {
 
   // Demo mode has no server of its own, so only fall back when the twin really cannot be reached
   useEffect(() => {
-    if (!servers || !isStandalone) return undefined;
+    if (!servers || !isStandalone || servers.api === 'demo') return undefined;
     const stop = new AbortController();
     const timer = setTimeout(() => stop.abort(), 3500);
     fetch(`${servers.api}/api/health`, { signal: stop.signal }).then((r) => { if (!r.ok) setUseNativeFallback(true); }).catch(() => setUseNativeFallback(true)).finally(() => clearTimeout(timer));
     return () => { clearTimeout(timer); stop.abort(); };
   }, [servers, isStandalone]);
+
+  // In demo mode the twin runs here, so the 3D page shows what this app is simulating
+  useEffect(() => {
+    if (isStandalone && live) web.current?.injectJavaScript(`window.bulosFeed && window.bulosFeed(${JSON.stringify(live)}, ${JSON.stringify(forecast ?? null)}); true;`);
+  }, [isStandalone, live, forecast]);
 
   // Changing the colour layer talks to the running map instead of reloading it
   useEffect(() => {

@@ -11,12 +11,14 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet" />
   </head>
   <body>
+    <div id="intro" aria-hidden="true"><img src="/favicon.svg" alt="" /><b>Bulos 3D</b></div>
     <canvas id="world" aria-label="3D model of the Naga River watershed"></canvas>
     <div id="tags" aria-hidden="true"></div>
+    <div id="mark" aria-hidden="true"><img src="/favicon.svg" alt="" /><div><b>Bulos 3D</b><span>Digital twin</span></div></div>
 
     <header class="bar">
-      <a class="brand" href="#spill"><img src="/favicon.svg" alt="" width="36" height="36" />Bulos 3D</a>
-      <a class="open" href="/">Open the twin</a>
+      <a class="brand" href="#spill"><img src="/favicon.svg" alt="" width="58" height="58" />Bulos 3D</a>
+      <a class="open" href="/" data-twin>Open the twin</a>
     </header>
 
     <nav class="stream" aria-label="Page sections">
@@ -32,31 +34,43 @@
     <main>
       <section id="spill" class="hero">
         <div class="hero-text">
-          <h1 id="headline" aria-live="polite">Your water looks clean&#8288;<i class="stop"></i></h1>
+          <h1 id="headline" aria-live="polite">Your water looks clean<i class="stop"></i></h1>
           <p id="lead">This is the real Naga River, from Mt. Isarog to Naga City. Click it to spill something, and watch what its digital twin does.</p>
           <div class="actions">
             <button id="try" class="primary" type="button">Spill at the farm stream</button>
             <button id="reset" class="plain" type="button" hidden>Clean the river</button>
+            <div class="switch" role="group" aria-label="Run the spill with or without the twin">
+              <button id="with" type="button" aria-pressed="true">With the twin</button>
+              <button id="without" type="button" aria-pressed="false">Without it</button>
+            </div>
           </div>
+          <p id="also" class="also">Or spill at <button type="button" data-spill="spring">the mountain spring</button> or <button type="button" data-spill="kiosk">just above the kiosk</button></p>
         </div>
         <aside id="log" class="log" hidden aria-live="polite">
           <div class="log-head"><span>Simulated spill</span><b id="clock">+0 min</b></div>
           <ol id="events"></ol>
+          <div class="tally"><div><b id="safe-n">0</b><span>moved to stored water</span></div><div><b id="hit-n">0</b><span>reached by the spill</span></div></div>
         </aside>
       </section>
 
       <section id="how" class="how">
-        <article class="step" data-step="0"><div class="card"><small>Step 1 of 5</small><h2>Sense&#8288;<i class="stop"></i></h2><p>One biological sensor sits upstream. Low-cost nodes watch every water point below it.</p></div></article>
-        <article class="step" data-step="1"><div class="card"><small>Step 2 of 5</small><h2>Sync&#8288;<i class="stop"></i></h2><p>Every reading updates the virtual river, so the model stays in step with the water.</p></div></article>
-        <article class="step" data-step="2"><div class="card"><small>Step 3 of 5</small><h2>Simulate&#8288;<i class="stop"></i></h2><p>River physics runs four hours ahead to show where polluted water is going, and when.</p></div></article>
-        <article class="step" data-step="3"><div class="card"><small>Step 4 of 5</small><h2>Decide&#8288;<i class="stop"></i></h2><p>Risk rules judge each point. They can tell a dirty probe from real pollution.</p></div></article>
-        <article class="step" data-step="4"><div class="card"><small>Step 5 of 5</small><h2>Act&#8288;<i class="stop"></i></h2><p>Intakes close before the water arrives, and stored water takes over. That is what makes it a twin, not a map.</p></div></article>
+        <article class="step" data-step="0"><div class="card"><small>Step 1 of 5</small><h2>Sense<i class="stop"></i></h2><p>One biological sensor sits upstream. Low-cost nodes watch every water point below it.</p></div></article>
+        <article class="step" data-step="1"><div class="card"><small>Step 2 of 5</small><h2>Sync<i class="stop"></i></h2><p>Every reading updates the virtual river, so the model stays in step with the water.</p></div></article>
+        <article class="step" data-step="2"><div class="card"><small>Step 3 of 5</small><h2>Simulate<i class="stop"></i></h2><p>River physics runs four hours ahead to show where polluted water is going, and when.</p></div></article>
+        <article class="step" data-step="3"><div class="card"><small>Step 4 of 5</small><h2>Decide<i class="stop"></i></h2><p>Risk rules judge each point. They can tell a dirty probe from real pollution.</p></div></article>
+        <article class="step" data-step="4"><div class="card"><small>Step 5 of 5</small><h2>Act<i class="stop"></i></h2><p>Intakes close before the water arrives, and stored water takes over. That is what makes it a twin, not a map.</p></div></article>
       </section>
 
       <section id="bicol" class="bicol">
         <div class="card wide">
-          <h2>Now make it rain on all of Bicol&#8288;<i class="stop"></i></h2>
-          <p>Real terrain shows where water gathers. Drag the rain and see where runoff risk climbs.</p>
+          <h2>Now make it rain on all of Bicol<i class="stop"></i></h2>
+          <p>Real terrain shows where water gathers. Change the rain, then point at the map to read any place.</p>
+          <div class="presets" role="group" aria-label="Rain presets">
+            <button type="button" data-rain="0">Dry day</button>
+            <button type="button" data-rain="20" aria-pressed="true">Rainy day</button>
+            <button type="button" data-rain="60">Monsoon</button>
+            <button type="button" data-rain="120">Storm</button>
+          </div>
           <label class="rain"><span>Rain in the next 24 hours</span><b id="rain-value">20 mm</b>
             <input id="rain" type="range" min="0" max="120" value="20" />
           </label>
@@ -68,17 +82,21 @@
 
       <section id="app" class="app">
         <div class="app-copy">
-          <h2>Everything in one circle&#8288;<i class="stop"></i></h2>
+          <h2>Everything in one circle<i class="stop"></i></h2>
           <p>The mobile app puts the whole twin in your hand. Tap the dial.</p>
           <div class="dial" id="dial" role="tablist" aria-label="App screens">
             <div class="disc"><span class="wave"></span><b id="dial-title">Home</b><small id="dial-note">The river at a glance</small></div>
+          </div>
+          <div id="try-phone" class="try" hidden>
+            <div id="qr" role="img" aria-label="QR code that opens the app"></div>
+            <div><h3>Try it on your phone</h3><p>Scan to open the app in your browser. There is nothing to install.</p><a href="/app/">Open the app</a><a id="apk" href="/" hidden>Download for Android</a></div>
           </div>
         </div>
         <div class="phone-stage" id="stage"><div class="phone" id="phone"><img id="screen" src="/landing/home-calm.jpg" alt="The Bulos 3D Home screen" width="600" height="1298" /></div></div>
       </section>
 
       <section id="truth" class="truth">
-        <h2>Honest about what this is&#8288;<i class="stop"></i></h2>
+        <h2>Honest about what this is<i class="stop"></i></h2>
         <p class="wide-copy">Bulos 3D is a working software prototype by students. No sensor hardware has been built yet, and every water reading on this page is simulated.</p>
         <div class="numbers">
           <div><b data-count="93.1" data-suffix="%">0%</b><span>of contaminated time blocked from a spill</span></div>
@@ -97,8 +115,8 @@
 
       <section class="end">
         <img src="/favicon.svg" alt="" width="120" height="120" />
-        <h2>Know the water is safe before it reaches the tap&#8288;<i class="stop"></i></h2>
-        <a class="primary" href="/">Open the twin</a>
+        <h2>Know the water is safe before it reaches the tap<i class="stop"></i></h2>
+        <a class="primary" href="/" data-twin>Open the twin</a>
         <p>Made by students of Camarines Sur National High School for the Xylem Global Student Innovation Challenge. Not an official government system.</p>
         <p class="credits">Elevation: Copernicus GLO-90 (ESA/Airbus). Waterways: OpenStreetMap contributors. Region V boundary: geoBoundaries (NAMRIA, PSA, OCHA), CC BY 3.0 IGO. Weather: Open-Meteo.</p>
       </section>

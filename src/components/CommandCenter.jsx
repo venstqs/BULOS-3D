@@ -684,8 +684,8 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
         <div className="flex items-center gap-1.5 px-2 pt-1">
           <button onClick={() => setMenu((m) => !m)} aria-expanded={menu} aria-label="Menu" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-2 hover:bg-panel-2"><Menu size={18} /></button>
           <button onClick={() => { controls.current.home?.(); }} title="Back to the whole river" className="flex min-w-0 flex-1 items-center gap-2 text-left">
-            <img src="/favicon.svg" alt="" className="h-8 w-8 shrink-0" />
-            <span className="truncate font-display text-[17px] font-semibold">Bulos 3D</span>
+            <img src="/favicon.svg" alt="" className="h-12 w-12 shrink-0" />
+            <span className="truncate font-display text-[22px] font-semibold tracking-tight">Bulos 3D</span>
           </button>
           <button onClick={() => setPanel((v) => !v)} aria-expanded={panel} aria-label={panel ? 'Collapse panel' : 'Expand panel'} className="hidden h-9 w-7 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-panel-2 lg:flex"><ChevronUp size={16} className={panel ? '' : 'rotate-180'} /></button>
         </div>

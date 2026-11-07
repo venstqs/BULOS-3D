@@ -95,7 +95,7 @@ export default function AboutPage({ live, go }) {
   return (
     <div className="about grid gap-3">
       <section className="glass grid items-center gap-6 p-7 md:grid-cols-[auto_minmax(0,1fr)]">
-        <img src="/favicon.svg" alt="" className="h-24 w-24" />
+        <img src="/favicon.svg" alt="" className="h-36 w-36" />
         <div>
           <h2 className="font-display text-[34px] font-semibold leading-[1.1]">Know the water is safe before it reaches the tap</h2>
           <p className="mt-2 max-w-[66ch] text-[15px] leading-relaxed text-ink-2">
