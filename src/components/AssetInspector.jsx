@@ -52,7 +52,7 @@ export default function AssetInspector({ st, stations = [], onPick, onClose }) {
       <SiteViewCanvas st={st} view={view} onReady={(ctx) => setParts(viewsOf(ctx))} />
 
       <div className="pointer-events-none absolute inset-0">
-        <Floating id="site-title" label="Move site details" className="site-panel pointer-events-auto absolute left-3 top-3 w-[min(340px,calc(100vw-24px))]">
+        <Floating id="site-title" title="Site details" label="Move site details" className="site-panel pointer-events-auto absolute left-3 top-3 w-[min(340px,calc(100vw-24px))]">
           <div className="px-3.5 pb-3">
             <div className="seg-flat" role="tablist" aria-label="Water points">
               {stations.map((s) => <button key={s.id} role="tab" aria-selected={s.id === st.id} onClick={() => choose(s.id)}>{s.id}</button>)}
@@ -72,7 +72,7 @@ export default function AssetInspector({ st, stations = [], onPick, onClose }) {
           </div>
         </Floating>
 
-        <Floating id="site-readings" label="Move readings" className="site-panel pointer-events-auto absolute right-3 top-14 hidden max-h-[calc(100vh-78px)] w-[300px] overflow-y-auto md:block">
+        <Floating id="site-readings" title="Sensor readings" label="Move readings" className="site-panel pointer-events-auto absolute right-3 top-14 hidden max-h-[calc(100vh-78px)] w-[300px] overflow-y-auto md:block">
           <div className="px-3.5 pb-3.5">
             <h3 className="font-display text-[15px] font-semibold">Sensor readings</h3>
             <p className="text-[12px] text-muted">Simulated for the competition.</p>

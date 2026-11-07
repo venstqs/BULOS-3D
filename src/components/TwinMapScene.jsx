@@ -122,6 +122,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
   useEffect(() => {
     if (!hasData) return undefined;
     const stem = staticData.main_stem;
+    const fine = staticData.main_fine?.length > 1 ? staticData.main_fine : stem;
     const stations = first.current.stations;
     const [hLon, hLat] = stem[0];
     const [oLon, oLat] = stem.at(-1);
@@ -140,8 +141,9 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
           sources: {
             imagery: { type: 'raster', tileSize: 256, maxzoom: MAPBOX ? 20 : 18, ...IMAGERY },
             dem: { type: 'raster-dem', tileSize: 256, ...TERRAIN },
+            shade: { type: 'raster-dem', tileSize: 256, ...TERRAIN },
             osm: { type: 'vector', url: 'https://tiles.openfreemap.org/planet', attribution: '© OpenStreetMap contributors, OpenFreeMap' },
-            river: { type: 'geojson', lineMetrics: true, data: line(stem) },
+            river: { type: 'geojson', lineMetrics: true, data: line(fine) },
             catchment: { type: 'geojson', data: line(staticData.catchment.ring) },
             streams: { type: 'geojson', data: { type: 'FeatureCollection', features: staticData.streams.filter((x) => x.area_km2 < 40).map((x) => line(x.coords)) } },
             pipes: { type: 'geojson', data: { type: 'FeatureCollection', features: (staticData.pipes ?? []).map((p) => line(p.coords)) } },
@@ -158,24 +160,37 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
           },
           layers: [
             { id: 'background', type: 'background', paint: { 'background-color': '#101a2e' } },
-            { id: 'imagery', type: 'raster', source: 'imagery', paint: { 'raster-saturation': -0.28, 'raster-contrast': -0.05 } },
+            { id: 'imagery', type: 'raster', source: 'imagery', paint: { 'raster-saturation': -0.1, 'raster-contrast': 0.06, 'raster-brightness-min': 0.03, 'raster-fade-duration': 150 } },
+            // The street base map, in the clean style of a public hazard map
+            { id: 'st-land', type: 'fill', source: 'osm', 'source-layer': 'landcover', layout: { visibility: 'none' }, paint: { 'fill-color': ['match', ['get', 'class'], 'wood', '#cfe6c4', 'farmland', '#ecf0d6', 'grass', '#dcecc9', 'wetland', '#d3e8e0', '#e6efd8'], 'fill-opacity': 0.9 } },
+            { id: 'st-use', type: 'fill', source: 'osm', 'source-layer': 'landuse', layout: { visibility: 'none' }, paint: { 'fill-color': ['match', ['get', 'class'], 'residential', '#eceef2', 'school', '#f4ecd8', 'hospital', '#f7e3e3', 'commercial', '#efe9ee', '#eceef2'], 'fill-opacity': 0.85 } },
+            { id: 'st-park', type: 'fill', source: 'osm', 'source-layer': 'park', layout: { visibility: 'none' }, paint: { 'fill-color': '#cfe6c4', 'fill-opacity': 0.7 } },
+            { id: 'st-water', type: 'fill', source: 'osm', 'source-layer': 'water', layout: { visibility: 'none' }, paint: { 'fill-color': '#b8daf5' } },
+            { id: 'shade', type: 'hillshade', source: 'shade', paint: { 'hillshade-exaggeration': 0.22, 'hillshade-shadow-color': '#0d2233', 'hillshade-highlight-color': '#ffffff', 'hillshade-illumination-direction': 315 } },
+            { id: 'admin', type: 'line', source: 'osm', 'source-layer': 'boundary', minzoom: 10, filter: ['>=', ['get', 'admin_level'], 6], paint: { 'line-color': '#ffffff', 'line-opacity': 0.4, 'line-width': 1, 'line-dasharray': [4, 3] } },
+            { id: 'waterways', type: 'line', source: 'osm', 'source-layer': 'waterway', minzoom: 12, paint: { 'line-color': '#7cc4ff', 'line-opacity': 0.65, 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 17, 2.2] } },
             { id: 'basin', type: 'fill', source: 'basin', paint: { 'fill-color': '#56b6ff', 'fill-opacity': 0.1 } },
             { id: 'catchment-glow', type: 'line', source: 'catchment', paint: { 'line-color': '#7fd0ff', 'line-width': 6, 'line-blur': 5, 'line-opacity': 0.5 } },
             { id: 'catchment', type: 'line', source: 'catchment', paint: { 'line-color': '#ffffff', 'line-width': 1.5, 'line-dasharray': [3, 2], 'line-opacity': 0.85 } },
-            { id: 'osm-water', type: 'fill', source: 'osm', 'source-layer': 'water', paint: { 'fill-color': '#2f8fe0', 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0, 14, 0.5] } },
+            { id: 'osm-water', type: 'fill', source: 'osm', 'source-layer': 'water', paint: { 'fill-color': '#2a7fb5', 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0, 14, 0.34] } },
             { id: 'roads', type: 'line', source: 'osm', 'source-layer': 'transportation', minzoom: 11, filter: ['in', ['get', 'class'], ['literal', ['motorway', 'trunk', 'primary', 'secondary', 'tertiary', 'minor']]], paint: { 'line-color': '#f4f1e4', 'line-opacity': 0.55, 'line-width': ['interpolate', ['exponential', 1.6], ['zoom'], 11, 0.5, 15, 2.2, 19, 16] } },
             { id: 'streams', type: 'line', source: 'streams', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#62c0ff', 'line-opacity': 0.9, 'line-width': ['interpolate', ['exponential', 2], ['zoom'], 11, 1, 14, 1.3, 20, 80] } },
             { id: 'network', type: 'line', source: 'network', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#35e0c2', 'line-opacity': 0.8, 'line-width': ['interpolate', ['exponential', 2], ['zoom'], 11, 0.8, 15, 1.4, 20, 12] } },
-            { id: 'pipes', type: 'line', source: 'pipes', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['exponential', 2], ['zoom'], 11, 1.3, 15, 2, 20, 16] } },
-            { id: 'river-glow', type: 'line', source: 'river', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-width': ['interpolate', ['exponential', 2], ['zoom'], 11, 2.6, 13, 3, 16, 7, 20, 110], 'line-blur': 0.6, 'line-opacity': 0.92, 'line-gradient': ['interpolate', ['linear'], ['line-progress'], 0, '#46b4ff', 1, '#46b4ff'] } },
+            { id: 'pipes', type: 'line', source: 'pipes', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-opacity': ['interpolate', ['linear'], ['zoom'], 15, 1, 16.5, 0], 'line-width': ['interpolate', ['exponential', 2], ['zoom'], 11, 1.3, 15, 2, 20, 16] } },
+            { id: 'river-glow', type: 'line', source: 'river', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-width': ['interpolate', ['exponential', 2], ['zoom'], 11, 2.6, 13, 3, 16, 7, 20, 64], 'line-blur': 0.6, 'line-opacity': 0.92, 'line-gradient': ['interpolate', ['linear'], ['line-progress'], 0, '#46b4ff', 1, '#46b4ff'] } },
             { id: 'trail-glow', type: 'line', source: 'trail', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['exponential', 2], ['zoom'], 11, 5, 16, 11], 'line-blur': 4, 'line-opacity': 0.5 } },
             { id: 'trail', type: 'line', source: 'trail', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['exponential', 2], ['zoom'], 11, 1.5, 16, 3] } },
-            { id: 'buildings', type: 'fill-extrusion', source: 'osm', 'source-layer': 'building', minzoom: 13.6, paint: { 'fill-extrusion-color': '#e9e3d6', 'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 5], 'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0], 'fill-extrusion-opacity': 0.92, 'fill-extrusion-vertical-gradient': true } },
+            { id: 'buildings', type: 'fill-extrusion', source: 'osm', 'source-layer': 'building', minzoom: 13.6, paint: { 'fill-extrusion-color': ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 5], 3, '#f1f3f6', 12, '#dbe4f0', 30, '#b9cbe6'], 'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 5], 'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0], 'fill-extrusion-opacity': 0.92, 'fill-extrusion-vertical-gradient': true } },
+            { id: 'road-names', type: 'symbol', source: 'osm', 'source-layer': 'transportation_name', minzoom: 14.5, layout: { 'symbol-placement': 'line', 'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name']], 'text-font': ['Noto Sans Regular'], 'text-size': 11, 'text-max-angle': 30 }, paint: { 'text-color': '#ffffff', 'text-halo-color': 'rgba(10,25,50,0.85)', 'text-halo-width': 1.3 } },
+            { id: 'poi-dots', type: 'circle', source: 'osm', 'source-layer': 'poi', minzoom: 15, filter: ['in', ['get', 'class'], ['literal', ['school', 'college', 'hospital', 'town_hall', 'place_of_worship', 'police', 'fire_station']]], paint: { 'circle-radius': 3.5, 'circle-color': ['match', ['get', 'class'], 'hospital', '#d03b3b', 'school', '#e0a800', 'college', '#e0a800', '#2f5be7'], 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.2 } },
+            { id: 'poi-names', type: 'symbol', source: 'osm', 'source-layer': 'poi', minzoom: 15, filter: ['in', ['get', 'class'], ['literal', ['school', 'college', 'hospital', 'town_hall', 'place_of_worship', 'police', 'fire_station']]], layout: { 'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name']], 'text-font': ['Noto Sans Regular'], 'text-size': 11, 'text-anchor': 'top', 'text-offset': [0, 0.5], 'text-max-width': 9, 'text-optional': true }, paint: { 'text-color': '#ffffff', 'text-halo-color': 'rgba(10,25,50,0.85)', 'text-halo-width': 1.3 } },
+            { id: 'peaks', type: 'symbol', source: 'osm', 'source-layer': 'mountain_peak', minzoom: 10, layout: { 'text-field': ['concat', ['coalesce', ['get', 'name:en'], ['get', 'name']], ['case', ['has', 'ele'], ['concat', '\n', ['to-string', ['get', 'ele']], ' m'], '']], 'text-font': ['Noto Sans Regular'], 'text-size': 11.5 }, paint: { 'text-color': '#ffffff', 'text-halo-color': 'rgba(10,25,50,0.85)', 'text-halo-width': 1.4 } },
             { id: 'names', type: 'symbol', source: 'names', layout: { 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Regular'], 'text-size': 15, 'text-letter-spacing': 0.06 }, paint: { 'text-color': '#c9ecff', 'text-halo-color': 'rgba(8,30,60,0.9)', 'text-halo-width': 1.8 } },
             { id: 'barangay-dots', type: 'circle', source: 'barangays', minzoom: 11, paint: { 'circle-radius': 4, 'circle-stroke-width': 1.2, 'circle-stroke-color': '#ffffff', 'circle-color': ['step', ['get', 'km'], '#2eb872', 1.5, '#f2c200', 3, '#ec835a', 6, '#d03b3b'] } },
             { id: 'places', type: 'symbol', source: 'osm', 'source-layer': 'place', minzoom: 9, filter: ['in', ['get', 'class'], ['literal', ['city', 'town', 'village', 'suburb']]], layout: { 'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name']], 'text-font': ['Noto Sans Regular'], 'text-size': ['match', ['get', 'class'], 'city', 15, 'town', 13, 11.5] }, paint: { 'text-color': '#ffffff', 'text-halo-color': 'rgba(10,25,50,0.82)', 'text-halo-width': 1.5 } },
             { id: 'tag-dot', type: 'circle', source: 'tags', maxzoom: 17.5, filter: ['==', ['get', 'kind'], 'station'], paint: { 'circle-radius': ['case', ['get', 'picked'], 8, 6], 'circle-color': ['get', 'color'], 'circle-stroke-color': '#ffffff', 'circle-stroke-width': ['case', ['get', 'picked'], 2.5, 1.5], 'circle-pitch-alignment': 'viewport' } },
             { id: 'tag-station', type: 'symbol', source: 'tags', maxzoom: 17.5, filter: ['==', ['get', 'kind'], 'station'], layout: { 'text-field': ['get', 'text'], 'text-font': ['Noto Sans Bold'], 'text-size': 12.5, 'text-anchor': 'bottom', 'text-offset': [0, -0.9], 'text-allow-overlap': true }, paint: { 'text-color': '#ffffff', 'text-halo-color': '#0b2231', 'text-halo-width': 2 } },
+            { id: 'tag-close', type: 'symbol', source: 'tags', minzoom: 17.5, maxzoom: 20, filter: ['==', ['get', 'kind'], 'station'], layout: { 'text-field': ['get', 'detail'], 'text-font': ['Noto Sans Bold'], 'text-size': 12.5, 'text-anchor': 'bottom', 'text-offset': [0, -7], 'text-allow-overlap': true, 'text-line-height': 1.3, 'text-max-width': 34 }, paint: { 'text-color': '#ffffff', 'text-halo-color': '#0b2231', 'text-halo-width': 1.4 } },
             { id: 'tag-other', type: 'symbol', source: 'tags', minzoom: 12.2, filter: ['!=', ['get', 'kind'], 'station'], layout: { 'text-field': ['get', 'text'], 'text-font': ['Noto Sans Regular'], 'text-size': 11.5, 'text-anchor': 'top', 'text-offset': [0, 0.5], 'text-allow-overlap': false }, paint: { 'text-color': ['get', 'color'], 'text-halo-color': '#0b2231', 'text-halo-width': 1.8 } },
           ],
           terrain: { source: 'dem', exaggeration: EXAGGERATION },
@@ -237,7 +252,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
       });
       // Shadows are drawn once per site and laid on the ground like a decal
       const span = ctx.radius * 2.5;
-      const decal = new THREE.Mesh(new THREE.PlaneGeometry(span, span).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.5, depthWrite: false, toneMapped: false, color: '#0a1420' }));
+      const decal = new THREE.Mesh(new THREE.PlaneGeometry(span, span).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ opacity: 0.5, depthWrite: false, toneMapped: false, color: '#0a1420', blending: THREE.CustomBlending, blendSrc: THREE.SrcAlphaFactor, blendDst: THREE.OneMinusSrcAlphaFactor }));
       decal.visible = false;
       decal.frustumCulled = false;
       ctx.g.add(decal);
@@ -288,8 +303,8 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
     const shared = { uTime: { value: 0 }, uBase: { value: 0 } };
     const ribbons = [];
     /** Water drawn on the terrain: a strip that follows the ground and keeps a readable width. */
-    const makeRibbon = (coords, { width, ref, tex, order, frag = RIVER_FRAG, taper = 0, points, flow = 1.1, tint = '#3aa8ff', useField = 0, exact = false }) => {
-      const path = exact ? null : new THREE.CatmullRomCurve3(coords.filter((_, i) => i % 2 === 0 || i === coords.length - 1).map(([a, b]) => new THREE.Vector3(a, b, 0)), false, 'centripetal');
+    const makeRibbon = (coords, { width, ref, tex, order, frag = RIVER_FRAG, taper = 0, points, flow = 1.1, tint = '#3aa8ff', useField = 0, everyPoint = false, exact = false }) => {
+      const path = exact ? null : new THREE.CatmullRomCurve3(coords.filter((_, i) => everyPoint || i % 2 === 0 || i === coords.length - 1).map(([a, b]) => new THREE.Vector3(a, b, 0)), false, 'centripetal');
       const pts = exact ? coords.map(([a, b]) => new THREE.Vector3(a, b, 0)) : path.getSpacedPoints(points ?? Math.min(300, Math.max(14, coords.length * 2)));
       const n = pts.length;
       const pos = new Float32Array(n * 6);
@@ -338,7 +353,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
       ribbons.push(r);
       return r;
     };
-    const riverRibbon = makeRibbon(stem, { width: 26, ref: 15.3, tex: 1.7, order: -7, taper: 1, points: 760, useField: 1 });
+    const riverRibbon = makeRibbon(fine, { width: 22, ref: 15.3, tex: 1.7, order: -7, taper: 1, points: 1100, useField: 1, everyPoint: true });
     const pipeRibbons = Object.fromEntries((staticData.pipes ?? []).map((p) => [p.id, makeRibbon(p.coords, { width: 1.1, ref: 15.6, tex: 1.4, order: -5, frag: PIPE_FRAG, flow: 1, tint: '#4fd2ff', exact: true })]));
     let drapeIndex = 0;
     let frame = 0;
@@ -689,7 +704,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
       const eta = tauStep === 0 && fc?.arrival_s > 0 ? `ETA ${Math.round(fc.arrival_s / 60)} min` : '';
       const at = w.sites[st.id];
       tagList.push({ ...tag('station', at.lon, at.lat, `${st.id}  ${closed ? 'closed' : eta || st.wqhi.score}`, color), id: st.id });
-      tagList.at(-1).properties = { ...tagList.at(-1).properties, id: st.id, picked: st.id === selectedId };
+      tagList.at(-1).properties = { ...tagList.at(-1).properties, id: st.id, picked: st.id === selectedId, detail: `${st.name}\nWater health ${st.wqhi.score}/100, turbidity ${fmt(st.reading?.turbidity, 1)} NTU, pH ${fmt(st.reading?.ph, 2)}` };
     }
     map.getSource('tags').setData({ type: 'FeatureCollection', features: tagList });
   }, [live, atTime, tauStep, selectedId, ready, staticData, layers.particles, layers.assets]);
@@ -700,11 +715,11 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
     if (!map || !ready) return;
     const vis = (id, on) => { if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', on ? 'visible' : 'none'); };
     vis('buildings', layers.buildings !== false);
-    vis('roads', layers.labels !== false);
-    vis('places', layers.labels !== false);
-    for (const id of ['tag-dot', 'tag-station', 'tag-other']) vis(id, view.mapLabels !== false);
+    for (const id of ['roads', 'places', 'road-names', 'poi-dots', 'poi-names', 'peaks', 'admin']) vis(id, layers.labels !== false);
+    for (const id of ['tag-dot', 'tag-station', 'tag-close', 'tag-other']) vis(id, view.mapLabels !== false);
     vis('catchment', layers.catchment !== false);
     vis('streams', layers.streams !== false);
+    vis('waterways', layers.streams !== false);
     vis('pipes', layers.pipes !== false);
     const access = view.hazard === 'access';
     vis('network', access || layers.network === true);
@@ -750,12 +765,17 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
     const satellite = view.base === 'satellite';
     const light = view.base === 'light';
     map.setLayoutProperty('imagery', 'visibility', satellite ? 'visible' : 'none');
-    map.setPaintProperty('background', 'background-color', light ? '#eef2f6' : '#101a2e');
-    map.setPaintProperty('roads', 'line-color', light ? '#b9c3d2' : '#f4f1e4');
-    map.setPaintProperty('roads', 'line-opacity', satellite ? 0.55 : 0.9);
-    map.setPaintProperty('places', 'text-color', light ? '#16204a' : '#ffffff');
-    map.setPaintProperty('places', 'text-halo-color', light ? 'rgba(255,255,255,0.9)' : 'rgba(10,25,50,0.82)');
-    map.setPaintProperty('buildings', 'fill-extrusion-color', light ? '#d8dfe9' : satellite ? '#e9e3d6' : '#3a4a68');
+    map.setPaintProperty('background', 'background-color', light ? '#f3f5f1' : '#101a2e');
+    for (const id of ['st-land', 'st-use', 'st-park', 'st-water']) map.setLayoutProperty(id, 'visibility', light ? 'visible' : 'none');
+    map.setPaintProperty('shade', 'hillshade-exaggeration', light ? 0.45 : 0.22);
+    map.setPaintProperty('roads', 'line-color', light ? '#ffffff' : '#f4f1e4');
+    map.setPaintProperty('roads', 'line-opacity', light ? 1 : 0.55);
+    map.setPaintProperty('admin', 'line-color', light ? '#8a97ad' : '#ffffff');
+    map.setPaintProperty('waterways', 'line-color', light ? '#8cc4ef' : '#7cc4ff');
+    for (const id of ['places', 'road-names', 'poi-names', 'peaks', 'tag-station', 'tag-close', 'tag-other', 'names']) {
+      map.setPaintProperty(id, 'text-color', light ? '#16204a' : id === 'tag-other' ? ['get', 'color'] : id === 'names' ? '#c9ecff' : '#ffffff');
+      map.setPaintProperty(id, 'text-halo-color', light ? 'rgba(255,255,255,0.95)' : 'rgba(10,25,50,0.85)');
+    }
     map.setTerrain({ source: 'dem', exaggeration: view.relief });
   }, [view.base, view.relief, ready]);
 

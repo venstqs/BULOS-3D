@@ -23,10 +23,12 @@ void main(){
   float n = noise(q * 2.0) * 0.6 + noise(q * 5.0 + 3.1) * 0.4;
   float streak = smoothstep(0.58, 0.78, n);
   vec3 c = mix(water * 0.72, water, 1.0 - across * 0.7);
-  c = mix(c, vec3(1.0), streak * (0.55 - 0.3 * dirty));
+  c = mix(c, vec3(1.0), streak * (0.3 - 0.16 * dirty));
   float pulse = 0.5 + 0.5 * sin(uTime * 3.2 - vUv.x * 1.6);
   c += vec3(0.45, 0.06, 0.02) * dirty * pulse * 0.55;
-  gl_FragColor = vec4(c, smoothstep(1.0, 0.72, across));
+  // Clean water takes a natural deep tone; pollution keeps its full colour so it stands out
+  c = mix(c, c * vec3(0.5, 0.72, 0.8) + vec3(0.03, 0.05, 0.06), (1.0 - dirty) * uUseField);
+  gl_FragColor = vec4(c, smoothstep(1.0, 0.6, across) * mix(0.78, 1.0, dirty));
 }`;
 
 /** A round pipe seen from above, with pulses of water moving along it. */

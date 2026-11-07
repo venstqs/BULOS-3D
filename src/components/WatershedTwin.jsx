@@ -205,7 +205,7 @@ export default function WatershedTwin({ live, forecast, staticData, layers, lite
       )}
 
       <div className="pointer-events-none absolute inset-0 z-10">
-        <Floating id="shed-story" label="Move the story panel" className="site-panel pointer-events-auto absolute left-3 top-3 w-[min(320px,calc(100%-24px))]">
+        <Floating id="shed-story" title="River story" label="Move the story panel" className="site-panel pointer-events-auto absolute left-3 top-3 w-[min(320px,calc(100%-24px))]">
           <div className="px-3.5 pb-3.5">
             <h2 className="font-display text-[17px] font-semibold leading-snug">{stopped ? stopped.name : 'Where does the water go?'}</h2>
             <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
@@ -249,7 +249,7 @@ export default function WatershedTwin({ live, forecast, staticData, layers, lite
         )}
 
         {river && (
-          <Floating id="shed-profile" label="Move the river profile" className="site-panel pointer-events-auto absolute bottom-3 left-3 right-3">
+          <Floating id="shed-profile" title="River profile" label="Move the river profile" className="site-panel pointer-events-auto absolute bottom-3 left-3 right-3">
             <div className="px-3.5 pb-2">
               <div className="flex items-baseline justify-between gap-3 text-[12.5px] text-ink-2">
                 <span className="font-semibold text-ink">The river from source to city</span>

@@ -216,3 +216,25 @@ main .grid > *, main .flex > * { min-width: 0; }
 
 /* the drop in the Watershed story */
 .drop-pin { width: 18px; height: 18px; border-radius: 50%; background: var(--color-civic); border: 3px solid #fff; box-shadow: 0 0 0 7px rgba(47, 91, 231, 0.3), 0 2px 8px rgba(0, 0, 0, 0.4); }
+
+/* separate windows over the map */
+.map-window { position: absolute; max-height: calc(100vh - 100px); display: flex; flex-direction: column; border-radius: 12px; background: #fff; box-shadow: 0 2px 4px rgba(16, 24, 40, 0.2), 0 8px 26px rgba(16, 24, 40, 0.2); color: var(--color-ink); }
+@media (max-width: 1023px) { .map-window { position: fixed; left: 8px; right: 8px; bottom: 8px; max-height: 62vh; } }
+.map-window-bar { display: flex; align-items: center; gap: 6px; padding: 7px 7px 5px 12px; cursor: grab; touch-action: none; user-select: none; }
+.floating[data-lifted] .map-window-bar { cursor: grabbing; }
+.door { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 7px 0; border-radius: 8px; background: #f2f6ff; color: var(--color-civic); font-size: 13px; font-weight: 600; }
+.door:hover { background: #e4ecff; }
+.door[aria-pressed="true"] { background: var(--color-civic); color: #fff; }
+.layer-row { display: block; width: 100%; padding: 6px 9px; border-radius: 8px; color: var(--color-ink-2); font-size: 13px; text-align: left; }
+.layer-row:hover { background: #f2f6ff; }
+.layer-row[aria-pressed="true"] { background: var(--color-civic); color: #fff; font-weight: 600; }
+.switch { appearance: none; position: relative; flex-shrink: 0; width: 32px; height: 18px; border-radius: 999px; background: #cdd6e4; cursor: pointer; transition: background 0.15s; }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); transition: transform 0.15s; }
+.switch:checked { background: var(--color-civic); }
+.switch:checked::after { transform: translateX(14px); }
+.switch:focus-visible { outline: 2px solid var(--color-civic); outline-offset: 2px; }
+
+/* minimized panels shrink to a small title bar */
+.floating[data-min] { width: 190px; max-height: none; overflow: hidden; }
+.map-window[data-min] .map-window-bar { padding-bottom: 7px; }
+@media (max-width: 1023px) { .map-window[data-min] { right: auto; bottom: calc(8px + var(--dock, 0) * 48px); } }

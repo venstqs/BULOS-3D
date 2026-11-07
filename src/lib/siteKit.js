@@ -978,7 +978,7 @@ export function bakeShadow(ctx, sun) {
   const passes = [[0, 0, 0.5], [0.09, 0.03, 0.2], [-0.07, 0.08, 0.2], [0.02, -0.1, 0.2], [0.3, 0.3, 0.08], [-0.3, 0.3, 0.08], [-0.3, -0.3, 0.08], [0.3, -0.3, 0.08]];
   const mask = document.createElement('canvas');
   mask.width = size; mask.height = size;
-  const m = mask.getContext('2d');
+  const m = mask.getContext('2d', { willReadFrequently: true });
   for (const [dx, dz, weight] of passes) {
     light.position.copy(dir).add(new THREE.Vector3(dx, 0, dz)).normalize().multiplyScalar(R * 4);
     baker.render(scene, eye);

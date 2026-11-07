@@ -398,6 +398,8 @@ class Platform:
                 catchment=dict(ring=ring, area_km2=round(float(self.twin.catchment.sum()) * T.cell_area / 1e6, 2)),
                 streams=rivers.streams(T, self.twin.catchment, self.profile),
                 main_stem=[[p["lon"], p["lat"], p["z"], p["s"]] for p in self.profile],
+                # The river as mapped, every bend included, for drawing. main_stem stays the model grid.
+                main_fine=[[round(a, 6), round(b, 6)] for a, b in (rivers.main_line() or [])],
                 water_assets=rivers.water_assets(),
                 network=self._network()[0],
                 access=self._network()[1],

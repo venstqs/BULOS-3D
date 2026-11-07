@@ -18,7 +18,7 @@ CONDITION = {0: "Clear", 1: "Mostly clear", 2: "Partly cloudy", 3: "Overcast", 4
 
 def _get(url, params):
     req = urllib.request.Request(f"{url}?{urllib.parse.urlencode(params)}", headers={"User-Agent": "Bulos3D-student-project"})
-    with urllib.request.urlopen(req, timeout=10) as r:
+    with urllib.request.urlopen(req, timeout=2.5) as r:
         return json.load(r)
 
 

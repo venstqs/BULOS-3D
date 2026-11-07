@@ -42,6 +42,10 @@ async def lifespan(_app):
         start(P)
     yield
     task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        pass
 
 
 app = FastAPI(title="Bulos 3D API", version="3.0.0", lifespan=lifespan,

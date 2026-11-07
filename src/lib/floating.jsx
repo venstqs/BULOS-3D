@@ -1,21 +1,27 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { GripHorizontal } from 'lucide-react';
+import { GripHorizontal, Minus, Square, X } from 'lucide-react';
 
 // Panels that can be picked up and placed anywhere, like windows on a desktop.
-// Each one remembers where it was left. Double-click its grip to send one back; "Reset panels" sends all back.
+// Each one remembers where it was left, and whether it was minimized.
+// Double-click its grip to send one back; "Reset panels" sends all back and opens them up again.
 const KEY = 'bulos-panels';
 const RESET = 'bulos-panels-reset';
 const read = () => { try { return JSON.parse(localStorage.getItem(KEY)) ?? {}; } catch { return {}; } };
 const write = (all) => { try { localStorage.setItem(KEY, JSON.stringify(all)); } catch { /* the panel still moves, it just will not be remembered */ } };
 
-export const resetPanels = () => { write({}); window.dispatchEvent(new Event(RESET)); };
+const MIN_KEY = 'bulos-panels-min';
+const readMin = () => { try { return JSON.parse(localStorage.getItem(MIN_KEY)) ?? {}; } catch { return {}; } };
+const writeMin = (all) => { try { localStorage.setItem(MIN_KEY, JSON.stringify(all)); } catch { /* it still folds, it just will not be remembered */ } };
+
+export const resetPanels = () => { write({}); writeMin({}); window.dispatchEvent(new Event(RESET)); };
 const movable = () => window.matchMedia('(min-width: 768px)').matches;
 
 /** True once any panel has been moved, so the reset button only shows when it has something to do. */
 export function usePanelsMoved() {
-  const [moved, setMoved] = useState(() => Object.keys(read()).length > 0);
+  const changed = () => Object.keys(read()).length + Object.keys(readMin()).length > 0;
+  const [moved, setMoved] = useState(changed);
   useEffect(() => {
-    const check = () => setMoved(Object.keys(read()).length > 0);
+    const check = () => setMoved(changed());
     window.addEventListener(RESET, check);
     window.addEventListener('bulos-panels-moved', check);
     return () => { window.removeEventListener(RESET, check); window.removeEventListener('bulos-panels-moved', check); };
@@ -78,6 +84,36 @@ export function useFloating(id) {
   return { ref, grab, home, lifted, style: at.x || at.y ? { transform: `translate(${at.x}px, ${at.y}px)` } : undefined };
 }
 
+/** Fold a panel down to a small title bar, so it stops covering the map. */
+function useMinimized(id) {
+  const [min, setMin] = useState(() => Boolean(readMin()[id]));
+  useEffect(() => {
+    const open = () => setMin(false);
+    window.addEventListener(RESET, open);
+    return () => window.removeEventListener(RESET, open);
+  }, []);
+  const toggle = useCallback(() => {
+    setMin((was) => {
+      const all = readMin();
+      if (was) delete all[id]; else all[id] = true;
+      writeMin(all);
+      return !was;
+    });
+    window.dispatchEvent(new Event('bulos-panels-moved'));
+  }, [id]);
+  return [min, toggle];
+}
+
+function MinimizeButton({ min, toggle, title, className = '' }) {
+  const Icon = min ? Square : Minus;
+  return (
+    <button onPointerDown={(e) => e.stopPropagation()} onDoubleClick={(e) => e.stopPropagation()} onClick={toggle} aria-expanded={!min} aria-label={`${min ? 'Restore' : 'Minimize'} ${title}`} title={min ? 'Restore' : 'Minimize'}
+            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted hover:bg-panel-2 hover:text-ink ${className}`}>
+      <Icon size={min ? 12 : 15} />
+    </button>
+  );
+}
+
 /** The bar a panel is carried by. Arrow keys nudge it, for anyone not using a mouse. */
 export function Grip({ float, label = 'Move panel', className = '', children }) {
   const nudge = (e) => {
@@ -96,12 +132,32 @@ export function Grip({ float, label = 'Move panel', className = '', children }) 
 }
 
 /** A positioned panel that can be dragged by its grip. */
-export function Floating({ id, className = '', children, label, grip = true, ...rest }) {
+export function Floating({ id, className = '', children, label, grip = true, title, ...rest }) {
   const float = useFloating(id);
+  const [min, toggle] = useMinimized(id);
+  const folded = Boolean(title) && min;
   return (
-    <div ref={float.ref} style={float.style} data-lifted={float.lifted || undefined} className={`floating ${className}`} {...rest}>
+    <div ref={float.ref} style={float.style} data-lifted={float.lifted || undefined} data-min={folded || undefined} className={`floating ${className}`} {...rest}>
       {grip && <Grip float={float} label={label} />}
-      {children}
+      {title && <MinimizeButton min={min} toggle={toggle} title={title} className="!absolute right-1 top-0.5 z-[1]" />}
+      {folded && <div onPointerDown={float.grab} className="cursor-grab truncate pb-2 pl-3.5 pr-9 font-display text-[14px] font-semibold">{title}</div>}
+      {title ? <div className={folded ? 'hidden' : 'contents'}>{children}</div> : children}
+    </div>
+  );
+}
+
+/** A separate window: carried by its title bar, closed with its X, raised when clicked. */
+export function MapWindow({ id, title, onClose, onRaise, dock = 0, className = '', children }) {
+  const float = useFloating(id);
+  const [min, toggle] = useMinimized(id);
+  return (
+    <div ref={float.ref} style={{ ...float.style, '--dock': dock }} data-lifted={float.lifted || undefined} data-min={min || undefined} onPointerDownCapture={onRaise} role="dialog" aria-label={title} className={`floating map-window ${className}`}>
+      <div onPointerDown={float.grab} onDoubleClick={float.home} title="Drag to move. Double-click to put it back." className="map-window-bar">
+        <h2 className="min-w-0 flex-1 truncate font-display text-[14px] font-semibold">{title}</h2>
+        <MinimizeButton min={min} toggle={toggle} title={title} />
+        <button onPointerDown={(e) => e.stopPropagation()} onClick={onClose} aria-label={`Close ${title}`} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted hover:bg-panel-2 hover:text-ink"><X size={15} /></button>
+      </div>
+      <div className={min ? 'hidden' : 'min-h-0 flex-1 overflow-y-auto'}>{children}</div>
     </div>
   );
 }

@@ -137,23 +137,23 @@ def test_api_ingest_paths():
     from fastapi.testclient import TestClient
     from backend.main import app
     from backend.ingest import DEV_EUI
-    c = TestClient(app)
-    payload = encode_uplink(dict(turbidity=3.1, orp=402, ph=7.3, tds=171, temp=24.5), "NORMAL", True, False, 4010, 0.02, 88)
-    r = c.post("/api/ingest/chirpstack", json=dict(
-        deviceInfo=dict(devEui=DEV_EUI["KS-03"]), data=base64.b64encode(payload).decode(),
-        rxInfo=[dict(rssi=-97, snr=5.5)], fCnt=12))
-    assert r.status_code == 200, r.text
-    r = c.post("/api/ingest/ttn", json=dict(end_device_ids=dict(dev_eui=DEV_EUI["MB-04"]),
-                                            uplink_message=dict(frm_payload=base64.b64encode(payload).decode())))
-    assert r.status_code == 200, r.text
-    r = c.post("/api/ingest/reading", json=dict(station_id="AG-02", turbidity_ntu=2.5, orp_mv=399, ph=7.3, tds_ppm=166))
-    assert r.status_code == 200, r.text
-    assert c.post("/api/ingest/rainfall", json=dict(rain_mm_15min=2.5)).status_code == 200
-    assert c.post("/api/ingest/reading", json=dict(station_id="AG-02", ph=7)).status_code == 400
-    s = c.get("/api/state").json()
-    assert len(s["stations"]) == 5
-    assert c.get("/api/heatmap").status_code == 200
-    assert c.get("/api/static").json()["catchment"]["area_km2"] > 15
+    with TestClient(app) as c:
+        payload = encode_uplink(dict(turbidity=3.1, orp=402, ph=7.3, tds=171, temp=24.5), "NORMAL", True, False, 4010, 0.02, 88)
+        r = c.post("/api/ingest/chirpstack", json=dict(
+            deviceInfo=dict(devEui=DEV_EUI["KS-03"]), data=base64.b64encode(payload).decode(),
+            rxInfo=[dict(rssi=-97, snr=5.5)], fCnt=12))
+        assert r.status_code == 200, r.text
+        r = c.post("/api/ingest/ttn", json=dict(end_device_ids=dict(dev_eui=DEV_EUI["MB-04"]),
+                                                uplink_message=dict(frm_payload=base64.b64encode(payload).decode())))
+        assert r.status_code == 200, r.text
+        r = c.post("/api/ingest/reading", json=dict(station_id="AG-02", turbidity_ntu=2.5, orp_mv=399, ph=7.3, tds_ppm=166))
+        assert r.status_code == 200, r.text
+        assert c.post("/api/ingest/rainfall", json=dict(rain_mm_15min=2.5)).status_code == 200
+        assert c.post("/api/ingest/reading", json=dict(station_id="AG-02", ph=7)).status_code == 400
+        s = c.get("/api/state").json()
+        assert len(s["stations"]) == 5
+        assert c.get("/api/heatmap").status_code == 200
+        assert c.get("/api/static").json()["catchment"]["area_km2"] > 15
 
 
 # ------------------------------------------------------------ maintenance & advisory
