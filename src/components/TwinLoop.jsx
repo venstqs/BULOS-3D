@@ -62,8 +62,8 @@ export default function TwinLoop({ live }) {
           <Cpu size={15} className="mt-px shrink-0 text-muted" />
           <span>
             <b className="font-semibold text-ink">Where Bulos 3D is today:</b> the full two-way loop runs against a simulated field
-            that sends real-format sensor packets. The path for a real sensor node is built and tested with a software
-            stand-in. A physical node has not been connected yet, so field accuracy is still unproven.
+            that sends real-format sensor packets. It combines open map, terrain and weather data with simulated sensor readings.
+            No physical sensor has been built yet, so field accuracy is still unproven.
           </span>
         </p>
       </div>

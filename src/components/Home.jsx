@@ -106,7 +106,7 @@ export default function Home({ live, forecast, staticData, trend, tasks, onOpenP
 const ACTIVITY = {
   TASK_DONE: ['Maintenance done', ClipboardCheck],
   TASK_ADDED: ['Reminder added', BellPlus],
-  ADVISORY_SENT: ['SMS advisory sent', MessageSquareWarning],
+  ADVISORY_SENT: ['Advisory logged', MessageSquareWarning],
   CMD_SHUT: ['Intake closed by operator', Droplet],
   CMD_PREEMPT_SHUT: ['Intake closed ahead of plume', Droplet],
   CMD_REARM: ['Intake reopened', Droplet],

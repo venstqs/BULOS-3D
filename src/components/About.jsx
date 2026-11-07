@@ -42,7 +42,7 @@ const STACK = [
   ['Frontend & 3D/GIS', 'React, Tailwind CSS, MapLibre GL, Three.js', MapIcon],
   ['Backend & processing', 'Python FastAPI; forecasts in-process or on a Celery worker', ServerCog],
   ['Time-series storage', 'PostgreSQL + TimescaleDB (SQLite for laptop demos)', Database],
-  ['Field hardware', 'Low-cost ESP32 nodes over Wi-Fi, LoRaWAN or MQTT, with one biological (TLF) sensor shared at an upstream sentinel', Cpu],
+  ['Planned field hardware', 'Not built yet. The design uses low-cost ESP32 nodes over Wi-Fi, LoRaWAN or MQTT, with one biological (TLF) sensor shared at an upstream sentinel', Cpu],
 ];
 
 const BENEFICIARIES = [
@@ -119,8 +119,8 @@ export default function AboutPage({ live, go }) {
         <section className="section p-5">
           <h2 className="font-display text-lg font-semibold">Our solution</h2>
           <p className="mt-2 text-sm leading-relaxed text-ink-2">
-            Low-cost ESP32 sensor nodes send readings over LoRaWAN or MQTT to a Python digital twin. The twin combines them with a 3D model of the
-            watershed to show water safety and how contamination moves. It warns health units and residents, and closes intakes, before polluted water is dispensed.
+            A Python digital twin combines sensor readings with a 3D model of the watershed to show water safety and how contamination moves. It warns health
+            units and residents, and closes intakes, before polluted water is dispensed. Today it runs on open map and weather data with simulated sensors. Low-cost ESP32 nodes are the planned next step.
           </p>
         </section>
       </div>

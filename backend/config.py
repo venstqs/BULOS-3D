@@ -53,7 +53,7 @@ def _stations(idx, names, owners, gateways, notes, mid):
              dict(capacity_l=3000.0, demand_lps=0.12)]
     pops = [0, 0, 2250, mid["population"], 650]
     sms = [None, "City ENRO duty officer", "Barangay Health Worker", mid["sms"], "City Health Officer"]
-    networks = ["LGU-LoRaWAN", "DOST-LoRaWAN", "LGU-LoRaWAN", "LGU-LoRaWAN", "LGU-LoRaWAN"]
+    networks = ["LGU-LoRaWAN", "Proposed LoRaWAN link", "LGU-LoRaWAN", "LGU-LoRaWAN", "LGU-LoRaWAN"]
     if mid["kind"] == "SOLAR_PUMP_WELL":                     # riverbank-filtered groundwater
         base[3] = dict(turbidity=0.6, orp=380.0, ph=7.10, tds=240.0, temp=25.0, bio=1.2)
     return [dict(id=ids[k], name=names[k], kind=kinds[k], stem_index=idx[k], owner=owners[k],
@@ -88,7 +88,7 @@ SITES = {
                    "Rural Health Unit & School Intake"],
             owners=["City Water Office", "Proposed partner: DOST Region V", "Barangay Council",
                     "Barangay Water Association", "City Health Office"],
-            gateways=["LGU-GW-Isarog", "DOST-GW-Bicol", "LGU-GW-Isarog", "LGU-GW-Naga", "LGU-GW-Naga"],
+            gateways=["LGU-GW-Isarog", "Proposed gateway", "LGU-GW-Isarog", "LGU-GW-Naga", "LGU-GW-Naga"],
             notes=[
                 "Spring box on the forested Isarog slope feeding the upland gravity line. "
                 "Supplemental Bulos edge node.",

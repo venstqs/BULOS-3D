@@ -198,7 +198,7 @@ export function AdvisoryModal({ live, forecast, act, onClose }) {
     if (ok) onClose();
   };
   return (
-    <Modal title="Send SMS advisory" onClose={onClose}>
+    <Modal title="Send advisory" onClose={onClose}>
       <form onSubmit={submit}>
         <p className="mb-3 text-sm text-ink-2">
           {affected.length ? 'Water points that are affected or expecting contamination are already selected.' : 'No water point is affected right now. Choose who should receive the message.'}
@@ -217,7 +217,7 @@ export function AdvisoryModal({ live, forecast, act, onClose }) {
           <textarea rows={3} value={message} onChange={(e) => setMessage(e.target.value)} maxLength={300}
                     placeholder="Water advisory: do not drink untreated water; boil water for at least 1 minute." />
         </Field>
-        <p className="text-xs text-muted">{live.sms_provider === 'outbox' ? 'No SMS gateway is configured, so messages are logged in Reports instead of sent.' : `Sent through ${live.sms_provider}.`}</p>
+        <p className="text-xs text-muted">{live.sms_provider === 'outbox' ? 'Prototype: no phone numbers are set up, so nothing is really sent. The message is kept in Reports.' : `Sent through ${live.sms_provider}.`}</p>
         <div className="mt-5 flex justify-end gap-2">
           <button type="button" onClick={onClose} className="btn-ghost">Cancel</button>
           <button type="submit" disabled={busy || !ids.length} className="btn-primary">Send to {ids.length} contact{ids.length === 1 ? '' : 's'}</button>

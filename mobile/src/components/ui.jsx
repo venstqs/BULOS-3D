@@ -206,7 +206,7 @@ export function AdvisoryBanner() {
           <Text key={x.id} style={[FONT.body, { marginTop: 2 }]}>Arriving at {x.name} in {fmtMin(fc[x.id].arrival_s)}.</Text>
         ))}
         <Text style={[FONT.small, { marginTop: 4, color: C.ink2 }]}>Do not drink untreated water along this stretch; boil for at least 1 minute.</Text>
-        <Button title="Send SMS advisory" icon="send" onPress={() => router.push('/advisory')} style={{ marginTop: 10, alignSelf: 'flex-start' }} />
+        <Button title="Send advisory" icon="send" onPress={() => router.push('/advisory')} style={{ marginTop: 10, alignSelf: 'flex-start' }} />
       </View>
     </View>
   );

@@ -249,6 +249,8 @@ async def advisory(req: AdvisoryReq):
     except ValueError as e:
         raise HTTPException(409, str(e))
     roles = ", ".join(sorted({s["role"] for s in sent}))
+    if P.notifier.provider == "outbox":
+        return dict(ok=True, sent=sent, message=f"Advisory logged for {roles}. Prototype: no text message was sent.")
     return dict(ok=True, sent=sent, message=f"SMS advisory sent to {roles}.")
 
 

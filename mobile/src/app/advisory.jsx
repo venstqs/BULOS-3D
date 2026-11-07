@@ -44,7 +44,7 @@ export default function Advisory() {
                    placeholder="Water advisory: do not drink untreated water; boil water for at least 1 minute." placeholderTextColor={C.muted}
                    style={{ borderWidth: 1, borderColor: C.line, borderRadius: 12, padding: 12, minHeight: 80, backgroundColor: '#fff', color: C.ink }} />
         <Text style={[FONT.small, { marginTop: 8 }]}>
-          {live.sms_provider === 'outbox' ? 'No SMS gateway is configured on the server, so messages are logged in Reports instead of sent.' : `Sent through ${live.sms_provider}.`}
+          {live.sms_provider === 'outbox' || live.sms_provider?.startsWith('on-phone') ? 'Prototype: no phone numbers are set up, so nothing is really sent. The message is kept in Reports.' : `Sent through ${live.sms_provider}.`}
         </Text>
       </Card>
       <Button title={`Send to ${ids.length} contact${ids.length === 1 ? '' : 's'}`} icon="send" busy={busy} disabled={!ids.length} onPress={send} />

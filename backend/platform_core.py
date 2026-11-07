@@ -321,7 +321,7 @@ class Platform:
             rec = self.notifier.send(st.cfg["sms"], text)
             sent.append(dict(station=sid, role=st.cfg["sms"], status=rec["status"]))
             self._emit(dict(t=self.t, station=sid, type="ADVISORY_SENT", severity="warning",
-                            message=f"{by} sent an SMS advisory to {st.cfg['sms']}: {text}"), actor=by)
+                            message=f"{by} {'logged an advisory for' if self.notifier.provider == 'outbox' else 'sent an SMS advisory to'} {st.cfg['sms']}: {text}"), actor=by)
         if not sent:
             raise ValueError("None of the selected water points has an SMS contact.")
         return sent

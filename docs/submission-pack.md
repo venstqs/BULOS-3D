@@ -8,7 +8,7 @@ Aim to submit by Nov 19.
 - [ ] Read the **Official Rules** on the challenge site. Video length and required files were not on the main page.
 - [ ] Enter **Challenge #2: Water Quality**, **High School track**. Teams can have up to 5 students aged 13–25.
 - [ ] Anyone under 18: submit the **Parent/Guardian Consent & Release form**, or the team is disqualified.
-- [ ] Order the bench node parts today (`docs/bench-node.md`).
+- [ ] Remember this is a software prototype. No sensor hardware has been built, so never show or claim any.
 
 Judging: **Impact**, **Challenge Fit & Feasibility**, **Innovation**.
 
@@ -33,8 +33,8 @@ Be exact about this. Judges will ask, and the twin has a "What is real here" pan
 
 Bulos 3D runs this loop: **Sense → Sync → Simulate → Decide → Act**. Academic work separates a *digital model* (no
 live link), a *digital shadow* (data flows in only) and a *digital twin* (data flows both ways). Be exact when judges
-ask: the two-way loop runs against a simulated field that sends real-format packets. The real-node path has only been
-tested with a software stand-in until a physical node is connected.
+ask: the two-way loop runs against a simulated field that sends real-format packets. No physical sensor has been built.
+The twin combines open map, terrain and weather data with simulated sensor readings.
 
 Design references: the 3D-plus-time view and layer catalogue of spatial twins such as the NSW Spatial Digital Twin, and
 the community hazard mapping style of Project NOAH, applied here to water quality. Bulos 3D is not affiliated with either
@@ -70,18 +70,22 @@ All are **simulated**, from 12 randomised runs per case. Say "in simulation" eve
 - Without any biological sensor, spill blocking is only **58.9%**.
 - Median spill warning: **99 minutes** ahead, with a median arrival-time error of 24 minutes.
 - Monsoon warning is shorter: a median of **19 minutes**, because rain reaches the whole river quickly.
-- The twin runs on the real Naga River (OpenStreetMap, 29.7 km), with elevation from the Copernicus 90 m model.
+- The twin runs on a real river line (OpenStreetMap, 29.6 km), with elevation from the Copernicus 90 m model. Elevations matched SRTM within 4 m at 10 test points.
 - **0 false shut-offs** in 36 quiet runs and 36 dirty-sensor runs; all 36 dirty sensors were correctly identified.
 
 **Be upfront about:**
 - In the sentinel spill case, 5 of 36 intake events never closed. Monsoon: 5 of 33.
 - The simulator and twin share the same type of model, so field results will be worse.
 - Risk weights are expert estimates. They have not been fitted to lab *E. coli* tests.
-- The water points are an illustrative layout. The terrain and river are real elevation data.
+- The water points, people served and pipelines are an illustrative layout. The terrain and river are real.
+- No DOST or LGU data is connected. AG-02 and the rain gauge show where government stations could plug in.
+- Only the lower 14.4 km of the river is mapped as the Naga River. The upper 15.2 km is an unnamed stream.
+- The rain the twin uses is simulated. Live weather is shown beside it and does not drive it.
+- Text messages are a prototype: no phone numbers are set up and nothing is really sent.
 
-## 5. Feasibility: hardware tiers
+## 5. Feasibility: planned hardware tiers
 
-Costs are rough estimates to confirm with real quotes.
+**None of this has been built.** It is the plan for after the competition. Costs are rough estimates to confirm with real quotes.
 
 | Tier | What | Where | Rough cost |
 |---|---|---|---|
@@ -111,8 +115,8 @@ A quote or short letter from a barangay health worker, the City Health Office or
 | 0:30 | 3D map, river from Isarog to Naga | "Bulos 3D is a digital twin of a real watershed, built from satellite elevation data. It knows how fast water moves and where it goes." |
 | 0:50 | Sentinel diagram | "Biological sensors are too expensive for every barangay. So we use one upstream, and cheap nodes everywhere else. The twin connects them." |
 | 1:05 | Drag the time bar: replay, then forecast | "This is what makes it a twin, not a map. It remembers the last six hours and runs the river forward four hours." |
-| 1:10 | Simulate spill; AG-02 alert, ETA, SMS | "A piggery lagoon fails. The sentinel sees it. Before the plume reaches the kiosk, the twin predicts its arrival, warns the health worker and closes the intake." |
-| 1:45 | **Real bench node:** add soil, LED, valve closes, dashboard reacts | "This is real hardware. Dirty water, and the valve closes by itself, even with no internet." |
+| 1:10 | Simulate spill; AG-02 alert, ETA, SMS | "In this simulation, a piggery lagoon fails. The sentinel sees it. Before the plume reaches the kiosk, the twin predicts its arrival, warns the health worker and closes the intake." |
+| 1:45 | **3D Site View of the kiosk:** the valve turns red and the taps stop | "In the twin, the intake closes by itself before the polluted water arrives. This is still a simulation. Building the real sensor node is our next step." |
 | 2:10 | Dirty-sensor case | "A dirty probe looks like pollution. Bulos 3D tells them apart, so nobody loses water because of a false alarm." |
 | 2:25 | Results table | "In simulation, this affordable design blocked 93% of contaminated water time from a spill, with no false shut-offs in our tests. Next, we test against lab samples." |
 | 2:45 | Phone app, rollout | "It runs on a phone, and a new river is a configuration change. Water safety shouldn't depend on being near a city." |
@@ -132,7 +136,7 @@ Anyone with the link can press the simulated valves. That is fine for a demo, bu
 ## 9. Final checklist
 
 - [ ] Rules read, track and challenge chosen, consent forms in
-- [ ] Bench node works on camera
+- [ ] Demo recorded: Follow a drop, a simulated spill, 3D Site View, Presentation mode (press H)
 - [ ] Concept paper updated (section 3)
 - [ ] Impact facts verified, with sources
 - [ ] Video recorded and within the limit

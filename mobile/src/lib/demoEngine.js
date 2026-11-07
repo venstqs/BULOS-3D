@@ -489,7 +489,7 @@ class DemoDigitalTwin {
       const text = message || `Water advisory for ${st.name}: ${arr ? `contaminated water expected in about ${Math.floor(arr / 60)} min. ` : 'contamination detected. '}Do not drink untreated water; boil water for at least 1 minute.`;
       this._sms(st.sms, text);
       sent.push({ station: id, role: st.sms, status: 'simulated, not sent' });
-      this._event(id, 'ADVISORY_SENT', 'warning', `${by} sent an SMS advisory to ${st.sms}: ${text}`);
+      this._event(id, 'ADVISORY_SENT', 'warning', `${by} logged an advisory for ${st.sms}: ${text}`);
     }
     if (!sent.length) throw new Error('None of the selected water points has an SMS contact.');
     return sent;

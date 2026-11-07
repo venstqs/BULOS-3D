@@ -20,10 +20,10 @@ export const STATIONS = [
     "base": {
       "turbidity": 0.8,
       "orp": 430,
-      "ph": 7.45,
+      "ph": 7.44,
       "tds": 120,
       "temp": 21,
-      "bio": 0.5
+      "bio": 0.6
     },
     "valve": null,
     "tank": null
@@ -32,10 +32,10 @@ export const STATIONS = [
     "id": "AG-02",
     "name": "Agricultural Runoff Sentinel",
     "kind": "EXISTING_GOV_SENSOR",
-    "owner": "DOST Region V (Bicol)",
-    "network": "DOST-LoRaWAN",
-    "gateway": "DOST-GW-Bicol",
-    "note": "Existing government water-quality sonde below the farm tributary. Ingested, not owned.",
+    "owner": "Proposed partner: DOST Region V",
+    "network": "Proposed LoRaWAN link",
+    "gateway": "Proposed gateway",
+    "note": "Proposed river station below the farm tributary. A real rollout would read a government sonde here; none is connected today.",
     "lat": 13.622367,
     "lon": 123.247165,
     "elevation_m": 34.8,
@@ -45,12 +45,12 @@ export const STATIONS = [
     "aquifer": false,
     "sms": "City ENRO duty officer",
     "base": {
-      "turbidity": 2.1,
+      "turbidity": 2.2,
       "orp": 400,
       "ph": 7.29,
-      "tds": 164,
+      "tds": 165,
       "temp": 24,
-      "bio": 3.45
+      "bio": 3.4
     },
     "valve": null,
     "tank": null
@@ -74,8 +74,8 @@ export const STATIONS = [
     "base": {
       "turbidity": 2,
       "orp": 410,
-      "ph": 7.3,
-      "tds": 169,
+      "ph": 7.29,
+      "tds": 170,
       "temp": 25,
       "bio": 3
     },
@@ -108,9 +108,9 @@ export const STATIONS = [
       "turbidity": 0.6,
       "orp": 380,
       "ph": 7.1,
-      "tds": 240,
+      "tds": 239,
       "temp": 25,
-      "bio": 1.1
+      "bio": 1.2
     },
     "valve": {
       "model": "Solar pump controller enable + 2\" NC solenoid",
@@ -138,12 +138,12 @@ export const STATIONS = [
     "aquifer": false,
     "sms": "City Health Officer",
     "base": {
-      "turbidity": 2.7,
+      "turbidity": 2.8,
       "orp": 395,
       "ph": 7.34,
-      "tds": 189,
+      "tds": 190,
       "temp": 26,
-      "bio": 3.9
+      "bio": 4
     },
     "valve": {
       "model": "12 V DC normally-closed solenoid, 1\"",
@@ -275,7 +275,7 @@ export const STATIC = {
   "bio_alert_ppb": 10,
   "rain_gauge": {
     "id": "ARG-NAGA",
-    "name": "DOST-ASTI automated rain gauge (Naga City)",
+    "name": "Simulated rain gauge (Naga City)",
     "lat": 13.626,
     "lon": 123.26
   }

@@ -12,7 +12,7 @@ import { TASK_PILL, dueIn, fmt, fmtClock, fmtDate, notFitted, quality, stationSt
 const ACTIVITY = {
   TASK_DONE: ['Maintenance done', 'checkmark-done', 'Completed', 'good'],
   TASK_ADDED: ['Reminder added', 'notifications', 'Scheduled', 'blue'],
-  ADVISORY_SENT: ['SMS advisory sent', 'chatbubble-ellipses', 'Sent', 'blue'],
+  ADVISORY_SENT: ['Advisory logged', 'chatbubble-ellipses', 'Logged', 'blue'],
   CMD_SHUT: ['Intake closed by operator', 'lock-closed', 'Closed', 'amber'],
   CMD_PREEMPT_SHUT: ['Intake closed ahead of plume', 'lock-closed', 'Closed', 'amber'],
   CMD_REARM: ['Intake reopened', 'lock-open', 'Reopened', 'good'],

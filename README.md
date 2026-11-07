@@ -7,8 +7,11 @@ Xylem Global Student Innovation Challenge · Camarines Sur National High School.
 Pilot catchment: **Mt. Isarog west slope → Naga River system → Naga City, Camarines Sur** (57 km², 29.7 km mapped river, 336 m → 3 m).
 An alternate site (Mt. Makiling, Los Baños) is kept for comparison: `BULOS_SITE=makiling`.
 
-Bulos 3D takes the IoT and LoRaWAN telemetry that DOST and LGUs already collect, adds low-cost edge nodes where none
-exist, and turns it into a 3D decision-support system. The system detects contamination from cheap surrogate
+> **Status: software prototype.** No sensor hardware has been built and no DOST or LGU data is connected. The twin runs on
+> open map, terrain and weather data, with simulated sensor readings.
+
+Bulos 3D is designed to take IoT and LoRaWAN telemetry from DOST and LGUs, add low-cost edge nodes where none
+exist, and turn it into a 3D decision-support system. The system detects contamination from cheap surrogate
 sensors, tells sensor faults apart from real events, forecasts when a plume will reach each downstream water point,
 and closes intakes and texts residents before contaminated water is dispensed.
 
@@ -87,11 +90,11 @@ For development with hot reload use `npm run backend` and `npm run dev` in two t
 3D libraries unbundled (around 50 MB), so the first load there is much slower.
 
 **Competition materials:** [`docs/submission-pack.md`](docs/submission-pack.md) (concept changes, results, video script,
-deployment, checklist), [`docs/bench-node.md`](docs/bench-node.md) (build the low-cost real prototype), and
+deployment, checklist), [`docs/bench-node.md`](docs/bench-node.md) (plan for a low-cost prototype, not built), and
 [`docs/evaluation.md`](docs/evaluation.md) (simulated test results; regenerate with `python -m backend.tools.evaluate`).
 
-**Real hardware:** a Wi-Fi bench node (`firmware/bulos_bench_node`) posts to `POST /api/node/reading` and takes over one
-water point while the rest stay simulated. Rehearse without hardware using `python -m backend.tools.fake_node`.
+**Planned hardware (not built):** the firmware for a Wi-Fi bench node (`firmware/bulos_bench_node`) is written to post to
+`POST /api/node/reading` and take over one water point while the rest stay simulated. It has never run on a device. Rehearse without hardware using `python -m backend.tools.fake_node`.
 
 **Mobile app (Expo Go):** see [`mobile/README.md`](mobile/README.md). In short, run `npm run start:lan` here,
 then `npm start` in `mobile/`, and scan the QR code with Expo Go on the same Wi-Fi.

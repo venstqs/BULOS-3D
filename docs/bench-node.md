@@ -1,5 +1,7 @@
 # Build the Bulos 3D bench node
 
+> **Status: not built.** This is a plan for a future prototype. No part of it has been assembled or tested.
+
 A working model of one water point: a sensor sees dirty water, the valve closes by itself, and the live
 digital twin reacts. Build time is about one afternoon once the parts arrive. The firmware has **not been
 flashed on real hardware yet**, so expect some debugging. Order parts today.
