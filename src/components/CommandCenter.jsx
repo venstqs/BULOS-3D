@@ -316,7 +316,7 @@ function LayersWindow({ view, setView, layers, setLayers }) {
         <summary className="cursor-pointer py-1 font-display text-[13px] font-semibold">Map style</summary>
         <div className="grid gap-2.5 pt-1 text-ink-2">
           <div><div className="mb-1 text-[12.5px]">Base map</div>{pick('base', [['satellite', 'Satellite'], ['light', 'Streets']])}</div>
-          <div><div className="mb-1 text-[12.5px]">Colours</div>{pick('palette', [['hazard', 'Hazard'], ['ocean', 'Water'], ['clear', 'Colour-safe']])}</div>
+          <div><div className="mb-1 text-[12.5px]">Colours</div>{pick('palette', [['hazard', 'Hazard'], ['clear', 'Colour-safe']])}</div>
           <label className="block text-[12.5px]">Layer strength {Math.round(view.opacity * 100)}%
             <input type="range" min={0.2} max={1} step={0.05} value={view.opacity} onChange={(e) => set({ opacity: Number(e.target.value) })} className="mt-1 w-full accent-[#2f5be7]" />
           </label>
@@ -587,6 +587,7 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
     try {
       const saved = { ...DEFAULT_VIEW, ...JSON.parse(localStorage.getItem(VIEW_KEY)) };
       if (saved.base === 'dark') saved.base = 'satellite';
+      if (saved.palette === 'ocean') saved.palette = 'hazard';   // blue heat vanished into the water
       return HAZARDS[saved.hazard] ? saved : { ...saved, hazard: DEFAULT_VIEW.hazard };   // an older save may name a removed layer
     } catch { return DEFAULT_VIEW; }
   });

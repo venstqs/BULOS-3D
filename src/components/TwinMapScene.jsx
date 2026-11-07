@@ -165,7 +165,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
             { id: 'shade', type: 'hillshade', source: 'shade', paint: { 'hillshade-exaggeration': 0.22, 'hillshade-shadow-color': '#0d2233', 'hillshade-highlight-color': '#ffffff', 'hillshade-illumination-direction': 315 } },
             { id: 'admin', type: 'line', source: 'osm', 'source-layer': 'boundary', minzoom: 10, filter: ['>=', ['get', 'admin_level'], 6], paint: { 'line-color': '#ffffff', 'line-opacity': 0.4, 'line-width': 1, 'line-dasharray': [4, 3] } },
             { id: 'waterways', type: 'line', source: 'osm', 'source-layer': 'waterway', minzoom: 12, paint: { 'line-color': '#7cc4ff', 'line-opacity': 0.65, 'line-width': ['interpolate', ['linear'], ['zoom'], 12, 0.6, 17, 2.2] } },
-            { id: 'basin', type: 'fill', source: 'basin', paint: { 'fill-color': '#56b6ff', 'fill-opacity': 0.1 } },
+            { id: 'basin', type: 'fill', source: 'basin', paint: { 'fill-color': '#ffffff', 'fill-opacity': 0.03 } },
             { id: 'catchment-glow', type: 'line', source: 'catchment', paint: { 'line-color': '#7fd0ff', 'line-width': 6, 'line-blur': 5, 'line-opacity': 0.5 } },
             { id: 'catchment', type: 'line', source: 'catchment', paint: { 'line-color': '#ffffff', 'line-width': 1.5, 'line-dasharray': [3, 2], 'line-opacity': 0.85 } },
             { id: 'osm-water', type: 'fill', source: 'osm', 'source-layer': 'water', paint: { 'fill-color': '#2a7fb5', 'fill-opacity': ['interpolate', ['linear'], ['zoom'], 12, 0, 14, 0.34] } },
