@@ -25,7 +25,7 @@ export function viewsOf(ctx) {
 }
 
 /** A close view of one site: its model, real shadows and the sky that lights it. */
-export default function SiteViewCanvas({ st, view = 'site', onReady, onView, orbit = false }) {
+export default function SiteViewCanvas({ st, view = 'site', onReady, onView, orbit = false, light = false }) {
   const host = useRef(null);
   const world = useRef(null);
   const pinLayer = useRef(null);
@@ -34,7 +34,7 @@ export default function SiteViewCanvas({ st, view = 'site', onReady, onView, orb
   useEffect(() => {
     const el = host.current;
     const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.75));
+    renderer.setPixelRatio(light ? 1 : Math.min(window.devicePixelRatio, 1.75));
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 0.95;
     renderer.shadowMap.enabled = true;
@@ -53,7 +53,7 @@ export default function SiteViewCanvas({ st, view = 'site', onReady, onView, orb
 
     const sun = new THREE.DirectionalLight('#fff1dc', 3);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(4096, 4096);
+    sun.shadow.mapSize.set(light ? 1024 : 4096, light ? 1024 : 4096);
     sun.shadow.bias = -0.0004;
     sun.shadow.normalBias = 0.03;
     scene.add(sun, sun.target);
@@ -68,17 +68,19 @@ export default function SiteViewCanvas({ st, view = 'site', onReady, onView, orb
     scene.fog = new THREE.Fog('#dfeaf6', 70, 620);
 
     // A line of trees all round, so the site sits in a landscape
-    const belt = { g: new THREE.Group(), live: [], ground: [] };
-    reseed(77);
-    for (let i = 0; i < 60; i += 1) {
-      const a = (i / 60) * Math.PI * 2 + rnd(-0.04, 0.04);
-      const r = rnd(72, 150);
-      if (i % 3 === 0) coconut(belt.g, Math.cos(a) * r, Math.sin(a) * r, rnd(10, 13), 0.8);
-      else tree(belt.g, Math.cos(a) * r, Math.sin(a) * r, rnd(1.6, 2.6));
+    if (!light) {
+      const belt = { g: new THREE.Group(), live: [], ground: [] };
+      reseed(77);
+      for (let i = 0; i < 60; i += 1) {
+        const a = (i / 60) * Math.PI * 2 + rnd(-0.04, 0.04);
+        const r = rnd(72, 150);
+        if (i % 3 === 0) coconut(belt.g, Math.cos(a) * r, Math.sin(a) * r, rnd(10, 13), 0.8);
+        else tree(belt.g, Math.cos(a) * r, Math.sin(a) * r, rnd(1.6, 2.6));
+      }
+      mergeStatic(belt);
+      belt.g.traverse((o) => { o.castShadow = false; });
+      scene.add(belt.g);
     }
-    mergeStatic(belt);
-    belt.g.traverse((o) => { o.castShadow = false; });
-    scene.add(belt.g);
 
     const w = { renderer, scene, camera, controls, sun, site: null, flight: null };
     world.current = w;

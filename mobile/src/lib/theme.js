@@ -1,8 +1,8 @@
-// Same soft-aqua design language as the Bulos 3D website.
+// Same white and blue design as the Bulos 3D website.
 export const C = {
-  bgTop: '#e3e9ff',
-  bgBottom: '#cfe6fb',
-  card: 'rgba(255,255,255,0.78)',
+  bgTop: '#eef2f6',
+  bgBottom: '#eef2f6',
+  card: '#ffffff',
   tile: '#ffffff',
   panel2: '#f3f7ff',
   line: '#e3e9f7',
@@ -37,11 +37,11 @@ export const STATION_COLOR = {
 };
 
 export const shadow = {
-  shadowColor: '#2f5be7',
-  shadowOpacity: 0.12,
-  shadowRadius: 14,
-  shadowOffset: { width: 0, height: 6 },
-  elevation: 3,
+  shadowColor: '#101828',
+  shadowOpacity: 0.09,
+  shadowRadius: 10,
+  shadowOffset: { width: 0, height: 2 },
+  elevation: 2,
 };
 
 export const FONT = {

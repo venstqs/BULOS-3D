@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Box, Lock, LockOpen, MessageSquareText, Printer } from 'lucide-react';
+import { Download, Box, Lock, LockOpen, MessageSquareText, Printer } from 'lucide-react';
 import LineChart from './charts/LineChart';
 import RiverSchematic from './RiverSchematic';
 import StationPanel, { StatusBadge } from './StationPanel';
@@ -62,7 +62,7 @@ export function StatusTable({ live, forecast, onOpen }) {
   );
 }
 
-const KIND_LABEL = {
+const KIND_LABEL = { ADVISORY_SENT: 'Advisory logged',
   FORECAST_ADVISORY: 'Water advisory', EDGE_AUTO_TRIP: 'Intake closed automatically', CMD_PREEMPT_SHUT: 'Intake closed ahead of plume',
   ANOMALY: 'Contamination detected', BIOFOULING: 'Sensor maintenance needed', RESERVE_LOW: 'Stored water running low',
   SCENARIO: 'Simulation', REARM_RECOMMENDED: 'Safe to reopen intake', RECOVERED: 'Back to normal', TRANSIT_CALIBRATION: 'Model updated from field data',
@@ -311,6 +311,37 @@ function RiskStrip({ live, forecast, onOpen }) {
 }
 
 /* ================================================================== WATER POINTS */
+/** Every water point side by side, for spotting the odd one out. */
+function CompareAll({ live, selected, onSelect }) {
+  const best = Math.max(...live.stations.map((s) => s.wqhi.score));
+  return (
+    <details className="section compare no-print">
+      <summary>Compare all water points</summary>
+      <table className="data">
+        <thead><tr><th>Water point</th><th>Status</th><th>Water health</th><th>Risk</th><th>Turbidity</th><th>pH</th><th>TDS</th><th>Intake</th><th>People</th></tr></thead>
+        <tbody>
+          {live.stations.map((s) => {
+            const st = stationStatus(s);
+            return (
+              <tr key={s.id} onClick={() => onSelect(s.id)} aria-selected={s.id === selected.id} className="cursor-pointer hover:bg-[#f2f6ff]">
+                <td className="font-semibold">{s.id}</td>
+                <td><span className="inline-flex items-center gap-1.5"><i className="h-2 w-2 rounded-full" style={{ background: st.color }} />{st.label}</span></td>
+                <td className="num"><span className="inline-flex items-center gap-2">{s.wqhi.score}<i className="hidden h-1.5 w-16 overflow-hidden rounded-full bg-[#e4ecff] sm:block"><b className="block h-full bg-civic" style={{ width: `${(s.wqhi.score / Math.max(best, 1)) * 100}%` }} /></i></span></td>
+                <td className="num">{fmt(s.risk, 2)}</td>
+                <td className="num">{fmt(s.reading?.turbidity, 1)} NTU</td>
+                <td className="num">{fmt(s.reading?.ph, 2)}</td>
+                <td className="num">{Math.round(s.reading?.tds ?? 0)} mg/L</td>
+                <td>{s.valve ? (s.valve.open ? 'Open' : 'Closed') : 'None'}</td>
+                <td className="num">{(s.population ?? 0).toLocaleString()}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </details>
+  );
+}
+
 export function WaterPointsPage({ live, selected, history, staticData, onSelect, onInspect, onChanged }) {
   if (!live || !selected) return <Wait />;
   const s = history?.series ?? [];
@@ -334,6 +365,8 @@ export function WaterPointsPage({ live, selected, history, staticData, onSelect,
           );
         })}
       </div>
+      <CompareAll live={live} selected={selected} onSelect={onSelect} />
+
       <Section title={selected.name} note={`${selected.owner}. Sensor readings are simulated.`}
                right={<button onClick={() => onInspect(selected.id)} className="btn-primary !py-1.5"><Box size={14} />Open 3D site view</button>} flush>
         <StationPanel key={selected.id} st={selected} history={history} forecast={live.forecast.stations} pnsdw={staticData?.pnsdw ?? {}} onChanged={onChanged} />
@@ -360,15 +393,46 @@ export function WaterPointsPage({ live, selected, history, staticData, onSelect,
 const pctClass = (v) => (v >= 99 ? 'text-ink' : v >= 90 ? 'bg-[#fff3cf] text-[#7a5600]' : 'bg-[#fde6e6] text-[#a32626]');
 const FILTERS = [['all', 'All', () => true], ['alerts', 'Alerts', (e) => e.severity !== 'info'], ['actions', 'Actions', (e) => /^(CMD_|TASK_|ADVISORY)/.test(e.type)]];
 
+function downloadEvents(events) {
+  const safe = (v) => `"${String(v ?? '').replaceAll('"', '""')}"`;
+  const rows = [['Time', 'Water point', 'Severity', 'Event', 'Details'], ...events.map((e) => [new Date(e.t_ms).toISOString(), e.station ?? 'system', e.severity, e.type, e.message])];
+  const url = URL.createObjectURL(new Blob([rows.map((r) => r.map(safe).join(',')).join('\n')], { type: 'text/csv' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'bulos-3d-events-simulated.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function ReportTile({ label, value, alert }) {
+  return (
+    <div className="section px-4 py-3">
+      <div className={`font-display text-[26px] font-semibold leading-tight tabular-nums ${alert ? 'text-[#a32626]' : ''}`}>{value}</div>
+      <div className="text-[13px] text-ink-2">{label}</div>
+    </div>
+  );
+}
+
 export function ReportsPage({ live }) {
   const { data } = usePoll('/api/compliance?hours=24', 15000);
   const [filter, setFilter] = useState('all');
   const keep = FILTERS.find(([k]) => k === filter)[2];
+  const events = live?.events ?? [];
+  const pcts = (data?.stations ?? []).flatMap((s) => [s.turbidity_pct, s.ph_pct, s.tds_pct]);
+  const compliance = pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : null;
+  const alerts = events.filter((e) => e.severity === 'danger').length;
+  const closed = (live?.stations ?? []).filter((s) => s.valve && !s.valve.open).length;
   return (
     <div className="grid gap-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <ReportTile label="Samples within the standard" value={compliance == null ? '…' : `${compliance}%`} />
+        <ReportTile label="Serious alerts in the log" value={alerts} alert={alerts > 0} />
+        <ReportTile label="Intakes closed now" value={closed} alert={closed > 0} />
+        <ReportTile label="Advisories logged" value={live?.sms.length ?? 0} />
+      </div>
       <Section title="Drinking-water compliance, last 24 hours"
                note="Share of raw intake samples within the Philippine National Standards for Drinking Water (PNSDW 2017). Readings are simulated."
-               right={<button onClick={() => window.print()} className="btn-ghost no-print inline-flex items-center gap-1.5 !py-1.5"><Printer size={14} />Print report</button>} flush>
+               right={<span className="no-print flex gap-2"><button onClick={() => downloadEvents(events)} className="btn-ghost inline-flex items-center gap-1.5 !py-1.5"><Download size={14} />Download events</button><button onClick={() => window.print()} className="btn-ghost inline-flex items-center gap-1.5 !py-1.5"><Printer size={14} />Print report</button></span>} flush>
         {!data ? <div className="section-body"><Wait /></div> : (
           <table className="data">
             <thead><tr><th>Water point</th><th>Samples</th><th>Turbidity ≤ {data.limits.turbidity_ntu} NTU</th><th>pH {data.limits.ph_min}–{data.limits.ph_max}</th><th>TDS ≤ {data.limits.tds_mgL}</th><th>Avg WQHI</th><th>Intake closed</th></tr></thead>

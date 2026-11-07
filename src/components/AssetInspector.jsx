@@ -36,7 +36,7 @@ function Reading({ label, unit, v, min, max, d, s }) {
 
 /** The site model on its own. The mobile app embeds this (?embed=site). */
 export function SiteScene({ st }) {
-  return <div className="relative h-full w-full"><SiteViewCanvas st={st} /></div>;
+  return <div className="relative h-full w-full"><SiteViewCanvas st={st} light /></div>;
 }
 
 /** Full-screen look at one water point, with hanging panels like the map. */

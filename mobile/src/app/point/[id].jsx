@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Alert, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { Button, Card, CardHead, Empty, Pill, Row, Screen, StatusBadge, Tile } from '../../components/ui';
+import { Button, Card, CardHead, Empty, Meter, Pill, Row, Screen, StatusBadge, Tile } from '../../components/ui';
 import { Gauge, LineChart } from '../../components/charts';
 import { apiGet } from '../../lib/api';
 import { useData } from '../../lib/data';
@@ -106,9 +106,7 @@ export default function PointDetail() {
         {Object.entries(st.wqhi.parts).map(([k, v]) => (
           <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
             <Text style={[FONT.small, { width: 74, color: C.ink2 }]}>{PART_LABEL[k] ?? k}</Text>
-            <View style={{ flex: 1, height: 7, borderRadius: 4, backgroundColor: C.panel2 }}>
-              <View style={{ width: `${v}%`, height: 7, borderRadius: 4, backgroundColor: C.primary }} />
-            </View>
+            <View style={{ flex: 1 }}><Meter pct={v} height={7} /></View>
             <Text style={[FONT.small, { width: 28, textAlign: 'right', color: C.ink }]}>{v}</Text>
           </View>
         ))}
@@ -149,9 +147,7 @@ export default function PointDetail() {
       {st.tank && (
         <Card>
           <CardHead title="Stored-water reserve" />
-          <View style={{ height: 10, borderRadius: 5, backgroundColor: C.panel2 }}>
-            <View style={{ width: `${st.tank.pct ?? 0}%`, height: 10, borderRadius: 5, backgroundColor: C.primary }} />
-          </View>
+          <Meter pct={st.tank.pct ?? 0} height={10} />
           <Text style={[FONT.small, { marginTop: 6 }]}>{fmt(st.tank.pct, 0)}% of {(st.tank.capacity_l / 1000).toFixed(1)} m³ · about {fmt(st.tank.reserve_h, 1)} h of supply</Text>
         </Card>
       )}

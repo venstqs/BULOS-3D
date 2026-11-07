@@ -121,6 +121,8 @@ A quote or short letter from a barangay health worker, the City Health Office or
 | 2:25 | Results table | "In simulation, this affordable design blocked 93% of contaminated water time from a spill, with no false shut-offs in our tests. Next, we test against lab samples." |
 | 2:45 | Phone app, rollout | "It runs on a phone, and a new river is a configuration change. Water safety shouldn't depend on being near a city." |
 
+**Easiest way to record:** on the Map, press **Start the guided demo** from the welcome card or Customize. It plays steps 0:30 to 2:25 by itself in about 70 seconds. Press **H** first if you want the panels hidden.
+
 ## 8. Put it online
 
 Judging runs about Nov 23 – Dec 9, so judges need a link that works without your PC.
@@ -137,6 +139,7 @@ Anyone with the link can press the simulated valves. That is fine for a demo, bu
 
 - [ ] Rules read, track and challenge chosen, consent forms in
 - [ ] Demo recorded: Follow a drop, a simulated spill, 3D Site View, Presentation mode (press H)
+- [ ] Mobile app opened on a real phone with Expo Go (it has run on an Android emulator)
 - [ ] Concept paper updated (section 3)
 - [ ] Impact facts verified, with sources
 - [ ] Video recorded and within the limit

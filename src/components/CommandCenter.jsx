@@ -8,6 +8,7 @@ import { WATER_KEY } from '../lib/waterColour';
 import { AHEAD_S, PAST_S, exposure, fmtOffset } from '../lib/twinField';
 import { useTwinTime } from '../lib/useTwinTime';
 import MapCredits from './MapCredits';
+import GuidedDemo from './GuidedDemo';
 import { Floating, MapWindow, resetPanels, usePanelsMoved } from '../lib/floating';
 
 const TwinMapScene = lazy(() => import('./TwinMapScene'));
@@ -332,7 +333,7 @@ function LayersWindow({ view, setView, layers, setLayers }) {
 }
 
 /** First visit: what this is, and three good places to start. */
-function Welcome({ onDemo, onDrop, onTour, onClose }) {
+function Welcome({ onGuide, onDrop, onTour, onClose }) {
   const start = 'flex-1 rounded-lg px-3 py-2 text-[13px] font-semibold';
   return (
     <Floating id="map-welcome" grip={false} role="region" aria-label="Welcome" className={`${card} absolute bottom-14 left-1/2 z-[24] hidden w-[520px] -ml-[260px] p-4 lg:block`}>
@@ -340,7 +341,7 @@ function Welcome({ onDemo, onDrop, onTour, onClose }) {
       <h2 className="pr-7 font-display text-[17px] font-semibold">Welcome to Bulos 3D</h2>
       <p className="mt-1 text-[13px] leading-relaxed text-ink-2">A digital twin of the river from Mt. Isarog to Naga City. The map and weather are real. Sensor readings are simulated. Try one of these:</p>
       <div className="mt-3 flex gap-2">
-        <button onClick={onDemo} className={`${start} bg-civic text-white`}>Run a demo spill</button>
+        <button onClick={onGuide} className={`${start} bg-civic text-white`}>Start the guided demo</button>
         <button onClick={onDrop} className={`${start} bg-[#f2f6ff] text-civic`}>Follow a drop</button>
         <button onClick={onTour} className={`${start} bg-[#f2f6ff] text-civic`}>Tour the sites</button>
       </div>
@@ -366,7 +367,7 @@ function SimulationBar({ live }) {
 }
 
 /** How the screen itself looks and behaves. */
-function CustomizeWindow({ ui, setUi, view, setView, onPresent, onWelcome }) {
+function CustomizeWindow({ ui, setUi, view, setView, onPresent, onWelcome, onGuide }) {
   const flip = (k) => setUi((u) => ({ ...u, [k]: !u[k] }));
   const line = (label, on, change) => (
     <label key={label} className="flex cursor-pointer items-center justify-between gap-3 py-1 text-ink-2">
@@ -377,6 +378,7 @@ function CustomizeWindow({ ui, setUi, view, setView, onPresent, onWelcome }) {
     <div className="px-3 pb-3 text-[13px]">
       <button onClick={onPresent} className="btn-primary w-full justify-center"><Eye size={14} />Presentation mode</button>
       <p className="mt-1.5 text-[12px] leading-snug text-muted">Hides every panel so only the map shows. Good for your pitch.</p>
+      <button onClick={onGuide} className="btn-ghost mt-2 w-full justify-center">Start the guided demo</button>
       <h3 className="mt-3 border-t border-line pt-3 font-display text-[13px] font-semibold">Panels</h3>
       <div className="seg-flat mt-1.5">
         <button role="tab" aria-selected={!ui.glass} onClick={() => setUi((u) => ({ ...u, glass: false }))}>Solid white</button>
@@ -594,6 +596,7 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
   const [panel, setPanel] = useState(true);
   const [wins, setWins] = useState({ layers: false, legend: false, data: false, custom: false });
   const [presenting, setPresenting] = useState(false);
+  const [guide, setGuide] = useState(false);
   const [welcome, setWelcome] = useState(() => { try { return !localStorage.getItem(WELCOME_KEY); } catch { return false; } });
   const closeWelcome = () => { setWelcome(false); try { localStorage.setItem(WELCOME_KEY, '1'); } catch { /* it just shows again next time */ } };
   const [ui, setUi] = useState(() => { try { return { ...DEFAULT_UI, ...JSON.parse(localStorage.getItem(UI_KEY)) }; } catch { return DEFAULT_UI; } });
@@ -754,12 +757,13 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
           )}
 
           <SimulationBar live={live} />
+          {guide && <GuidedDemo live={live} forecast={forecast} controls={controls} time={time} onClose={() => setGuide(false)} />}
           {welcome && !presenting && (
             <Welcome
               onClose={closeWelcome}
               onDrop={() => { closeWelcome(); go('map'); }}
               onTour={() => { closeWelcome(); controls.current.startTour?.(); }}
-              onDemo={() => { closeWelcome(); post('/api/speed', { speed: 240 }).then(() => act('/api/scenario', { name: 'SEPTIC' }, 'Demo spill started. Watch the river and the warning on the left.')); }}
+              onGuide={() => { closeWelcome(); setGuide(true); }}
             />
           )}
           {/* Separate windows, opened from the main panel */}
@@ -770,7 +774,7 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
           )}
           {wins.custom && (
             <MapWindow id="win-custom" title="Customize" dock={3} onClose={() => toggleWin('custom')} onRaise={() => setTop('custom')} className={`${winZ('custom')} lg:right-[60px] lg:top-[92px] lg:w-[270px]`}>
-              <CustomizeWindow ui={ui} setUi={setUi} view={view} setView={setView} onPresent={() => setPresenting(true)} onWelcome={() => setWelcome(true)} />
+              <CustomizeWindow ui={ui} setUi={setUi} view={view} setView={setView} onPresent={() => setPresenting(true)} onWelcome={() => setWelcome(true)} onGuide={() => { setWins((w) => ({ ...w, custom: false })); setGuide(true); }} />
             </MapWindow>
           )}
           {wins.legend && (

@@ -60,12 +60,12 @@ function softEdge() {
   c.width = 256; c.height = 256;
   const g = c.getContext('2d');
   g.fillStyle = '#000'; g.fillRect(0, 0, 256, 256);
-  g.filter = 'blur(9px)';
+  g.filter = 'blur(20px)';
   g.fillStyle = '#fff';
   g.beginPath();
   for (let i = 0; i <= 64; i += 1) {
     const a = (i / 64) * Math.PI * 2;
-    const r = 104 + 8 * Math.sin(a * 5) + 5 * Math.sin(a * 11 + 1) + 3 * Math.sin(a * 23);
+    const r = 92 + 8 * Math.sin(a * 5) + 5 * Math.sin(a * 11 + 1) + 3 * Math.sin(a * 23);
     g[i ? 'lineTo' : 'moveTo'](128 + Math.cos(a) * r, 128 + Math.sin(a) * r);
   }
   g.fill();
@@ -229,7 +229,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
       const pin = new THREE.Mesh(new THREE.ConeGeometry(4.2, 9, 24), new THREE.MeshStandardMaterial({ color: '#0ca30c', emissive: '#0ca30c', emissiveIntensity: 0.4, roughness: 0.35 }));
       pin.rotation.x = Math.PI;
       pin.frustumCulled = false;
-      const ring = new THREE.Mesh(new THREE.RingGeometry(r * 0.92, r * 1.06, 72).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#d03b3b', transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+      const ring = new THREE.Mesh(new THREE.RingGeometry(r * 0.985, r * 1.015, 96).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#d03b3b', transparent: true, depthWrite: false, side: THREE.DoubleSide }));
       ring.visible = false;
       ring.position.y = 0.2;
       ring.frustumCulled = false;
@@ -238,7 +238,8 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
       ctx.ground.forEach((pad, i) => {
         pad.material = pad.material.clone();
         // Sit in with the satellite image around it, rather than glowing on top
-        pad.material.color.multiplyScalar(0.52);
+        pad.material.color.multiplyScalar(0.46);
+        pad.material.opacity = 0.86;
         pad.material.envMapIntensity = 0.25;
         pad.material.alphaMap = softEdge();
         pad.material.blending = THREE.CustomBlending;
@@ -498,11 +499,11 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
       });
     };
 
-    const focus = (id) => {
+    const focus = (id, room = {}) => {
       const s = sites[id];
       if (!s) return;
       stopFollow();
-      fly({ center: [s.lon, s.lat], zoom: CLOSE_ZOOM, pitch: 70, bearing: map.getBearing(), duration: 2600, padding: { ...panelGap.current, right: 372 } });
+      fly({ center: [s.lon, s.lat], zoom: CLOSE_ZOOM, pitch: 70, bearing: map.getBearing(), duration: 2600, padding: { ...panelGap.current, right: 372, ...room } });
     };
 
     let timer = 0;
@@ -532,7 +533,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
 
     controls.current = {
       home: () => { stopTour(); stopFollow(); fly({ ...home, duration: 1800 }); },
-      focus: (id) => { stopTour(); focus(id); },
+      focus: (id, room) => { stopTour(); focus(id, room); },
       sensors: (id) => {
         const s = sites[id];
         if (!s?.sensorAt) return;
@@ -703,6 +704,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
       // Low risk does not mean nothing is happening: closed early and plume on the way each get their own colour
       const calm = tauStep === 0 && stationStatus(st).color === BAND.LOW.color;
       const dot = calm && closed ? CLOSED_EARLY : calm && eta ? BAND.MODERATE.color : color;
+      s?.ring.material.color.set(dot);
       tagList.push({ ...tag('station', at.lon, at.lat, `${st.id}  ${closed ? 'closed' : eta || st.wqhi.score}`, dot), id: st.id });
       tagList.at(-1).properties = { ...tagList.at(-1).properties, id: st.id, picked: st.id === selectedId, detail: `${st.name}\nWater health ${st.wqhi.score}/100, turbidity ${fmt(st.reading?.turbidity, 1)} NTU, pH ${fmt(st.reading?.ph, 2)}` };
     }

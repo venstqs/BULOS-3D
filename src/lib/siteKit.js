@@ -246,12 +246,12 @@ export function kit() {
     solar: new THREE.MeshStandardMaterial({ map: solarTexture(), roughness: 0.16, metalness: 0.6 }),
     chain: new THREE.MeshStandardMaterial({ color: '#b5bcc3', alphaMap: chainTexture(), alphaTest: 0.32, side: THREE.DoubleSide, metalness: 0.75, roughness: 0.42 }),
     trunk: new THREE.MeshStandardMaterial({ map: barkTexture(), roughness: 0.95 }),
-    crown: plain('#3a7330', 0.95, 0, { envMapIntensity: 0.35 }),
+    crown: plain('#2f6029', 0.95, 0, { envMapIntensity: 0.3 }),
     pig: plain('#e6b3a7', 0.7),
     frond: leafPlant(frondTexture()),
     banana: leafPlant(bananaTexture()),
-    leaf: leafPlant(leaf),
-    leaf2: leafPlant(leaf2),
+    leaf: leafPlant(leaf, { color: '#c9dcb8' }),
+    leaf2: leafPlant(leaf2, { color: '#c9dcb8' }),
     tuft: leafPlant(grassTexture(), { alphaTest: 0.36 }),
     ripple: rippleTexture(),
   };
@@ -810,7 +810,7 @@ export function tree(p, x, z, s = 1, mat) {
     const c = add(g, new THREE.IcosahedronGeometry(1.5, 1), m.crown, Math.cos(a) * r, H + 0.3 + (i === 6 ? 0.5 : rnd(-0.3, 0.3)), Math.sin(a) * r);
     c.scale.y = 0.72;
   }
-  for (let i = 0; i < 130; i += 1) {
+  for (let i = 0; i < 175; i += 1) {
     const u = rnd(-1, 1);
     const a = rnd(0, Math.PI * 2);
     const r = 3.1 * Math.cbrt(rnd(0.45, 1));

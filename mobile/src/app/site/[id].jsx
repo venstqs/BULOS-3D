@@ -13,8 +13,8 @@ export default function SiteView() {
   return (
     <Background>
       <Stack.Screen options={{ title: st ? `${st.id} 3D site view` : '3D site view' }} />
-      <View style={{ flex: 1, padding: 16, gap: 12 }}>
-        <Web3D style={{ flex: 1 }} query={{ embed: 'site', id }} />
+      <View style={{ flex: 1, padding: 10, gap: 10 }}>
+        <Web3D style={{ flex: 1, borderRadius: 14 }} query={{ embed: 'site', id }} />
         {st && (
           <Card>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
