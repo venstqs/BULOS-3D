@@ -1,8 +1,10 @@
+<p align="center"><img src="public/favicon.svg" width="128" alt="Bulos 3D logo"></p>
+
 # Bulos 3D: Water Quality Digital Twin
 
 **Spatial telemetry, physicochemical surrogate analytics and hydrodynamic simulation for rural, decentralized water networks.**
 Xylem Global Student Innovation Challenge · Camarines Sur National High School.
-Pilot catchment: **Mt. Isarog west slope → Naga River system → Naga City, Camarines Sur** (58 km², 28 km main channel, 1,852 m → 4 m).
+Pilot catchment: **Mt. Isarog west slope → Naga River system → Naga City, Camarines Sur** (57 km², 29.7 km mapped river, 336 m → 3 m).
 An alternate site (Mt. Makiling, Los Baños) is kept for comparison: `BULOS_SITE=makiling`.
 
 Bulos 3D takes the IoT and LoRaWAN telemetry that DOST and LGUs already collect, adds low-cost edge nodes where none
