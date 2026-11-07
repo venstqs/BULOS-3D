@@ -40,8 +40,9 @@ export function SiteScene({ st }) {
 }
 
 /** Full-screen look at one water point, with hanging panels like the map. */
-export default function AssetInspector({ st, stations = [], onPick, onClose }) {
+export default function AssetInspector({ st, stations = [], onPick, onClose, act }) {
   const [view, setView] = useState('site');
+  const [orbit, setOrbit] = useState(false);
   const [parts, setParts] = useState({});
   if (!st) return null;
   const status = stationStatus(st);
@@ -49,7 +50,7 @@ export default function AssetInspector({ st, stations = [], onPick, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-[#dbe9f7]" role="dialog" aria-label={`3D site view of ${st.name}`}>
-      <SiteViewCanvas st={st} view={view} onReady={(ctx) => setParts(viewsOf(ctx))} />
+      <SiteViewCanvas st={st} view={view} orbit={orbit} onView={setView} onReady={(ctx) => setParts(viewsOf(ctx))} />
 
       <div className="pointer-events-none absolute inset-0">
         <Floating id="site-title" title="Site details" label="Move site details" className="site-panel pointer-events-auto absolute left-3 top-3 w-[min(340px,calc(100vw-24px))]">
@@ -77,6 +78,11 @@ export default function AssetInspector({ st, stations = [], onPick, onClose }) {
             <h3 className="font-display text-[15px] font-semibold">Sensor readings</h3>
             <p className="text-[12px] text-muted">Simulated for the competition.</p>
             <div className="mt-2.5 space-y-2.5">{readings(st).filter((g) => !notFitted(st, g.k)).map((g) => <Reading key={g.k} {...g} />)}</div>
+            {st.valve && act && (
+              <button onClick={() => act('/api/valve', { station_id: st.id, action: st.valve.open ? 'SHUT' : 'REARM' }, `Intake at ${st.id} ${st.valve.open ? 'closed' : 'reopened'}.`)} className={`${st.valve.open ? 'btn-danger' : 'btn-primary'} mt-3 w-full justify-center`}>
+                {st.valve.open ? 'Close intake' : 'Reopen intake'}
+              </button>
+            )}
             <h3 className="mt-4 font-display text-[15px] font-semibold">Assessment</h3>
             <dl className="mt-1 space-y-1 text-[13px]">
               <div className="flex justify-between gap-3"><dt className="text-ink-2">Condition</dt><dd className="text-right font-medium">{CLASS_LABEL[st.classification]}</dd></div>
@@ -89,6 +95,7 @@ export default function AssetInspector({ st, stations = [], onPick, onClose }) {
         <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 flex-wrap items-center justify-center gap-2">
           <div className="seg pointer-events-auto shadow-[0_1px_2px_rgba(16,24,40,0.2),0_4px_14px_rgba(16,24,40,0.14)]" role="group" aria-label="Look at">
             {Object.entries(parts).map(([k, v]) => <button key={k} aria-pressed={view === k} onClick={() => setView(k)}>{v.label}</button>)}
+            <button aria-pressed={orbit} onClick={() => setOrbit((o) => !o)} title="Slowly circle the site">Orbit</button>
           </div>
         </div>
 

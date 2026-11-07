@@ -10,14 +10,12 @@ import { PIPE_FRAG, RIVER_FRAG, paintRiver } from '../lib/waterShaders';
 import { waterCss } from '../lib/waterColour';
 
 // The command view: a real 3D map with detailed facilities and people on it.
-// Free open data by default; VITE_MAPBOX_TOKEN switches the imagery and terrain to Mapbox.
+// Esri is the default photo: Mapbox's has a large cloud and its black shadow over the lower river.
+// VITE_MAPBOX_TOKEN adds Mapbox as a choice under Map style.
 const MAPBOX = import.meta.env.VITE_MAPBOX_TOKEN;
-const IMAGERY = MAPBOX
-  ? { tiles: [`https://api.mapbox.com/v4/mapbox.satellite/{z}/{x}/{y}@2x.webp?access_token=${MAPBOX}`], attribution: '© Mapbox © Maxar' }
-  : { tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' };
-const TERRAIN = MAPBOX
-  ? { tiles: [`https://api.mapbox.com/v4/mapbox.terrain-rgb/{z}/{x}/{y}.pngraw?access_token=${MAPBOX}`], encoding: 'mapbox', maxzoom: 14 }
-  : { tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', maxzoom: 13, attribution: 'Terrain: Mapzen/AWS open data' };
+const IMAGERY = { tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'], attribution: 'Imagery © Esri, Maxar, Earthstar Geographics' };
+const MAPBOX_IMAGERY = { tiles: [`https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/256/{z}/{x}/{y}@2x?access_token=${MAPBOX}`], attribution: '© Mapbox © Maxar' };
+const TERRAIN = { tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'], encoding: 'terrarium', maxzoom: 13, attribution: 'Terrain: Mapzen/AWS open data' };
 const EXAGGERATION = 1.5;
 const CLOSE_ZOOM = 20.5;
 // Everything is drawn at true size. Models too small to see are skipped, which keeps the map fast.
@@ -135,7 +133,8 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
           version: 8,
           glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
           sources: {
-            imagery: { type: 'raster', tileSize: 256, maxzoom: MAPBOX ? 20 : 18, ...IMAGERY },
+            imagery: { type: 'raster', tileSize: 256, maxzoom: 18, ...IMAGERY },
+            ...(MAPBOX ? { 'imagery-mapbox': { type: 'raster', tileSize: 256, maxzoom: 21, ...MAPBOX_IMAGERY } } : {}),
             dem: { type: 'raster-dem', tileSize: 256, ...TERRAIN },
             shade: { type: 'raster-dem', tileSize: 256, ...TERRAIN },
             osm: { type: 'vector', url: 'https://tiles.openfreemap.org/planet', attribution: '© OpenStreetMap contributors, OpenFreeMap' },
@@ -157,6 +156,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
           layers: [
             { id: 'background', type: 'background', paint: { 'background-color': '#101a2e' } },
             { id: 'imagery', type: 'raster', source: 'imagery', paint: { 'raster-saturation': -0.1, 'raster-contrast': 0.06, 'raster-brightness-min': 0.03, 'raster-fade-duration': 150 } },
+            ...(MAPBOX ? [{ id: 'imagery-mapbox', type: 'raster', source: 'imagery-mapbox', layout: { visibility: 'none' }, paint: { 'raster-saturation': -0.1, 'raster-contrast': 0.06, 'raster-brightness-min': 0.03, 'raster-fade-duration': 150 } }] : []),
             // The street base map, in the clean style of a public hazard map
             { id: 'st-land', type: 'fill', source: 'osm', 'source-layer': 'landcover', layout: { visibility: 'none' }, paint: { 'fill-color': ['match', ['get', 'class'], 'wood', '#cfe6c4', 'farmland', '#ecf0d6', 'grass', '#dcecc9', 'wetland', '#d3e8e0', '#e6efd8'], 'fill-opacity': 0.9 } },
             { id: 'st-use', type: 'fill', source: 'osm', 'source-layer': 'landuse', layout: { visibility: 'none' }, paint: { 'fill-color': ['match', ['get', 'class'], 'residential', '#eceef2', 'school', '#f4ecd8', 'hospital', '#f7e3e3', 'commercial', '#efe9ee', '#eceef2'], 'fill-opacity': 0.85 } },
@@ -569,7 +569,8 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
         drop.pin.setLngLat([lon, lat]);
         fly({ center: [lon, lat], zoom: 14.6, pitch: 68, bearing: heading, duration: 2000 });
       },
-      dropAt: (lon, lat, heading) => {
+      dropCamera: (lon, lat, heading) => fly({ center: [lon, lat], zoom: 14.6, pitch: 68, bearing: heading, duration: 1400 }),
+      dropAt: (lon, lat, heading, follow = true) => {
         if (!drop.pin) return;
         drop.pin.setLngLat([lon, lat]);
         const [px, py] = drop.path.at(-1);
@@ -577,6 +578,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
           drop.path.push([lon, lat]);
           map.getSource('trail')?.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: drop.path } });
         }
+        if (!follow || map.isMoving()) return;
         const z = map.queryTerrainElevation([lon, lat]);
         if (z != null) map.setCenterElevation(map.getCenterElevation() + (z - map.getCenterElevation()) * 0.12);
         map.jumpTo({ center: [lon, lat], bearing: heading });
@@ -661,7 +663,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
     const rainNow = atTime[live.stations[0].id]?.rain ?? 0;
     const storm = Math.min(1, rainNow / 30);
     w.rain = storm;
-    map.setPaintProperty('imagery', 'raster-brightness-max', 1 - 0.32 * night - 0.25 * storm);
+    for (const id of ['imagery', 'imagery-mapbox']) if (map.getLayer(id)) map.setPaintProperty(id, 'raster-brightness-max', 1 - 0.32 * night - 0.25 * storm);
     setNightGlow(night);
 
     const lagoon = w.sites.FARM?.lagoon;
@@ -763,6 +765,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
     const satellite = view.base === 'satellite';
     const light = view.base === 'light';
     map.setLayoutProperty('imagery', 'visibility', satellite ? 'visible' : 'none');
+    if (map.getLayer('imagery-mapbox')) map.setLayoutProperty('imagery-mapbox', 'visibility', view.base === 'mapbox' ? 'visible' : 'none');
     map.setPaintProperty('background', 'background-color', light ? '#f3f5f1' : '#101a2e');
     for (const id of ['st-land', 'st-use', 'st-park', 'st-water']) map.setLayoutProperty(id, 'visibility', light ? 'visible' : 'none');
     map.setPaintProperty('shade', 'hillshade-exaggeration', light ? 0.45 : 0.22);

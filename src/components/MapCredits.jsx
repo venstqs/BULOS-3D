@@ -3,9 +3,10 @@ import { Info } from 'lucide-react';
 
 const MAPBOX = Boolean(import.meta.env.VITE_MAPBOX_TOKEN);
 const CREDITS = [
-  MAPBOX ? 'Imagery © Mapbox © Maxar' : 'Imagery © Esri, Maxar, Earthstar Geographics',
+  'Imagery © Esri, Maxar, Earthstar Geographics',
+  ...(MAPBOX ? ['Mapbox imagery © Mapbox © Maxar'] : []),
   '© OpenStreetMap contributors, OpenFreeMap',
-  MAPBOX ? 'Terrain © Mapbox' : 'Terrain: Mapzen and AWS open data',
+  'Terrain: Mapzen and AWS open data',
   'Elevation model: Copernicus GLO-90 (ESA/Airbus)',
   'Weather: Open-Meteo',
   'Textures: Poly Haven (CC0)',

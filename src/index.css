@@ -254,3 +254,9 @@ main .grid > *, main .flex > * { min-width: 0; }
 .time-range:focus-visible { opacity: 1; outline: 2px solid var(--color-civic); outline-offset: 1px; border-radius: 6px; }
 .map-credit-button { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 8px; background: #fff; color: var(--color-ink-2); box-shadow: 0 1px 2px rgba(16, 24, 40, 0.2), 0 4px 14px rgba(16, 24, 40, 0.14); }
 .map-credit-button:hover, .map-credit-button[aria-expanded="true"] { color: var(--color-civic); }
+
+.map-root[data-present] .sim-bar { display: none; }
+
+/* labels pinned to a site model */
+.site-pin { position: absolute; left: 0; top: 0; pointer-events: auto; padding: 3px 9px; border-radius: 999px; background: #fff; color: var(--color-civic); font-size: 12px; font-weight: 600; white-space: nowrap; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.25), 0 3px 10px rgba(16, 24, 40, 0.18); }
+.site-pin:hover { background: var(--color-civic); color: #fff; }

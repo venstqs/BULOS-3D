@@ -1,7 +1,8 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Droplets, Pause, Play, RotateCcw, TriangleAlert } from 'lucide-react';
+import { Box, Droplets, Map as MapIcon, Navigation, Pause, Play, RotateCcw, SkipForward, TriangleAlert } from 'lucide-react';
 import { usePoll } from '../api';
-import { fmt } from '../lib/format';
+import { fmt, stationStatus } from '../lib/format';
+import { waterCss } from '../lib/waterColour';
 import { useTwinTime } from '../lib/useTwinTime';
 import { Floating } from '../lib/floating';
 import MapCredits from './MapCredits';
@@ -11,6 +12,11 @@ const TwinMapScene = lazy(() => import('./TwinMapScene'));
 const LAYERS = [['risk', 'Risk'], ['turbidity', 'Turbidity'], ['ph', 'pH'], ['tds', 'TDS'], ['bio', 'Biological'], ['none', 'None']];
 const RIVER_SPEED = 430;        // metres of river shown per real second
 const STOP_SECONDS = 3.4;       // pause at each water point
+const SPEEDS = [1, 2, 4];
+const KEY = {
+  risk: ['Moderate', 'Severe', 'linear-gradient(90deg, #ffe05a 0 33.3%, #fa9628 33.3% 66.6%, #e0342c 66.6%)'],
+  turbidity: ['Clear', 'Cloudy'], ph: ['Normal', 'Off range'], tds: ['Low', 'High'], bio: ['Low', 'High'],
+};
 const hours = (s) => { const m = Math.round(s / 60); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`; };
 
 function Stat({ label, value, unit }) {
@@ -22,30 +28,43 @@ function Stat({ label, value, unit }) {
   );
 }
 
-/** The river's fall from the mountain to the city, with the drop on it. Click anywhere to jump there. */
-function Profile({ river, stations, at, onSeek }) {
+/** The river's fall from the mountain to the city, coloured by its water right now. Click anywhere to jump there. */
+function Profile({ river, stations, channel, at, onSeek, onStation }) {
   const { stem, length, top } = river;
+  const [hover, setHover] = useState(null);
   const x = (s) => (s / length) * 1000;
   const y = (z) => 74 - (z / top) * 66;
   const line = stem.map((p) => `${x(p[3]).toFixed(1)},${y(p[2]).toFixed(1)}`).join(' ');
   const elevAt = river.sample(at).z;
-  const seek = (e) => { const r = e.currentTarget.getBoundingClientRect(); onSeek(((e.clientX - r.left) / r.width) * length); };
+  const where = (e) => { const r = e.currentTarget.getBoundingClientRect(); return Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)); };
+  const n = channel.chainage_m.length;
+  const stops = Array.from({ length: 33 }, (_, k) => { const i = Math.round((k / 32) * (n - 1)); return [k / 32, waterCss(channel.turb_excess[i], channel.orp_deficit[i])]; });
+  const peek = hover == null ? null : river.sample(hover * length);
   return (
-    <div className="relative cursor-pointer" onClick={seek} role="slider" aria-label="Position along the river" aria-valuemin={0} aria-valuemax={Math.round(length)} aria-valuenow={Math.round(at)} tabIndex={0}
+    <div className="relative cursor-pointer" onClick={(e) => onSeek(where(e) * length)} onPointerMove={(e) => setHover(where(e))} onPointerLeave={() => setHover(null)}
+         role="slider" aria-label="Position along the river" aria-valuemin={0} aria-valuemax={Math.round(length)} aria-valuenow={Math.round(at)} tabIndex={0}
          onKeyDown={(e) => { const d = { ArrowLeft: -500, ArrowRight: 500 }[e.key]; if (d) onSeek(Math.min(length, Math.max(0, at + d))); }}>
       <svg viewBox="0 0 1000 100" preserveAspectRatio="none" className="block h-[84px] w-full" aria-hidden="true">
-        <defs><linearGradient id="shed-fall" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#2f5be7" stopOpacity="0.28" /><stop offset="1" stopColor="#2f5be7" stopOpacity="0.03" /></linearGradient></defs>
+        <defs>
+          <linearGradient id="shed-fall" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#2f5be7" stopOpacity="0.2" /><stop offset="1" stopColor="#2f5be7" stopOpacity="0.02" /></linearGradient>
+          <linearGradient id="shed-water" gradientUnits="userSpaceOnUse" x1="0" x2="1000" y1="0" y2="0">{stops.map(([o, c]) => <stop key={o} offset={o} stopColor={c} />)}</linearGradient>
+        </defs>
         <polygon points={`0,100 ${line} 1000,100`} fill="url(#shed-fall)" />
-        <polyline points={line} fill="none" stroke="#b8cbf8" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-        <polyline points={stem.filter((p) => p[3] <= at).map((p) => `${x(p[3]).toFixed(1)},${y(p[2]).toFixed(1)}`).join(' ')} fill="none" stroke="#2f5be7" strokeWidth="3" vectorEffect="non-scaling-stroke" />
+        <rect x="0" y="0" width={x(at)} height="100" fill="#2f5be7" fillOpacity="0.07" />
+        <polyline points={line} fill="none" stroke="url(#shed-water)" strokeWidth="3.5" vectorEffect="non-scaling-stroke" />
       </svg>
       {stations.map((st) => (
         <div key={st.id} className="pointer-events-none absolute top-0 h-full -translate-x-1/2 text-center" style={{ left: `${(st.chainage_m / length) * 100}%` }}>
-          <span className={`absolute left-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white ${st.chainage_m <= at ? 'bg-civic' : 'bg-[#9db4ec]'}`} style={{ top: `${y(st.elevation_m ?? 0) * 0.84}px` }} />
-          <span className="absolute bottom-0 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11.5px] font-semibold text-ink-2">{st.id}</span>
+          <span className="absolute left-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white shadow-[0_0_0_1px_#b7c2d3]" style={{ top: `${y(st.elevation_m ?? 0) * 0.84}px`, background: stationStatus(st).color }} />
+          <button onClick={(e) => { e.stopPropagation(); onStation(st); }} className="pointer-events-auto absolute bottom-0 left-1/2 -translate-x-1/2 whitespace-nowrap rounded px-1 text-[11.5px] font-semibold text-ink-2 hover:bg-[#e9efff] hover:text-civic">{st.id}</button>
         </div>
       ))}
       <span className="pointer-events-none absolute h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-civic shadow-[0_0_0_5px_rgba(47,91,231,0.25)]" style={{ left: `${(at / length) * 100}%`, top: `${y(elevAt) * 0.84}px` }} />
+      {peek && (
+        <span className="pointer-events-none absolute top-0 z-10 -translate-x-1/2 whitespace-nowrap rounded-md bg-[#16204a] px-2 py-0.5 text-[11.5px] font-medium text-white" style={{ left: `${Math.min(94, Math.max(6, hover * 100))}%` }}>
+          {fmt((hover * length) / 1000, 1)} km, {Math.round(peek.z)} m high
+        </span>
+      )}
     </div>
   );
 }
@@ -59,6 +78,10 @@ export default function WatershedTwin({ live, forecast, staticData, layers, lite
   const [phase, setPhase] = useState('idle');          // idle, playing, paused, done
   const [at, setAt] = useState(0);
   const [stop, setStop] = useState(null);
+  const [speed, setSpeed] = useState(1);
+  const [following, setFollowing] = useState(true);
+  const follow = useRef(true);
+  follow.current = following;
   const pos = useRef({ s: 0, bearing: 0, wait: 0, passed: new Set(), lastPaint: 0 });
   const view = useMemo(() => ({ mapLabels: true, hazard: index, opacity: 0.7, palette: 'hazard', base: 'satellite', relief: 1.5 }), [index]);
   const stations = live?.stations ?? [];
@@ -115,7 +138,7 @@ export default function WatershedTwin({ live, forecast, staticData, layers, lite
     const r = pos.current;
     const turn = ((want - r.bearing + 540) % 360) - 180;
     r.bearing += turn * Math.min(1, dt * 1.1);
-    controls.current.dropAt?.(p.lon, p.lat, r.bearing);
+    controls.current.dropAt?.(p.lon, p.lat, r.bearing, follow.current);
   }, [river]);
 
   const start = () => {
@@ -155,6 +178,19 @@ export default function WatershedTwin({ live, forecast, staticData, layers, lite
     place(s, 1);
   };
 
+  /** Go straight to a water point and stay there until asked to continue. */
+  const visit = (st) => {
+    seek(st.chainage_m);
+    pos.current.passed.add(st.id);
+    setStop(st.id);
+    setPhase('paused');
+  };
+  const camera = (on) => {
+    setFollowing(on);
+    if (phase === 'idle' || !river) return;
+    if (on) { const p = river.sample(pos.current.s); controls.current.dropCamera?.(p.lon, p.lat, pos.current.bearing); } else controls.current.home?.();
+  };
+
   useEffect(() => {
     if (phase !== 'playing' || !river) return undefined;
     let raf = 0;
@@ -169,12 +205,12 @@ export default function WatershedTwin({ live, forecast, staticData, layers, lite
         if (r.wait <= 0) setStop(null);
         return;
       }
-      r.s = Math.min(river.length, r.s + RIVER_SPEED * dt);
+      r.s = Math.min(river.length, r.s + RIVER_SPEED * speed * dt);
       const reached = stations$.current.find((x) => x.chainage_m <= r.s && !r.passed.has(x.id));
       if (reached) {
         r.passed.add(reached.id);
         r.s = reached.chainage_m;
-        r.wait = STOP_SECONDS;
+        r.wait = STOP_SECONDS / Math.sqrt(speed);
         setStop(reached.id);
       }
       place(r.s, dt);
@@ -183,7 +219,7 @@ export default function WatershedTwin({ live, forecast, staticData, layers, lite
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [phase, river, place]);
+  }, [phase, river, place, speed]);
 
   const stopped = stations.find((s) => s.id === stop);
   const label = phase === 'playing' ? 'Pause' : phase === 'paused' ? 'Continue' : phase === 'done' ? 'Watch again' : 'Follow a drop';
@@ -212,6 +248,16 @@ export default function WatershedTwin({ live, forecast, staticData, layers, lite
             <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
               {stopped ? stopped.note : phase === 'done' ? 'The drop has reached the end of the river, in Naga City. Anything spilled upstream takes this same path.' : 'Follow one drop down the mapped river, from the slopes of Mt. Isarog to Naga City, and see what it passes on the way.'}
             </p>
+            {stopped && (
+              <div className="mt-2.5 rounded-lg bg-[#f2f6ff] px-2.5 py-2">
+                <div className="flex items-center gap-2 text-[13px] font-semibold">
+                  <i className="h-2.5 w-2.5 rounded-full" style={{ background: stationStatus(stopped).color }} />{stationStatus(stopped).label}
+                  <span className="ml-auto font-normal text-ink-2">Water health {stopped.wqhi.score}/100</span>
+                </div>
+                <div className="mt-0.5 text-[12.5px] text-ink-2">{stopped.population ? `Serves ${stopped.population.toLocaleString()} people.` : 'Monitoring point.'} {stopped.valve ? (stopped.valve.open ? 'Intake open.' : 'Intake closed.') : ''}</div>
+                <button onClick={() => onInspect(stopped.id)} className="mt-1 flex items-center gap-1 text-[13px] font-semibold text-civic hover:underline"><Box size={13} />Open the 3D site</button>
+              </div>
+            )}
             {river && phase !== 'idle' && (
               <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2.5 border-t border-line pt-3">
                 <Stat label="Distance travelled" value={fmt(at / 1000, 1)} unit="km" />
@@ -231,8 +277,18 @@ export default function WatershedTwin({ live, forecast, staticData, layers, lite
               <button onClick={phase === 'playing' ? () => setPhase('paused') : start} disabled={!river} className="btn-primary flex-1 justify-center">
                 {phase === 'playing' ? <Pause size={14} /> : phase === 'idle' ? <Droplets size={14} /> : <Play size={14} />}{label}
               </button>
-              {phase !== 'idle' && <button onClick={reset} aria-label="Back to the whole river" title="Back to the whole river" className="btn-ghost px-2.5"><RotateCcw size={14} /></button>}
+              {phase !== 'idle' && next && <button onClick={() => visit(next)} aria-label={`Skip to ${next.id}`} title={`Skip to ${next.id}`} className="btn-ghost px-2.5"><SkipForward size={14} /></button>}
+              {phase !== 'idle' && <button onClick={reset} aria-label="Back to the whole river" title="Start over" className="btn-ghost px-2.5"><RotateCcw size={14} /></button>}
             </div>
+            {phase !== 'idle' && (
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <div className="seg-flat flex-1" role="group" aria-label="Camera">
+                  <button role="tab" aria-selected={following} onClick={() => camera(true)}><span className="inline-flex items-center gap-1"><Navigation size={12} />Follow</span></button>
+                  <button role="tab" aria-selected={!following} onClick={() => camera(false)}><span className="inline-flex items-center gap-1"><MapIcon size={12} />Whole river</span></button>
+                </div>
+                <button onClick={() => setSpeed((v) => SPEEDS[(SPEEDS.indexOf(v) + 1) % SPEEDS.length])} aria-label={`Drop speed ${speed} times`} title="Change the speed" className="h-[31px] w-10 shrink-0 rounded-lg bg-[#eef2fb] text-[12.5px] font-semibold text-ink-2 hover:text-civic">{speed}×</button>
+              </div>
+            )}
             {river && phase !== 'idle' && live?.clock.mode === 'sim' && (
               <button onClick={() => act('/api/spill', { lat: here.lat, lon: here.lon }, 'Simulated spill started at this spot. Open Forecast to see when it arrives.')} className="mt-2 flex w-full items-center justify-center gap-1.5 text-[13px] font-semibold text-civic hover:underline">
                 <TriangleAlert size={13} />Simulate a spill here
@@ -242,24 +298,29 @@ export default function WatershedTwin({ live, forecast, staticData, layers, lite
         </Floating>
 
         {!lite && (
-          <Floating id="shed-layers" grip={false} className="pointer-events-auto absolute right-3 top-3">
+          <Floating id="shed-layers" grip={false} className="pointer-events-auto absolute right-3 top-3 flex flex-col items-end gap-1.5">
             <div className="flex items-center gap-2">
               <div className="seg shadow-[0_1px_2px_rgba(16,24,40,0.2),0_4px_14px_rgba(16,24,40,0.14)]" role="group" aria-label="Show on the map">
                 {LAYERS.map(([k, name]) => <button key={k} aria-pressed={index === k} onClick={() => setIndex(k)}>{name}</button>)}
               </div>
               <MapCredits className="relative" drop="down" />
             </div>
+            {KEY[index] && (
+              <div className="site-panel mr-9 flex items-center gap-2 px-2.5 py-1 text-[11.5px] text-ink-2">
+                {KEY[index][0]}<i className="h-[7px] w-24 rounded-sm" style={{ background: KEY[index][2] ?? 'linear-gradient(90deg, #ffe05a, #fa9628, #e0342c)' }} />{KEY[index][1]}
+              </div>
+            )}
           </Floating>
         )}
 
         {river && (
           <Floating id="shed-profile" title="River profile" label="Move the river profile" className="site-panel pointer-events-auto absolute bottom-3 left-3 right-3">
             <div className="px-3.5 pb-2">
-              <div className="flex items-baseline justify-between gap-3 text-[12.5px] text-ink-2">
+              <div className="flex items-baseline justify-between gap-3 pr-6 text-[12.5px] text-ink-2">
                 <span className="font-semibold text-ink">The river from source to city</span>
-                <span className="hidden sm:inline">{Math.round(river.top)} m at the source, {fmt(river.length / 1000, 1)} km long. Click anywhere to go there.</span>
+                <span className="hidden sm:inline">{Math.round(river.top)} m at the source, {fmt(river.length / 1000, 1)} km long. Click anywhere, or a water point, to go there.</span>
               </div>
-              <Profile river={river} stations={stations} at={at} onSeek={seek} />
+              <Profile river={river} stations={stations} channel={live.channel} at={at} onSeek={seek} onStation={visit} />
             </div>
           </Floating>
         )}

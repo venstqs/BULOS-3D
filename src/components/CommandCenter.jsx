@@ -260,6 +260,7 @@ const SWATCH = {
 };
 const OFF_BY_DEFAULT = ['network', 'barangays'];
 const UI_KEY = 'bulos-ui';
+const WELCOME_KEY = 'bulos-welcome-seen';
 const rampCss = (h, [a, b, c]) => (h?.steps ? `linear-gradient(90deg, ${a} 0 33.3%, ${b} 33.3% 66.6%, ${c} 66.6%)` : `linear-gradient(90deg, ${a}, ${b}, ${c})`);
 const DEFAULT_UI = { glass: false, timeline: true, colourBar: true, coords: true };
 const KEYS = [['H', 'Presentation mode'], ['L', 'Layers'], ['G', 'Legend'], ['D', 'Data'], ['C', 'Customize']];
@@ -315,7 +316,7 @@ function LayersWindow({ view, setView, layers, setLayers }) {
       <details className="mt-2 border-t border-line pt-2">
         <summary className="cursor-pointer py-1 font-display text-[13px] font-semibold">Map style</summary>
         <div className="grid gap-2.5 pt-1 text-ink-2">
-          <div><div className="mb-1 text-[12.5px]">Base map</div>{pick('base', [['satellite', 'Satellite'], ['light', 'Streets']])}</div>
+          <div><div className="mb-1 text-[12.5px]">Base map</div>{pick('base', [['satellite', 'Satellite'], ...(import.meta.env.VITE_MAPBOX_TOKEN ? [['mapbox', 'Mapbox']] : []), ['light', 'Streets']])}</div>
           <div><div className="mb-1 text-[12.5px]">Colours</div>{pick('palette', [['hazard', 'Hazard'], ['clear', 'Colour-safe']])}</div>
           <label className="block text-[12.5px]">Layer strength {Math.round(view.opacity * 100)}%
             <input type="range" min={0.2} max={1} step={0.05} value={view.opacity} onChange={(e) => set({ opacity: Number(e.target.value) })} className="mt-1 w-full accent-[#2f5be7]" />
@@ -330,8 +331,42 @@ function LayersWindow({ view, setView, layers, setLayers }) {
   );
 }
 
+/** First visit: what this is, and three good places to start. */
+function Welcome({ onDemo, onDrop, onTour, onClose }) {
+  const start = 'flex-1 rounded-lg px-3 py-2 text-[13px] font-semibold';
+  return (
+    <Floating id="map-welcome" grip={false} role="region" aria-label="Welcome" className={`${card} absolute bottom-14 left-1/2 z-[24] hidden w-[520px] -ml-[260px] p-4 lg:block`}>
+      <button onClick={onClose} aria-label="Close welcome" className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-md text-muted hover:bg-panel-2 hover:text-ink"><X size={15} /></button>
+      <h2 className="pr-7 font-display text-[17px] font-semibold">Welcome to Bulos 3D</h2>
+      <p className="mt-1 text-[13px] leading-relaxed text-ink-2">A digital twin of the river from Mt. Isarog to Naga City. The map and weather are real. Sensor readings are simulated. Try one of these:</p>
+      <div className="mt-3 flex gap-2">
+        <button onClick={onDemo} className={`${start} bg-civic text-white`}>Run a demo spill</button>
+        <button onClick={onDrop} className={`${start} bg-[#f2f6ff] text-civic`}>Follow a drop</button>
+        <button onClick={onTour} className={`${start} bg-[#f2f6ff] text-civic`}>Tour the sites</button>
+      </div>
+    </Floating>
+  );
+}
+
+/** While a simulated event runs, say so, and offer the way out. */
+function SimulationBar({ live }) {
+  const ev = live.clock.mode === 'sim' ? live.events.find((e) => e.type === 'SCENARIO') : null;
+  if (!ev || /Clear all events/i.test(ev.message)) return null;
+  const what = ev.message.replace(/^Field scenario injected:\s*/, '').split('(')[0].trim();
+  const mins = Math.max(0, Math.round((live.clock.epoch_ms - ev.t_ms) / 60000));
+  const stop = () => { post('/api/scenario', { name: 'RESET' }).catch(() => {}); post('/api/speed', { speed: 60 }).catch(() => {}); };
+  return (
+    <div role="status" className={`${card} sim-bar absolute left-1/2 top-[84px] z-[24] hidden -translate-x-1/2 items-center gap-2.5 px-3 py-1.5 text-[12.5px] lg:flex`}>
+      <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-[#d03b3b]" />
+      <span className="max-w-[340px] truncate font-medium">{what}</span>
+      <span className="shrink-0 text-muted tabular-nums">{mins} min in</span>
+      <button onClick={stop} className="shrink-0 font-semibold text-civic hover:underline">Back to normal</button>
+    </div>
+  );
+}
+
 /** How the screen itself looks and behaves. */
-function CustomizeWindow({ ui, setUi, view, setView, onPresent }) {
+function CustomizeWindow({ ui, setUi, view, setView, onPresent, onWelcome }) {
   const flip = (k) => setUi((u) => ({ ...u, [k]: !u[k] }));
   const line = (label, on, change) => (
     <label key={label} className="flex cursor-pointer items-center justify-between gap-3 py-1 text-ink-2">
@@ -358,7 +393,8 @@ function CustomizeWindow({ ui, setUi, view, setView, onPresent }) {
       <dl className="mt-1.5 grid grid-cols-[auto_1fr] items-center gap-x-2.5 gap-y-1 text-ink-2">
         {KEYS.map(([k, label]) => <div key={k} className="contents"><dt><kbd className="key">{k}</kbd></dt><dd>{label}</dd></div>)}
       </dl>
-      <button onClick={() => { setUi(DEFAULT_UI); resetPanels(); }} className="btn-ghost mt-3 w-full justify-center">Reset screen layout</button>
+      <button onClick={onWelcome} className="btn-ghost mt-3 w-full justify-center">Show the welcome card</button>
+      <button onClick={() => { setUi(DEFAULT_UI); resetPanels(); }} className="btn-ghost mt-2 w-full justify-center">Reset screen layout</button>
     </div>
   );
 }
@@ -407,7 +443,7 @@ function LegendWindow({ view, layers }) {
 }
 
 const SOURCES = [
-  ['Real', 'pill-good', ['Elevation model: Copernicus GLO-90 (90 m cells)', '3D map terrain: open elevation tiles on AWS', 'Satellite imagery: Esri. Capture dates are not known', 'River, streams, roads and building outlines: OpenStreetMap', 'Water district facilities and barangay names: OpenStreetMap', 'Weather right now: Open-Meteo weather model, not a local rain gauge', 'River flow estimate: global model through Open-Meteo, too coarse for this small river']],
+  ['Real', 'pill-good', ['Elevation model: Copernicus GLO-90 (90 m cells)', '3D map terrain: open elevation tiles on AWS', 'Satellite imagery: Esri, with Mapbox as an option. Capture dates are not known, and photos can show clouds', 'River, streams, roads and building outlines: OpenStreetMap', 'Water district facilities and barangay names: OpenStreetMap', 'Weather right now: Open-Meteo weather model, not a local rain gauge', 'River flow estimate: global model through Open-Meteo, too coarse for this small river']],
   ['Computed', 'pill-blue', ['River speed and travel time, from real slope', 'Watershed outline and drainage areas. These are rough in the flat lowlands near the city', 'Well exposure and runoff layers, from the 90 m elevation model', 'Forecasts and risk scores, from the twin']],
   ['Simulated', 'pill-amber', ['All sensor readings at the five water points', 'The rain the twin uses, which does not follow the real weather', 'Spills, valves, tanks, text messages, signal strength and battery levels']],
   ['Illustrative', 'pill-grey', ['The five water points are a proposed layout, not existing sites', 'People served and household counts', 'AG-02 and the rain gauge show where government stations could connect. No DOST data is connected', 'Pipelines and the barangay network follow real roads, but they are proposed routes', 'Most building heights are a 5 m default', 'Facility and people models']],
@@ -558,6 +594,8 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
   const [panel, setPanel] = useState(true);
   const [wins, setWins] = useState({ layers: false, legend: false, data: false, custom: false });
   const [presenting, setPresenting] = useState(false);
+  const [welcome, setWelcome] = useState(() => { try { return !localStorage.getItem(WELCOME_KEY); } catch { return false; } });
+  const closeWelcome = () => { setWelcome(false); try { localStorage.setItem(WELCOME_KEY, '1'); } catch { /* it just shows again next time */ } };
   const [ui, setUi] = useState(() => { try { return { ...DEFAULT_UI, ...JSON.parse(localStorage.getItem(UI_KEY)) }; } catch { return DEFAULT_UI; } });
   useEffect(() => { try { localStorage.setItem(UI_KEY, JSON.stringify(ui)); } catch { /* it still applies, it just will not be remembered */ } }, [ui]);
   useEffect(() => {
@@ -586,7 +624,7 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
   const [view, setView] = useState(() => {
     try {
       const saved = { ...DEFAULT_VIEW, ...JSON.parse(localStorage.getItem(VIEW_KEY)) };
-      if (saved.base === 'dark') saved.base = 'satellite';
+      if (saved.base === 'dark' || (saved.base === 'mapbox' && !import.meta.env.VITE_MAPBOX_TOKEN)) saved.base = 'satellite';
       if (saved.palette === 'ocean') saved.palette = 'hazard';   // blue heat vanished into the water
       return HAZARDS[saved.hazard] ? saved : { ...saved, hazard: DEFAULT_VIEW.hazard };   // an older save may name a removed layer
     } catch { return DEFAULT_VIEW; }
@@ -715,6 +753,15 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
             </Floating>
           )}
 
+          <SimulationBar live={live} />
+          {welcome && !presenting && (
+            <Welcome
+              onClose={closeWelcome}
+              onDrop={() => { closeWelcome(); go('map'); }}
+              onTour={() => { closeWelcome(); controls.current.startTour?.(); }}
+              onDemo={() => { closeWelcome(); post('/api/speed', { speed: 240 }).then(() => act('/api/scenario', { name: 'SEPTIC' }, 'Demo spill started. Watch the river and the warning on the left.')); }}
+            />
+          )}
           {/* Separate windows, opened from the main panel */}
           {wins.layers && (
             <MapWindow id="win-layers" title="Layers" onClose={() => toggleWin('layers')} onRaise={() => setTop('layers')} className={`${winZ('layers')} lg:left-[364px] lg:top-[92px] lg:w-[290px]`}>
@@ -723,7 +770,7 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
           )}
           {wins.custom && (
             <MapWindow id="win-custom" title="Customize" dock={3} onClose={() => toggleWin('custom')} onRaise={() => setTop('custom')} className={`${winZ('custom')} lg:right-[60px] lg:top-[92px] lg:w-[270px]`}>
-              <CustomizeWindow ui={ui} setUi={setUi} view={view} setView={setView} onPresent={() => setPresenting(true)} />
+              <CustomizeWindow ui={ui} setUi={setUi} view={view} setView={setView} onPresent={() => setPresenting(true)} onWelcome={() => setWelcome(true)} />
             </MapWindow>
           )}
           {wins.legend && (

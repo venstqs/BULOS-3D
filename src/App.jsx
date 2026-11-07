@@ -189,7 +189,7 @@ export default function App() {
       {inspected && (
         <ErrorBoundary label="The 3D site view">
           <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-[#16204a]/30 text-sm text-white">Loading the 3D site view…</div>}>
-            <AssetInspector st={inspected} stations={live.stations} onPick={setInspectId} onClose={() => setInspectId(null)} />
+            <AssetInspector st={inspected} stations={live.stations} onPick={setInspectId} act={act} onClose={() => setInspectId(null)} />
           </Suspense>
         </ErrorBoundary>
       )}

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { applyReading, buildSite, tickSite, updateDisplay } from '../lib/detailModels';
@@ -25,9 +25,11 @@ export function viewsOf(ctx) {
 }
 
 /** A close view of one site: its model, real shadows and the sky that lights it. */
-export default function SiteViewCanvas({ st, view = 'site', onReady }) {
+export default function SiteViewCanvas({ st, view = 'site', onReady, onView, orbit = false }) {
   const host = useRef(null);
   const world = useRef(null);
+  const pinLayer = useRef(null);
+  const [pins, setPins] = useState([]);
 
   useEffect(() => {
     const el = host.current;
@@ -101,6 +103,7 @@ export default function SiteViewCanvas({ st, view = 'site', onReady }) {
 
     let raf = 0;
     let last = performance.now();
+    const spot = new THREE.Vector3();
     const loop = (now) => {
       raf = requestAnimationFrame(loop);
       if (document.hidden) return;
@@ -117,6 +120,13 @@ export default function SiteViewCanvas({ st, view = 'site', onReady }) {
       controls.update();
       if (w.site) tickSite(w.site, now / 1000, dt);
       renderer.render(scene, camera);
+      // Labels stay pinned to their part of the model as the camera moves
+      for (const el of pinLayer.current?.children ?? []) {
+        spot.set(+el.dataset.x, +el.dataset.y, +el.dataset.z).project(camera);
+        const hidden = spot.z > 1 || Math.abs(spot.x) > 0.96 || Math.abs(spot.y) > 0.96;
+        el.style.visibility = hidden ? 'hidden' : 'visible';
+        el.style.transform = `translate(-50%, -100%) translate(${((spot.x + 1) / 2) * el.parentElement.clientWidth}px, ${((1 - spot.y) / 2) * el.parentElement.clientHeight}px)`;
+      }
     };
     raf = requestAnimationFrame(loop);
     return () => {
@@ -151,6 +161,7 @@ export default function SiteViewCanvas({ st, view = 'site', onReady }) {
     w.controls.target.set(...v.at);
     w.flight = null;
     onReady?.(ctx);
+    setPins(Object.entries(viewsOf(ctx)).filter(([k]) => k !== 'site').map(([k, p]) => ({ k, label: p.label, at: [p.at[0], p.at[1] + 1.1, p.at[2]] })));
     return () => {
       w.scene.remove(ctx.g);
       w.site = null;
@@ -167,6 +178,13 @@ export default function SiteViewCanvas({ st, view = 'site', onReady }) {
     w.flight = { t: 0, fromEye: w.camera.position.clone(), fromAt: w.controls.target.clone(), toEye: new THREE.Vector3(...v.eye), toAt: new THREE.Vector3(...v.at) };
   }, [view, id]);
 
+  useEffect(() => {
+    const w = world.current;
+    if (!w) return;
+    w.controls.autoRotate = orbit;
+    w.controls.autoRotateSpeed = 0.7;
+  }, [orbit]);
+
   // Keep the model in step with the latest reading
   useEffect(() => {
     const w = world.current;
@@ -175,5 +193,14 @@ export default function SiteViewCanvas({ st, view = 'site', onReady }) {
     updateDisplay(w.site, st);
   }, [st]);
 
-  return <div ref={host} className="absolute inset-0" />;
+  return (
+    <>
+      <div ref={host} className="absolute inset-0" />
+      <div ref={pinLayer} className={`pointer-events-none absolute inset-0 overflow-hidden ${view === 'site' ? '' : 'hidden'}`}>
+        {pins.map((p) => (
+          <button key={p.k} data-x={p.at[0]} data-y={p.at[1]} data-z={p.at[2]} onClick={() => onView?.(p.k)} className="site-pin">{p.label}</button>
+        ))}
+      </div>
+    </>
+  );
 }
