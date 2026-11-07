@@ -31,3 +31,8 @@ __pycache__/
 _archive/
 backend/data/bulos.db*
 .env
+
+# Trailer raw footage & AE autosaves
+docs/Adobe After Effects Auto-Save/
+docs/trailer/clips/
+

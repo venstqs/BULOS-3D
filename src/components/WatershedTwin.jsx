@@ -9,11 +9,12 @@ import MapCredits from './MapCredits';
 
 const TwinMapScene = lazy(() => import('./TwinMapScene'));
 
-const LAYERS = [['risk', 'Risk'], ['turbidity', 'Turbidity'], ['ph', 'pH'], ['tds', 'TDS'], ['bio', 'Biological'], ['none', 'None']];
+const LAYERS = [['bicol', 'Whole Bicol'], ['risk', 'Risk'], ['turbidity', 'Turbidity'], ['ph', 'pH'], ['tds', 'TDS'], ['bio', 'Biological'], ['none', 'None']];
 const RIVER_SPEED = 430;        // metres of river shown per real second
 const STOP_SECONDS = 3.4;       // pause at each water point
 const SPEEDS = [1, 2, 4];
 const KEY = {
+  bicol: ['Lower', 'Higher'],
   risk: ['Moderate', 'Severe', 'linear-gradient(90deg, #ffe05a 0 33.3%, #fa9628 33.3% 66.6%, #e0342c 66.6%)'],
   turbidity: ['Clear', 'Cloudy'], ph: ['Normal', 'Off range'], tds: ['Low', 'High'], bio: ['Low', 'High'],
 };
@@ -74,7 +75,7 @@ export default function WatershedTwin({ live, forecast, staticData, layers, lite
   const controls = useRef({});
   const time = useTwinTime(live, forecast);
   const [index, setIndex] = useState('risk');
-  const { data: grid } = usePoll(index === 'none' ? null : `/api/heatmap?index=${index}`, 8000);
+  const { data: grid } = usePoll(index === 'none' ? null : `/api/heatmap?index=${index}`, index === 'bicol' ? 900000 : 8000);
   const [phase, setPhase] = useState('idle');          // idle, playing, paused, done
   const [at, setAt] = useState(0);
   const [stop, setStop] = useState(null);

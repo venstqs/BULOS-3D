@@ -159,7 +159,8 @@ export default function Dock({ state, navigateToTab }) {
   const sum = riverSummary(live, forecast, tasks);
   const worstBand = sum ? stationStatus(sum.worst) : null;
   const calm = !sum || (worstBand.label === 'Low' && !sum.attention.length);
-  const ringColor = calm ? C.primary : worstBand.color;
+  // A plume on its way is a warning even while every point still reads low
+  const ringColor = calm ? C.primary : worstBand.label === 'Low' ? C.serious : worstBand.color;
 
   const R = Math.min(128, (W - ITEM - 20) / 2);
   const cx = W / 2;
@@ -227,7 +228,7 @@ export default function Dock({ state, navigateToTab }) {
   useEffect(() => {
     let timer;
     AsyncStorage.getItem(HINT_KEY).then((seen) => {
-      if (!seen) timer = setTimeout(() => setHint(true), 3000);
+      if (!seen) timer = setTimeout(() => setHint(true), 5400);
     }).catch(() => {});
     return () => clearTimeout(timer);
   }, []);

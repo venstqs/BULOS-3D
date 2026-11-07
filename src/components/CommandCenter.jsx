@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Activity, Box, Check, ShieldCheck, ChevronDown, Eye, Layers as LayersIcon, LayoutPanelLeft, Shapes, SlidersHorizontal, Table2, ChevronUp, Clock, Crosshair, Cpu, Droplets, FlaskConical, Lock, LockOpen, Menu, Minus, Navigation, Pause, Plane, Play, Plus, RotateCcw, Search, Send, Tag, TriangleAlert, Users, X,
+  Activity, Box, Check, Globe, ShieldCheck, ChevronDown, Eye, Layers as LayersIcon, LayoutPanelLeft, Shapes, SlidersHorizontal, Table2, ChevronUp, Clock, Crosshair, Cpu, Droplets, FlaskConical, Lock, LockOpen, Menu, Minus, Navigation, Pause, Plane, Play, Plus, RotateCcw, Search, Send, Tag, TriangleAlert, Users, X,
 } from 'lucide-react';
 import { get, post, usePoll } from '../api';
 import { BAND, CLOSED_EARLY, EDGE_LABEL, fmt, fmtClock, fmtMin, stationStatus } from '../lib/format';
@@ -716,6 +716,7 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
                     <button onClick={() => quick('safe')} className="flex items-center justify-center gap-1.5 rounded-lg bg-[#e9efff] py-2 text-[13px] font-semibold text-civic"><ShieldCheck size={13} />Is it safe?</button>
                     <button onClick={() => quick('advisory')} className="flex items-center justify-center gap-1.5 rounded-lg bg-civic py-2 text-[13px] font-semibold text-white"><Send size={13} />Send advisory</button>
                   </div>
+                  <button onClick={() => setView((v) => ({ ...v, hazard: v.hazard === 'bicol' ? 'risk' : 'bicol' }))} aria-pressed={view.hazard === 'bicol'} className="door mt-1.5 w-full"><Globe size={14} />{view.hazard === 'bicol' ? 'Back to the river' : 'See all of Bicol'}</button>
                 </div>
               )}
             </div>
