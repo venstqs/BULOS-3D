@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Bulos 3D: know before it reaches the tap</title>
+    <meta name="description" content="A digital twin of a real Philippine river. Spill something, and watch it warn the people downstream. A student prototype from Naga City." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <canvas id="world" aria-label="3D model of the Naga River watershed"></canvas>
+    <div id="tags" aria-hidden="true"></div>
+
+    <header class="bar">
+      <a class="brand" href="#spill"><img src="/favicon.svg" alt="" width="36" height="36" />Bulos 3D</a>
+      <a class="open" href="/">Open the twin</a>
+    </header>
+
+    <nav class="stream" aria-label="Page sections">
+      <svg viewBox="0 0 40 600" preserveAspectRatio="none" aria-hidden="true"><path id="stream-path" d="M20 0 C 34 70, 6 130, 20 200 S 34 330, 20 400 S 6 530, 20 600" /></svg>
+      <i id="stream-drop"></i>
+      <a href="#spill" style="top:0%"><span>Spill</span></a>
+      <a href="#how" style="top:25%"><span>How it works</span></a>
+      <a href="#bicol" style="top:50%"><span>All of Bicol</span></a>
+      <a href="#app" style="top:75%"><span>The app</span></a>
+      <a href="#truth" style="top:100%"><span>What is real</span></a>
+    </nav>
+
+    <main>
+      <section id="spill" class="hero">
+        <div class="hero-text">
+          <h1 id="headline" aria-live="polite">Your water looks clean&#8288;<i class="stop"></i></h1>
+          <p id="lead">This is the real Naga River, from Mt. Isarog to Naga City. Click it to spill something, and watch what its digital twin does.</p>
+          <div class="actions">
+            <button id="try" class="primary" type="button">Spill at the farm stream</button>
+            <button id="reset" class="plain" type="button" hidden>Clean the river</button>
+          </div>
+        </div>
+        <aside id="log" class="log" hidden aria-live="polite">
+          <div class="log-head"><span>Simulated spill</span><b id="clock">+0 min</b></div>
+          <ol id="events"></ol>
+        </aside>
+      </section>
+
+      <section id="how" class="how">
+        <article class="step" data-step="0"><div class="card"><small>Step 1 of 5</small><h2>Sense&#8288;<i class="stop"></i></h2><p>One biological sensor sits upstream. Low-cost nodes watch every water point below it.</p></div></article>
+        <article class="step" data-step="1"><div class="card"><small>Step 2 of 5</small><h2>Sync&#8288;<i class="stop"></i></h2><p>Every reading updates the virtual river, so the model stays in step with the water.</p></div></article>
+        <article class="step" data-step="2"><div class="card"><small>Step 3 of 5</small><h2>Simulate&#8288;<i class="stop"></i></h2><p>River physics runs four hours ahead to show where polluted water is going, and when.</p></div></article>
+        <article class="step" data-step="3"><div class="card"><small>Step 4 of 5</small><h2>Decide&#8288;<i class="stop"></i></h2><p>Risk rules judge each point. They can tell a dirty probe from real pollution.</p></div></article>
+        <article class="step" data-step="4"><div class="card"><small>Step 5 of 5</small><h2>Act&#8288;<i class="stop"></i></h2><p>Intakes close before the water arrives, and stored water takes over. That is what makes it a twin, not a map.</p></div></article>
+      </section>
+
+      <section id="bicol" class="bicol">
+        <div class="card wide">
+          <h2>Now make it rain on all of Bicol&#8288;<i class="stop"></i></h2>
+          <p>Real terrain shows where water gathers. Drag the rain and see where runoff risk climbs.</p>
+          <label class="rain"><span>Rain in the next 24 hours</span><b id="rain-value">20 mm</b>
+            <input id="rain" type="range" min="0" max="120" value="20" />
+          </label>
+          <div class="scale" aria-hidden="true"><span>Lower risk</span><i></i><i></i><i></i><i></i><span>Higher risk</span></div>
+          <button id="live-rain" class="plain small" type="button" hidden></button>
+          <p class="note">An estimate from real terrain and rainfall. It is not a measurement of water quality.</p>
+        </div>
+      </section>
+
+      <section id="app" class="app">
+        <div class="app-copy">
+          <h2>Everything in one circle&#8288;<i class="stop"></i></h2>
+          <p>The mobile app puts the whole twin in your hand. Tap the dial.</p>
+          <div class="dial" id="dial" role="tablist" aria-label="App screens">
+            <div class="disc"><span class="wave"></span><b id="dial-title">Home</b><small id="dial-note">The river at a glance</small></div>
+          </div>
+        </div>
+        <div class="phone-stage" id="stage"><div class="phone" id="phone"><img id="screen" src="/landing/home-calm.jpg" alt="The Bulos 3D Home screen" width="600" height="1298" /></div></div>
+      </section>
+
+      <section id="truth" class="truth">
+        <h2>Honest about what this is&#8288;<i class="stop"></i></h2>
+        <p class="wide-copy">Bulos 3D is a working software prototype by students. No sensor hardware has been built yet, and every water reading on this page is simulated.</p>
+        <div class="numbers">
+          <div><b data-count="93.1" data-suffix="%">0%</b><span>of contaminated time blocked from a spill</span></div>
+          <div><b data-count="97.8" data-suffix="%">0%</b><span>blocked from a monsoon cloudburst</span></div>
+          <div><b data-count="99" data-suffix=" min">0 min</b><span>median warning before a spill arrives</span></div>
+          <div><b data-count="0" data-suffix="">0</b><span>false shut-offs in 72 test runs</span></div>
+        </div>
+        <p class="note">Results from randomized simulation runs, not field measurements. Field results will likely be lower.</p>
+        <div class="split">
+          <div><h3>Real</h3><p>Copernicus elevation, OpenStreetMap rivers and roads, satellite imagery and live weather.</p></div>
+          <div><h3>Computed</h3><p>River speed, travel times, runoff layers, forecasts and risk scores.</p></div>
+          <div><h3>Simulated</h3><p>Sensor readings, spills, storms, valves, tanks and text messages.</p></div>
+          <div><h3>Illustrative</h3><p>The five water points, people served and pipelines are a proposed pilot layout.</p></div>
+        </div>
+      </section>
+
+      <section class="end">
+        <img src="/favicon.svg" alt="" width="120" height="120" />
+        <h2>Know the water is safe before it reaches the tap&#8288;<i class="stop"></i></h2>
+        <a class="primary" href="/">Open the twin</a>
+        <p>Made by students of Camarines Sur National High School for the Xylem Global Student Innovation Challenge. Not an official government system.</p>
+        <p class="credits">Elevation: Copernicus GLO-90 (ESA/Airbus). Waterways: OpenStreetMap contributors. Region V boundary: geoBoundaries (NAMRIA, PSA, OCHA), CC BY 3.0 IGO. Weather: Open-Meteo.</p>
+      </section>
+    </main>
+    <script type="module" src="/src/landing/main.js"></script>
+  </body>
+</html>
