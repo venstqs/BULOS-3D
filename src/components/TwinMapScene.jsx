@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import * as THREE from 'three';
-import { animatePerson, buildSite, setNightGlow, updateDisplay } from '../lib/detailModels';
+import { applyReading, buildSite, setNightGlow, tickSite, updateDisplay } from '../lib/detailModels';
+import { bakeShadow, sky } from '../lib/siteKit';
 import { fmt, stationStatus } from '../lib/format';
 import { riverAt } from '../lib/twinField';
 import { PIPE_FRAG, RIVER_FRAG, paintRiver } from '../lib/waterShaders';
@@ -75,20 +76,8 @@ function softEdge() {
   }
   g.fill();
   edgeTexture = new THREE.CanvasTexture(c);
+  edgeTexture.channel = 1;
   return edgeTexture;
-}
-
-/** Soft dark disc under a model, standing in for a cast shadow. */
-function contactShadow(r) {
-  const c = document.createElement('canvas');
-  c.width = 128; c.height = 128;
-  const g = c.getContext('2d');
-  const grad = g.createRadialGradient(64, 64, 8, 64, 64, 64);
-  grad.addColorStop(0, 'rgba(10,20,30,0.42)'); grad.addColorStop(0.7, 'rgba(10,20,30,0.2)'); grad.addColorStop(1, 'rgba(10,20,30,0)');
-  g.fillStyle = grad; g.fillRect(0, 0, 128, 128);
-  const m = new THREE.Mesh(new THREE.CircleGeometry(r, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthWrite: false }));
-  m.position.y = 0.01;
-  return m;
 }
 
 // River ribbon: its centre line follows the terrain, and its width changes with zoom
@@ -164,6 +153,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
               { type: 'Feature', properties: { name: 'Naga River watershed' }, geometry: { type: 'Point', coordinates: [stem[Math.floor(stem.length * 0.4)][0], stem[Math.floor(stem.length * 0.4)][1] + 0.016] } },
             ] } },
             plume: { type: 'geojson', data: empty },
+            trail: { type: 'geojson', data: empty },
             tags: { type: 'geojson', data: empty },
           },
           layers: [
@@ -178,6 +168,8 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
             { id: 'network', type: 'line', source: 'network', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#35e0c2', 'line-opacity': 0.8, 'line-width': ['interpolate', ['exponential', 2], ['zoom'], 11, 0.8, 15, 1.4, 20, 12] } },
             { id: 'pipes', type: 'line', source: 'pipes', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['exponential', 2], ['zoom'], 11, 1.3, 15, 2, 20, 16] } },
             { id: 'river-glow', type: 'line', source: 'river', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-width': ['interpolate', ['exponential', 2], ['zoom'], 11, 2.6, 13, 3, 16, 7, 20, 110], 'line-blur': 0.6, 'line-opacity': 0.92, 'line-gradient': ['interpolate', ['linear'], ['line-progress'], 0, '#46b4ff', 1, '#46b4ff'] } },
+            { id: 'trail-glow', type: 'line', source: 'trail', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['exponential', 2], ['zoom'], 11, 5, 16, 11], 'line-blur': 4, 'line-opacity': 0.5 } },
+            { id: 'trail', type: 'line', source: 'trail', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': ['interpolate', ['exponential', 2], ['zoom'], 11, 1.5, 16, 3] } },
             { id: 'buildings', type: 'fill-extrusion', source: 'osm', 'source-layer': 'building', minzoom: 13.6, paint: { 'fill-extrusion-color': '#e9e3d6', 'fill-extrusion-height': ['coalesce', ['get', 'render_height'], 5], 'fill-extrusion-base': ['coalesce', ['get', 'render_min_height'], 0], 'fill-extrusion-opacity': 0.92, 'fill-extrusion-vertical-gradient': true } },
             { id: 'names', type: 'symbol', source: 'names', layout: { 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Regular'], 'text-size': 15, 'text-letter-spacing': 0.06 }, paint: { 'text-color': '#c9ecff', 'text-halo-color': 'rgba(8,30,60,0.9)', 'text-halo-width': 1.8 } },
             { id: 'barangay-dots', type: 'circle', source: 'barangays', minzoom: 11, paint: { 'circle-radius': 4, 'circle-stroke-width': 1.2, 'circle-stroke-color': '#ffffff', 'circle-color': ['step', ['get', 'km'], '#2eb872', 1.5, '#f2c200', 3, '#ec835a', 6, '#d03b3b'] } },
@@ -203,8 +195,8 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
     const sites = {};
     const people = [];
     const scene = new THREE.Scene();
-    const hemi = new THREE.HemisphereLight('#ffffff', '#55604f', 1.35);
-    const sun = new THREE.DirectionalLight('#fff3df', 2.3);
+    const hemi = new THREE.HemisphereLight('#ffffff', '#55604f', 0.35);
+    const sun = new THREE.DirectionalLight('#fff3df', 2.6);
     sun.position.set(-0.5, 1, 0.65);
     scene.add(hemi, sun);
 
@@ -218,7 +210,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
       const ctx = buildSite(kind);
       ctx.g.rotation.y = facing;
       const root = new THREE.Group();
-      root.add(ctx.g, contactShadow(r));
+      root.add(ctx.g);
       ctx.g.traverse((o) => { if (o.isMesh) { o.frustumCulled = false; o.userData.site = id; } });
       const [x, z] = local(lon, lat);
       root.position.set(x, 0, z);
@@ -231,16 +223,26 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
       ring.position.y = 0.2;
       ring.frustumCulled = false;
       root.add(ring);
-      const pads = [root.children[1], ...ctx.g.children.filter((o) => o.geometry?.type === 'CircleGeometry')];
-      pads.slice(1).forEach((pad, i) => {
+      const pads = ctx.ground;
+      ctx.ground.forEach((pad, i) => {
         pad.material = pad.material.clone();
+        // Sit in with the satellite image around it, rather than glowing on top
+        pad.material.color.multiplyScalar(0.52);
+        pad.material.envMapIntensity = 0.25;
         pad.material.alphaMap = softEdge();
         pad.material.blending = THREE.CustomBlending;
         pad.material.blendSrc = THREE.SrcAlphaFactor;
         pad.material.blendDst = THREE.OneMinusSrcAlphaFactor;
         underModels(pad.material, -3 + i * 0.1, pad);
       });
-      sites[id] = { ...ctx, root, ring, pads, lon, lat, r, phase: Math.random() };
+      // Shadows are drawn once per site and laid on the ground like a decal
+      const span = ctx.radius * 2.5;
+      const decal = new THREE.Mesh(new THREE.PlaneGeometry(span, span).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.5, depthWrite: false, toneMapped: false, color: '#0a1420' }));
+      decal.visible = false;
+      decal.frustumCulled = false;
+      ctx.g.add(decal);
+      underModels(decal.material, -2, decal);
+      sites[id] = { ...ctx, root, ring, pads, decal, lon, lat, r, phase: Math.random(), facing };
       people.push(...ctx.people);
       return sites[id];
     };
@@ -263,11 +265,13 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
       const side = clearance(1) >= clearance(-1) ? 1 : -1;
       const [east, north] = [(-ny / len) * side * gap, (ex / len) * side * gap];
       const site = addSite(st.id, stem[at][0] + east / degLon, stem[at][1] + north / 111320, bearing * (Math.PI / 180) * -1 + 0.5, r);
-      const intake = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, gap, 12), new THREE.MeshStandardMaterial({ color: '#2d71d8', roughness: 0.4 }));
+      const reach = gap - r * 0.72;
+      const intake = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, reach, 12), new THREE.MeshStandardMaterial({ color: '#17191d', roughness: 0.5 }));
       intake.rotation.set(Math.PI / 2, 0, 0);
       const holder = new THREE.Group();
       holder.add(intake);
-      holder.position.set(-east / 2, 0.4, north / 2);
+      const mid = (gap + r * 0.72) / 2 / gap;
+      holder.position.set(-east * mid, 0.3, north * mid);
       holder.rotation.y = Math.atan2(-east, -north * -1);
       holder.traverse((o) => { o.frustumCulled = false; });
       site.root.add(holder);
@@ -384,6 +388,9 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
         renderer = new THREE.WebGLRenderer({ canvas: map.getCanvas(), context: gl, antialias: true });
         renderer.autoClear = false;
         renderer.outputColorSpace = THREE.SRGBColorSpace;
+        renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        renderer.toneMappingExposure = 1;
+        sky().then((t) => { scene.environment = t; scene.environmentIntensity = 0.8; map.triggerRepaint(); }).catch(() => {});
       },
       render(gl, args) {
         const now = performance.now();
@@ -407,6 +414,17 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
           const show = zoom >= MODELS_FROM_ZOOM && metres < within && (!s.asset || world.current?.assets !== false);
           s.root.visible = show;
           if (!show) continue;
+          if (!s.baked) {
+            s.baked = true;
+            const local = new THREE.Vector3(-0.5, 1, 0.65).applyAxisAngle(new THREE.Vector3(0, 1, 0), -s.facing);
+            const later = window.requestIdleCallback ?? ((f) => setTimeout(f, 120));
+            later(() => {
+              if (!mapRef.current) return;
+              s.decal.material.alphaMap = bakeShadow(s, local);
+              s.decal.material.needsUpdate = true;
+              s.decal.visible = true;
+            });
+          }
           // Settle on a height and keep it, or models bob as finer terrain tiles arrive
           if (s.y == null || drapesLeft > 0) s.y = elevation(s.lon, s.lat, s.base ?? 20);
           s.root.position.y = s.y - baseAlt + 0.3;
@@ -415,11 +433,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
             s.ring.scale.setScalar(0.85 + ph * 0.9);
             s.ring.material.opacity = (1 - ph) * 0.85;
           }
-          if (s.flag) s.flag.rotation.y = Math.sin(t * 2.4) * 0.22;
-          for (const c of s.spin) c.rotation.y = t * (3 + (world.current?.rain ?? 0) * 9);
-          if (s.beacon) s.beacon.visible = Math.sin(t * 5) > 0;
-          for (const tap of s.taps) tap.scale.x = 1 + Math.sin(t * 22 + tap.position.x) * 0.2;
-          for (const p of s.people) { p.visible = people; if (people) animatePerson(p, t, dt); }
+          tickSite(s, t, dt, { rain: world.current?.rain ?? 0, people });
         }
 
         const mc = maplibregl.MercatorCoordinate.fromLngLat(origin, baseAlt);
@@ -482,6 +496,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
 
     let timer = 0;
     let follow = false;
+    const drop = { pin: null, path: [] };
     const stopFollow = () => { follow = false; };
     let touring = false;
     const stopTour = () => { if (!touring) return; touring = false; handlers.current.onTour?.(false); handlers.current.onCaption?.(null); };
@@ -530,6 +545,38 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
       north: () => map.easeTo({ bearing: 0, duration: 700 }),
       tilt3d: (flat) => map.easeTo({ pitch: flat ? 0 : 60, duration: 800 }),
       startTour, stopTour,
+      // Follow a drop: a marker and a bright trail travelling down the river, with the camera behind it
+      dropStart: (lon, lat, heading) => {
+        stopTour(); stopFollow();
+        drop.path = [[lon, lat]];
+        map.getSource('trail')?.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: [] } });
+        if (!drop.pin) {
+          const el = document.createElement('div');
+          el.className = 'drop-pin';
+          drop.pin = new maplibregl.Marker({ element: el }).setLngLat([lon, lat]).addTo(map);
+        }
+        drop.pin.setLngLat([lon, lat]);
+        fly({ center: [lon, lat], zoom: 14.6, pitch: 68, bearing: heading, duration: 2000 });
+      },
+      dropAt: (lon, lat, heading) => {
+        if (!drop.pin) return;
+        drop.pin.setLngLat([lon, lat]);
+        const [px, py] = drop.path.at(-1);
+        if (Math.hypot(px - lon, py - lat) > 0.0004) {
+          drop.path.push([lon, lat]);
+          map.getSource('trail')?.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: drop.path } });
+        }
+        const z = map.queryTerrainElevation([lon, lat]);
+        if (z != null) map.setCenterElevation(map.getCenterElevation() + (z - map.getCenterElevation()) * 0.12);
+        map.jumpTo({ center: [lon, lat], bearing: heading });
+      },
+      dropEnd: () => {
+        drop.pin?.remove();
+        drop.pin = null;
+        drop.path = [];
+        map.getSource('trail')?.setData(empty);
+        fly({ ...home, duration: 1800 });
+      },
       setFollow: (on) => { stopTour(); follow = on; if (on) map.easeTo({ zoom: 14.2, pitch: 66, duration: 1400 }); },
     };
 
@@ -636,9 +683,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
         if (map.getZoom() >= SCREENS_FROM_ZOOM) updateDisplay(s, st);
         s.ring.material.color.set(color);
         s.ring.visible = risk >= 0.25 || Boolean(closed);
-        s.valve?.color.set(closed ? '#d03b3b' : '#22a35a');
-        s.valve?.emissive.set(closed ? '#d03b3b' : '#22a35a');
-        for (const tap of s.taps) tap.visible = !closed;
+        applyReading(s, st);
       }
       const fc = live.forecast.stations?.[st.id];
       const eta = tauStep === 0 && fc?.arrival_s > 0 ? `ETA ${Math.round(fc.arrival_s / 60)} min` : '';

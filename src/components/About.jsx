@@ -7,9 +7,9 @@ import TwinLoop from './TwinLoop';
 
 const FEATURES = [
   {
-    title: 'CesiumJS rural & watershed catchment mapping',
+    title: '3D rural and watershed catchment mapping',
     paper: 'Isolated watersheds, remote river basins and dispersed water access points draped over real terrain.',
-    here: 'CesiumJS globe on real 3D terrain and satellite imagery. The watershed boundary, streams and 28 km main river are computed from the Copernicus 90 m elevation model.',
+    here: 'A 3D map on real terrain and satellite imagery. The river, roads and buildings come from OpenStreetMap, and the watershed boundary from the Copernicus 90 m elevation model. Follow a drop on the Watershed page to travel the 29.7 km river.',
     page: 'map', Icon: Mountain,
   },
   {
@@ -33,13 +33,13 @@ const FEATURES = [
   {
     title: 'Immersive rural asset inspection & health indexing',
     paper: 'Click a solar pump, storage tank or communal spring for an isometric Three.js view with a health index and live gauges.',
-    here: 'Click any water point on the 3D map to open its isometric Three.js model (spring box, solar-pumped well, kiosk tank) with the 0–100 Water Quality Health Index and live gauges.',
+    here: 'Open the 3D site view of any water point to walk around its model (spring box, solar well, kiosk tank) and look closely at its sensors, valve and storage, with the 0–100 Water Quality Health Index and live readings.',
     page: 'points', Icon: FlaskConical,
   },
 ];
 
 const STACK = [
-  ['Frontend & 3D/GIS', 'React, Tailwind CSS, CesiumJS, Three.js / React Three Fiber', MapIcon],
+  ['Frontend & 3D/GIS', 'React, Tailwind CSS, MapLibre GL, Three.js', MapIcon],
   ['Backend & processing', 'Python FastAPI; forecasts in-process or on a Celery worker', ServerCog],
   ['Time-series storage', 'PostgreSQL + TimescaleDB (SQLite for laptop demos)', Database],
   ['Field hardware', 'Low-cost ESP32 nodes over Wi-Fi, LoRaWAN or MQTT, with one biological (TLF) sensor shared at an upstream sentinel', Cpu],
@@ -67,12 +67,12 @@ function Results() {
   if (!data?.cases) return null;
   const rows = Object.values(data.cases).filter((c) => c.mode === 'full_twin');
   return (
-    <Card>
+    <section className="section p-5">
       <h2 className="font-display text-lg font-semibold">Simulation test results</h2>
       <p className="mt-1 text-sm text-ink-2">
         {data.runs_per_case} randomised runs per case. These are simulated results, not field measurements. Without protection, 0% of contaminated water is blocked.
       </p>
-      <div className="tile mt-4 overflow-x-auto">
+      <div className="mt-3 overflow-x-auto">
         <table className="data">
           <thead><tr><th>Event</th><th>Sensor plan</th><th>Contaminated minutes blocked</th><th>Closed before arrival</th><th>Median warning</th></tr></thead>
           <tbody>
@@ -86,117 +86,109 @@ function Results() {
           </tbody>
         </table>
       </div>
-    </Card>
+    </section>
   );
 }
 
-function Card({ children, className = '' }) {
-  return <section className={`glass p-6 ${className}`}>{children}</section>;
-}
-
-export default function AboutPage({ live, staticData, go }) {
+export default function AboutPage({ live, go }) {
   const people = live?.stations.reduce((a, s) => a + (s.population || 0), 0);
   return (
-    <div className="mx-auto grid max-w-[1180px] gap-5">
-      <Card className="grid gap-6 md:grid-cols-[auto_1fr] md:items-center">
-        <img src="/favicon.svg" alt="" className="h-24 w-24" />
+    <div className="about grid gap-3">
+      <section className="grid items-center gap-6 rounded-xl bg-civic p-7 text-white md:grid-cols-[auto_minmax(0,1fr)]">
+        <span className="flex h-28 w-28 items-center justify-center rounded-full bg-white"><img src="/favicon.svg" alt="" className="h-24 w-24" /></span>
         <div>
-          <h1 className="font-display text-3xl font-semibold leading-tight">Bulos 3D: Water Quality Digital Twin</h1>
-          <p className="mt-1 text-ink-2">Spatial telemetry and hydrodynamic simulation platform for rural and isolated water networks.</p>
-          <p className="mt-3 max-w-[75ch] text-sm leading-relaxed text-ink-2">
-            Pilot: {staticData?.site.title ?? 'Naga City, Camarines Sur'}, along {staticData?.site.subtitle ?? 'Mt. Isarog to Naga City'}.
-            {people ? ` ${live.stations.length} water points serving about ${people.toLocaleString()} people.` : ''} Built for the Xylem Global
+          <h1 className="font-display text-[36px] font-semibold leading-[1.1]">Know the water is safe before it reaches the tap</h1>
+          <p className="mt-2 max-w-[66ch] text-[15px] leading-relaxed opacity-90">
+            Bulos 3D is a water quality digital twin for rural water networks. The pilot follows the Naga River, from the Mt. Isarog slope to Naga City,
+            {people ? ` with ${live.stations.length} water points serving about ${people.toLocaleString()} people.` : '.'} Built for the Xylem Global
             Student Innovation Challenge by Camarines Sur National High School.
           </p>
+          <button onClick={() => go('home')} className="mt-3 rounded-lg bg-white px-4 py-2 text-[13px] font-semibold text-civic">Open the map</button>
         </div>
-      </Card>
+      </section>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        <section className="section p-5">
+          <h2 className="font-display text-lg font-semibold">The problem</h2>
+          <ul className="mt-2 grid gap-2.5 pl-0 text-sm leading-relaxed text-ink-2">
+            <li className="list-none"><b className="text-ink">Testing is rare.</b> Remote areas rely on infrequent manual tests, so outbreaks are found late.</li>
+            <li className="list-none"><b className="text-ink">Small systems go unwatched.</b> Shallow wells, communal springs and solar pumps have no monitoring.</li>
+            <li className="list-none"><b className="text-ink">Help arrives slowly.</b> Rugged terrain and disconnected networks delay any response.</li>
+          </ul>
+        </section>
+        <section className="section p-5">
+          <h2 className="font-display text-lg font-semibold">Our solution</h2>
+          <p className="mt-2 text-sm leading-relaxed text-ink-2">
+            Low-cost ESP32 sensor nodes send readings over LoRaWAN or MQTT to a Python digital twin. The twin combines them with a 3D model of the
+            watershed to show water safety and how contamination moves. It warns health units and residents, and closes intakes, before polluted water is dispensed.
+          </p>
+        </section>
+      </div>
 
       <TwinLoop live={live} />
 
-      <div className="grid gap-5 md:grid-cols-2">
-        <Card>
-          <h2 className="font-display text-lg font-semibold">The problem</h2>
-          <ul className="mt-3 grid gap-3 text-sm leading-relaxed text-ink-2">
-            <li><b className="text-ink">Off-grid telemetry gaps.</b> Remote areas rely on infrequent manual tests, so outbreaks are found late.</li>
-            <li><b className="text-ink">Decentralized water vulnerability.</b> Shallow wells, communal springs and solar pumps have no SCADA oversight.</li>
-            <li><b className="text-ink">Slow emergency response.</b> Rugged terrain and disconnected networks delay intervention.</li>
-          </ul>
-        </Card>
-        <Card>
-          <h2 className="font-display text-lg font-semibold">Our solution</h2>
-          <p className="mt-3 text-sm leading-relaxed text-ink-2">
-            Low-cost ESP32 sensor nodes stream readings over LoRaWAN or MQTT into a Python digital twin. The twin combines the
-            telemetry with a 3D model of the watershed to show water safety, flow and contaminant movement across isolated
-            districts. It warns rural health units and residents before contaminated water is dispensed.
-          </p>
-        </Card>
-      </div>
-
-      <Card>
-        <h2 className="font-display text-lg font-semibold">The five core digital twin features</h2>
-        <p className="mt-1 text-sm text-muted">Each one is live in this prototype. Open it to see it working.</p>
-        <ol className="mt-4 grid gap-3">
-          {FEATURES.map(({ title, paper, here, page, Icon }, i) => (
-            <li key={title} className="tile grid gap-4 p-4 md:grid-cols-[48px_minmax(0,1fr)_auto] md:items-center">
-              <span className="icon-tile !h-12 !w-12"><Icon size={22} /></span>
-              <div className="min-w-0">
-                <div className="font-semibold">{i + 1}. {title}</div>
-                <p className="mt-1 text-sm text-ink-2"><span className="text-muted">Concept: </span>{paper}</p>
-                <p className="mt-1 text-sm text-ink-2"><span className="text-muted">In Bulos 3D: </span>{here}</p>
+      <section className="section" aria-label="Core features">
+        <div className="section-head"><h2>The five core features</h2></div>
+        <ol className="m-0 p-0">
+          {FEATURES.map(({ title, here, page, Icon }) => (
+            <li key={title} className="flex list-none items-center gap-3 border-t border-line px-4 py-3">
+              <Icon size={20} className="shrink-0 text-civic" />
+              <div className="min-w-0 flex-1">
+                <div className="text-[14px] font-semibold">{title}</div>
+                <p className="mt-0.5 max-w-[80ch] text-[13px] leading-relaxed text-ink-2">{here}</p>
               </div>
-              <button onClick={() => go(page)} className="btn-ghost whitespace-nowrap">Open</button>
+              <button onClick={() => go(page)} className="btn-ghost shrink-0 !py-1.5">Open</button>
             </li>
           ))}
         </ol>
-      </Card>
+      </section>
 
       <Results />
 
-      <div className="grid gap-5 md:grid-cols-2">
-        <Card>
-          <h2 className="font-display text-lg font-semibold">System architecture</h2>
-          <ul className="mt-3 grid gap-3">
+      <div className="grid gap-3 md:grid-cols-2">
+        <section className="section p-5">
+          <h2 className="font-display text-lg font-semibold">How it is built</h2>
+          <ul className="mt-2 grid gap-2.5 pl-0">
             {STACK.map(([k, v, Icon]) => (
-              <li key={k} className="flex gap-3 text-sm">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-panel-2 text-civic"><Icon size={17} /></span>
+              <li key={k} className="flex list-none gap-2.5 text-sm">
+                <Icon size={17} className="mt-0.5 shrink-0 text-civic" />
                 <span><b>{k}</b><span className="block text-ink-2">{v}</span></span>
               </li>
             ))}
           </ul>
-          <p className="mt-4 flex items-start gap-2 text-xs leading-relaxed text-muted">
+          <p className="mt-3 flex items-start gap-2 text-xs leading-relaxed text-muted">
             <Radio size={14} className="mt-0.5 shrink-0" />
-            Demo mode simulates the field and sends real LoRaWAN payloads through the same ingest path as live sensors
-            (ChirpStack, TTN or MQTT).
+            Demo mode simulates the field and sends real LoRaWAN payloads through the same path as live sensors.
           </p>
-        </Card>
-        <Card>
+        </section>
+        <section className="section p-5">
           <h2 className="font-display text-lg font-semibold">Who benefits</h2>
-          <ul className="mt-3 grid gap-3">
+          <ul className="mt-2 grid gap-2.5 pl-0">
             {BENEFICIARIES.map(([k, v, Icon]) => (
-              <li key={k} className="flex gap-3 text-sm">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-panel-2 text-civic"><Icon size={17} /></span>
+              <li key={k} className="flex list-none gap-2.5 text-sm">
+                <Icon size={17} className="mt-0.5 shrink-0 text-civic" />
                 <span><b>{k}</b><span className="block text-ink-2">{v}</span></span>
               </li>
             ))}
           </ul>
-        </Card>
+        </section>
       </div>
 
-      <Card>
+      <section className="section p-5">
         <h2 className="font-display text-lg font-semibold">UN Sustainable Development Goals</h2>
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {SDGS.map(([n, name, why, color]) => (
-            <div key={n} className="tile p-4">
+        <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {SDGS.map(([n, name, why]) => (
+            <div key={n}>
               <div className="flex items-center gap-2">
-                <span className="flex h-9 w-9 items-center justify-center rounded-lg font-display text-sm font-bold text-white" style={{ background: color }}>{n}</span>
-                <span className="text-sm font-semibold leading-tight">{name}</span>
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-civic font-display text-sm font-bold text-white">{n}</span>
+                <span className="text-[13px] font-semibold leading-tight">{name}</span>
               </div>
-              <p className="mt-2 text-xs leading-relaxed text-ink-2">{why}</p>
+              <p className="mt-1.5 text-xs leading-relaxed text-ink-2">{why}</p>
             </div>
           ))}
         </div>
         <p className="mt-4 flex items-center gap-2 text-xs text-muted"><Droplets size={14} /> Standards: PNSDW 2017 (DOH AO 2017-0010). Elevation: Copernicus GLO-90. Water-point locations are an illustrative pilot layout.</p>
-      </Card>
+      </section>
     </div>
   );
 }

@@ -41,7 +41,7 @@ function Section({ title, children, right }) {
   return (
     <section className="border-t border-line px-4 py-3">
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="font-display text-[13px] font-semibold text-ink">{title}</h3>
+        <h3 className="font-display text-[14px] font-semibold text-ink">{title}</h3>
         {right}
       </div>
       {children}
@@ -89,6 +89,8 @@ export default function StationPanel({ st, history, forecast, pnsdw, onChanged }
         </dl>
       </div>
 
+      <div className="grid lg:grid-cols-2">
+      <div className="min-w-0">
       <Section title="Health">
         <div className="grid grid-cols-2 gap-3">
           <div className="rounded-lg bg-panel-2 p-3">
@@ -143,6 +145,8 @@ export default function StationPanel({ st, history, forecast, pnsdw, onChanged }
         </div>
       </Section>
 
+      </div>
+      <div className="min-w-0 lg:border-l lg:border-line">
       <Section title="Forecast for this water point, next 4 hours">
         {fc && fc.arrival_s != null ? (
           <div className="text-xs leading-relaxed text-ink-2">
@@ -168,7 +172,7 @@ export default function StationPanel({ st, history, forecast, pnsdw, onChanged }
             <div className="mt-3 flex flex-wrap gap-2">
               <button disabled={busy || !st.valve.open}
                       onClick={() => act('/api/valve', { station_id: st.id, action: 'SHUT' })}
-                      className="rounded-md bg-critical/90 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40">
+                      className="btn-danger">
                 Close intake
               </button>
               <button disabled={busy || st.valve.open}
@@ -176,14 +180,14 @@ export default function StationPanel({ st, history, forecast, pnsdw, onChanged }
                         fc?.arrival_s != null && fc.peak_risk >= 0.45
                           ? `The twin forecasts contaminated water here ${fc.arrival_s === 0 ? 'now' : `in ${fmtMin(fc.arrival_s)}`} (peak risk ${fmt(fc.peak_risk, 2)}). Re-arm anyway?`
                           : null)}
-                      className="rounded-md bg-good/90 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-40">
-                Re-arm (interlocked)
+                      className="btn-primary !py-[7px]">
+                Reopen intake
               </button>
               <button disabled={busy || st.valve.open}
                       onClick={() => act('/api/valve', { station_id: st.id, action: 'FORCE_REARM', reason: 'Manual override.' },
                         'Force re-arm bypasses the on-site water-quality interlock. Continue?')}
-                      className="rounded-md border border-white/15 px-3 py-1.5 text-xs text-ink-2 disabled:opacity-40">
-                Force re-arm
+                      className="btn-ghost !py-[6px]">
+                Override and reopen
               </button>
             </div>
           </>
@@ -192,7 +196,7 @@ export default function StationPanel({ st, history, forecast, pnsdw, onChanged }
         )}
         {(st.classification === 'SENSOR_BIOFOULING' || st.edge_state === 'MAINTENANCE') && (
           <button disabled={busy} onClick={() => act('/api/maintenance/clean', { station_id: st.id })}
-                  className="mt-2 inline-flex items-center gap-1 rounded-md bg-warning/90 px-3 py-1.5 text-xs font-semibold text-black">
+                  className="btn-primary mt-2 !py-[7px]">
             <Sparkles size={12} /> Log lens cleaned
           </button>
         )}
@@ -228,6 +232,8 @@ export default function StationPanel({ st, history, forecast, pnsdw, onChanged }
           <span className="text-muted">Source</span><span className="truncate text-ink-2">{st.link.source ?? '—'}</span>
         </div>
       </Section>
+      </div>
+      </div>
     </div>
   );
 }

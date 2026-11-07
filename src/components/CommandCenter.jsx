@@ -1,11 +1,12 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Activity, Box, Check, ChevronUp, Clock, Crosshair, Cpu, Droplets, FlaskConical, Lock, LockOpen, Menu, Minus, Navigation, Pause, Plane, Play, Plus, RotateCcw, Search, Send, Tag, TriangleAlert, Users, X,
+  Activity, Box, Check, LayoutPanelLeft, ChevronUp, Clock, Crosshair, Cpu, Droplets, FlaskConical, Lock, LockOpen, Menu, Minus, Navigation, Pause, Plane, Play, Plus, RotateCcw, Search, Send, Tag, TriangleAlert, Users, X,
 } from 'lucide-react';
 import { get, post, usePoll } from '../api';
 import { EDGE_LABEL, fmt, fmtClock, fmtMin, stationStatus } from '../lib/format';
 import { AHEAD_S, PAST_S, exposure, fmtOffset } from '../lib/twinField';
 import { useTwinTime } from '../lib/useTwinTime';
+import { Floating, resetPanels, usePanelsMoved } from '../lib/floating';
 
 const TwinMapScene = lazy(() => import('./TwinMapScene'));
 // One surface for everything that hangs over the map: plain white, so the map keeps the colour
@@ -88,7 +89,7 @@ function Inspector({ st, fc, act, quick, onInspect, onDetails, onClose, onStreet
           <button disabled={closed} onClick={() => act('/api/valve', { station_id: st.id, action: 'SHUT' }, `Intake at ${st.id} closed.`)}
                   className="flex items-center justify-center gap-1 rounded-xl bg-[#d03b3b] px-2 py-1.5 text-xs font-semibold text-white disabled:opacity-40"><Lock size={13} />Close intake</button>
           <button disabled={!closed} onClick={() => act('/api/valve', { station_id: st.id, action: 'REARM' }, `Intake at ${st.id} re-opened.`)}
-                  className="flex items-center justify-center gap-1 rounded-xl border border-line bg-white px-2 py-1.5 text-xs font-semibold text-ink-2 disabled:opacity-40"><LockOpen size={13} />Re-arm</button>
+                  className="flex items-center justify-center gap-1 rounded-xl border border-line bg-white px-2 py-1.5 text-xs font-semibold text-ink-2 disabled:opacity-40"><LockOpen size={13} />Reopen</button>
         </div>
       )}
       <div className="mt-1.5 grid grid-cols-2 gap-1.5">
@@ -423,6 +424,7 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
   const [flat, setFlat] = useState(false);
   const readout = useRef(null);
   const needle = useRef(null);
+  const panelsMoved = usePanelsMoved();
   const { data: weather } = usePoll('/api/weather', 600000);
   const [touring, setTouring] = useState(false);
   const [following, setFollowing] = useState(false);
@@ -468,7 +470,7 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
       </div>
 
       {/* Left: everything about the river, one panel */}
-      <section aria-label="Bulos 3D" className={`${card} relative z-20 m-2 flex flex-col lg:absolute lg:left-3 lg:top-3 lg:m-0 lg:max-h-[calc(100vh-24px)] lg:w-[340px]`}>
+      <Floating id="map-main" label="Move this panel" role="region" aria-label="Bulos 3D" className={`${card} relative z-20 m-2 flex flex-col lg:absolute lg:left-3 lg:top-3 lg:m-0 lg:max-h-[calc(100vh-24px)] lg:w-[340px]`}>
         <div className="flex items-center gap-2 p-2">
           <button onClick={() => setMenu((m) => !m)} aria-expanded={menu} aria-label="Menu" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-2 hover:bg-panel-2"><Menu size={18} /></button>
           <img src="/favicon.svg" alt="" className="h-7 w-7 shrink-0" />
@@ -516,13 +518,13 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
           </>
         )}
         {!live && <p className="p-3 text-sm text-muted">{status === 'offline' ? 'The data server is not running. Run npm start in the project folder.' : 'Connecting to the twin…'}</p>}
-      </section>
+      </Floating>
 
       {live && (
         <>
           {/* Top right: account-level actions, then map controls */}
           <div className="map-actions absolute right-3 top-3 z-20 hidden items-center gap-2 lg:flex">{actions}</div>
-          <div className={`${card} absolute right-3 top-[64px] z-10 hidden flex-col overflow-hidden lg:flex`}>
+          <Floating id="map-tools" label="Move the map tools" className={`${card} absolute right-3 top-[64px] z-10 hidden flex-col overflow-hidden lg:flex`}>
             <button onClick={() => controls.current.zoom?.(0.8)} aria-label="Zoom in" title="Zoom in" className={tool}><Plus size={17} /></button>
             <button onClick={() => controls.current.zoom?.(-0.8)} aria-label="Zoom out" title="Zoom out" className={tool}><Minus size={17} /></button>
             <hr className="border-line" />
@@ -533,11 +535,17 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
             <button onClick={() => setView((v) => ({ ...v, mapLabels: !v.mapLabels }))} aria-pressed={!view.mapLabels} aria-label={view.mapLabels ? 'Hide map labels' : 'Show map labels'} title={view.mapLabels ? 'Hide labels' : 'Show labels'} className={`${tool} ${view.mapLabels ? '' : 'bg-[#e9efff] text-civic'}`}><Tag size={15} /></button>
             <button onClick={() => (touring ? controls.current.stopTour?.() : controls.current.startTour?.())} aria-pressed={touring} aria-label="Tour" title="Tour the five water points" className={`${tool} ${touring ? 'bg-[#e9efff] text-civic' : ''}`}><Plane size={15} /></button>
             <button onClick={() => { const on = !following; setFollowing(on); controls.current.setFollow?.(on); }} aria-pressed={following} aria-label="Follow the plume" title="Follow the plume" className={`${tool} ${following ? 'bg-[#e9efff] text-civic' : ''}`}><Crosshair size={15} /></button>
-          </div>
+          {panelsMoved && (
+              <>
+                <hr className="border-line" />
+                <button onClick={resetPanels} aria-label="Reset panels" title="Put all panels back" className={tool}><LayoutPanelLeft size={15} /></button>
+              </>
+            )}
+          </Floating>
 
           {/* Right: details, only when asked for */}
           {rightOpen && (
-            <aside className={`${card} relative z-10 m-2 overflow-y-auto lg:absolute lg:right-[60px] lg:top-[64px] lg:m-0 lg:max-h-[calc(100vh-150px)] lg:w-[300px]`}>
+            <Floating id="map-detail" label="Move the details panel" className={`${card} relative z-10 m-2 overflow-y-auto lg:absolute lg:right-[60px] lg:top-[64px] lg:m-0 lg:max-h-[calc(100vh-150px)] lg:w-[300px]`}>
               {probe ? (
                 <HazardCard
                   spot={spot} live={live} onClose={() => { setProbe(null); setSpot(null); }}
@@ -548,14 +556,14 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
                            onStreet={(id) => controls.current.street?.(id)} onSensors={(id) => controls.current.sensors?.(id)}
                            onClose={() => { setDetail(false); controls.current.home?.(); }} />
               )}
-            </aside>
+            </Floating>
           )}
 
           {/* Bottom: legend for the active layer, then time */}
-          <div className={`z-10 flex flex-wrap items-end gap-2 p-2 lg:absolute lg:bottom-3 lg:right-[220px] lg:p-0 ${panel ? 'lg:left-[364px]' : 'lg:left-3'}`}>
+          <Floating id="map-time" grip={false} className={`z-10 flex flex-wrap items-end gap-2 p-2 lg:absolute lg:bottom-3 lg:right-[220px] lg:p-0 ${panel ? 'lg:left-[364px]' : 'lg:left-3'}`}>
             <Legend view={view} />
             <Timeline live={live} time={time} />
-          </div>
+          </Floating>
           <div className={`${card} absolute bottom-[12px] right-[38px] z-10 hidden w-[172px] whitespace-nowrap px-2 py-1 text-right text-[10.5px] tabular-nums text-ink-2 lg:block`}><span ref={readout}>Move over the map</span></div>
 
           {caption && (

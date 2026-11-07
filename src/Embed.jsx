@@ -3,7 +3,7 @@ import { usePoll } from './api';
 
 // Full-screen 3D views embedded by the Bulos 3D mobile app in a WebView.
 //   ?embed=map&index=risk     3D watershed (tap a water point -> app opens it)
-//   ?embed=site&id=KS-03      isometric site model
+//   ?embed=site&id=KS-03      3D site model
 const TwinView = lazy(() => import('./components/TwinView'));
 const SiteScene = lazy(() => import('./components/AssetInspector').then((m) => ({ default: m.SiteScene })));
 
@@ -32,7 +32,7 @@ export default function Embed({ mode, params }) {
       )}
       {mode === 'site' && (st ? (
         <Suspense fallback={<Loading text="Loading the 3D site view…" />}>
-          <SiteScene st={st} zoom={Math.max(20, Math.min(46, window.innerWidth / 15))} />
+          <SiteScene st={st} />
         </Suspense>
       ) : <Loading text={live ? 'Unknown water point.' : 'Connecting to the data server…'} />)}
     </div>

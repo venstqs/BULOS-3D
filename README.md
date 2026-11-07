@@ -18,11 +18,11 @@ and closes intakes and texts residents before contaminated water is dispensed.
 
 | # | Feature (concept paper) | Implementation |
 |---|---|---|
-| 1 | **CesiumJS watershed & DEM catchment mapping** | CesiumJS 3D globe on ArcGIS World Elevation (or Cesium World Terrain with an ion token) with Esri satellite imagery. The **catchment boundary, stream network and main-stem long profile are computed by the backend from the Copernicus GLO-90 DEM**: priority-flood depression filling → D8 flow direction → flow accumulation → channel initiation at 0.35 km² (`backend/hydrology.py`). No pipe CAD drawings are needed. |
+| 1 | **3D watershed & DEM catchment mapping** | MapLibre GL 3D map on open terrain tiles with Esri satellite imagery, OpenStreetMap roads and buildings, and Three.js facility models drawn inside the map. The mobile app embed still uses CesiumJS. The **catchment boundary, stream network and main-stem long profile are computed by the backend from the Copernicus GLO-90 DEM**: priority-flood depression filling → D8 flow direction → flow accumulation → channel initiation at 0.35 km² (`backend/hydrology.py`). No pipe CAD drawings are needed. |
 | 2 | **Spatiotemporal contaminant heatmaps (multi-parameter)** | Each node gets a surrogate biological-contamination risk from turbidity rise, ORP drop, pH shift, TDS jump and DOST rainfall (noisy-OR, plus a faecal-signature term when turbidity rises *and* ORP falls). The risk is spread along the channel by the transport model and over hillslopes by rainfall × runoff potential (slope + wetness), then **draped as a heatmap on the 3D terrain**. |
 | 3 | **Terrain-driven flow & time-of-flight** | Discharge from the rational method on DEM contributing area. Channel width from downstream hydraulic geometry. **Manning velocity from DEM slope.** Animated particles move along every channel at the simulated velocity. **Node-to-node pulse transit times are measured by cross-correlation** and used to recalibrate each reach's velocity (dry-weather point-source pulses only, because rain loads every reach at once). |
 | 4 | **Contaminant dispersion & arrival forecasting** | 1-D advection–dispersion (finite volume, Fischer dispersion coefficient, lateral inflow dilution, decay). Observations are assimilated at every node, then the model is run 4 h ahead with DOST rain persistence. Output: **arrival, peak and clear times at each intake** → SMS advisory up to 75 min ahead → optional **pre-emptive valve closure** up to 30 min ahead. |
-| 5 | **Asset diagnostics, drift detection & shut-off** | Three.js / React Three Fiber **isometric diagnostic view** per site (probe biofilm, valve state, tank level, edge beacon). **WQHI 0–100** referenced to PNSDW 2017. A **biofouling classifier** looks for a slow, linear turbidity rise with flat ORP/TDS, no rain and a quiet upstream node (cross-node evidence); the water keeps flowing and a technician is dispatched. Autonomous edge trip with 120 s persistence, remote close, and **interlocked re-arm**. |
+| 5 | **Asset diagnostics, drift detection & shut-off** | Full-screen Three.js **3D site view** per water point, with photo materials and real shadows, and close-ups of the sensors, valve and storage. **WQHI 0–100** referenced to PNSDW 2017. A **biofouling classifier** looks for a slow, linear turbidity rise with flat ORP/TDS, no rain and a quiet upstream node (cross-node evidence); the water keeps flowing and a technician is dispatched. Autonomous edge trip with 120 s persistence, remote close, and **interlocked re-arm**. |
 
 Also included:
 - PNSDW compliance audit (SQLite or **TimescaleDB** hypertables).
@@ -49,9 +49,9 @@ Also included:
 ## Architecture
 
 ```
- DOST / LGU LoRaWAN gateways ─┐                         ┌─► CesiumJS 3D watershed, risk heatmap, flow particles
+ DOST / LGU LoRaWAN gateways ─┐                         ┌─► MapLibre 3D watershed, risk heatmap, flow animation
  Bulos ESP32 edge nodes ──────┼─► ingest (ChirpStack,   │   React + Tailwind operator console
- DOST-ASTI rain gauges ───────┘    TTN, MQTT, JSON)     ├─► Three.js isometric asset inspector
+ DOST-ASTI rain gauges ───────┘    TTN, MQTT, JSON)     ├─► Three.js 3D site view
                                         │               │
                                         ▼               │
                          ┌─────────── Twin (FastAPI) ───┤
@@ -202,3 +202,7 @@ _archive/  previous (pre-rewrite) version, zipped
 
 **SDG alignment:** 3 (waterborne disease prevention), 6 (safe decentralized water), 9 (upgrades existing public IoT),
 11 & 13 (typhoon and monsoon resilience).
+
+## Credits
+
+Building, ground and sky textures in `public/textures/` are CC0 from [Poly Haven](https://polyhaven.com).

@@ -1,15 +1,16 @@
 import { Suspense, lazy, useCallback, useMemo, useState } from 'react';
-import { Bell, ChevronDown, CloudRain, MapPinned, PlayCircle, TriangleAlert, X } from 'lucide-react';
+import { Bell, ChevronDown, PlayCircle, TriangleAlert, X } from 'lucide-react';
 import Home, { MaintenancePage } from './components/Home';
 import { FlowPage, MapPage, ReportsPage, WaterPointsPage } from './components/Pages';
 import AboutPage from './components/About';
 import { AdvisoryModal, LogMaintenanceModal, ReminderModal, WaterTestModal } from './components/Actions';
 import ErrorBoundary from './components/ErrorBoundary';
+import PageShell from './components/PageShell';
 import { post, usePoll } from './api';
 import { fmtClock, fmtMin } from './lib/format';
 
 // Heavy 3D libraries load on demand so the page itself appears immediately.
-const TwinView = lazy(() => import('./components/TwinView'));
+const WatershedTwin = lazy(() => import('./components/WatershedTwin'));
 const CommandCenter = lazy(() => import('./components/CommandCenter'));
 const AssetInspector = lazy(() => import('./components/AssetInspector'));
 
@@ -52,8 +53,6 @@ export default function App() {
   const [page, setPage] = useState(() => (new URLSearchParams(window.location.search).get('inspect') ? 'points' : 'home'));
   const { data: live, status, refresh } = usePoll('/api/state', page === 'home' ? 2500 : 1500);
   const { data: forecast } = usePoll('/api/forecast', 8000);
-  const [heatIndex, setHeatIndex] = useState('risk');
-  const { data: heatmap } = usePoll(page === 'map' ? `/api/heatmap?index=${heatIndex}` : null, 6000);
   const { data: maint, refresh: refreshMaint } = usePoll('/api/maintenance', 10000);
   const { data: trend } = usePoll(page === 'overview' ? '/api/trend?hours=12&bucket_min=30' : null, 15000);
   const deepLink = new URLSearchParams(window.location.search).get('inspect');
@@ -97,27 +96,27 @@ export default function App() {
     v ? 'Automatic intake closing is on.' : 'Automatic intake closing is off. Operators must close intakes by hand.');
   const quick = useCallback((kind, arg) => setDialog({ kind, arg }), []);
 
-  const map = lite ? (
-    <div className="flex h-full flex-col items-center justify-center gap-3 bg-gradient-to-br from-[#dfe8ff] to-[#cfe6fb] p-6 text-center">
-      <MapPinned size={34} className="text-civic" />
-      <div className="font-display text-base font-semibold">3D map is off (Lite mode)</div>
-      <p className="max-w-[46ch] text-sm text-ink-2">
-        {hasWebGL ? 'Everything else keeps working. Turn the map back on when your computer can handle 3D graphics.'
-          : 'This browser has WebGL turned off, so the 3D map cannot run. Enable hardware acceleration in the browser settings.'}
-      </p>
-      {hasWebGL && <button onClick={() => setLite(false)} className="btn-primary">Turn on the 3D map</button>}
-    </div>
-  ) : (
+  const map = (
     <ErrorBoundary label="The 3D map" compact onDisable={() => setLite(true)}>
-      <Suspense fallback={<div className="flex h-full items-center justify-center bg-panel-2 text-sm text-muted">Loading the 3D map…</div>}>
-        {/* click a water point: isometric 3D site view; double-click: its details page. */}
-        <TwinView staticData={staticData} live={live} forecast={forecast} heatmap={heatmap} selectedId={selectedId}
-                     onSelect={onInspect} onInspect={openPoint} layers={layers} setLayers={setLayers} />
+      <Suspense fallback={<div className="flex h-[70vh] items-center justify-center rounded-xl bg-white text-sm text-muted">Loading the twin…</div>}>
+        <WatershedTwin live={live} forecast={forecast} staticData={staticData} layers={layers} lite={lite} onLite={() => setLite(false)} canUse3D={hasWebGL} onInspect={setInspectId} act={act} />
       </Suspense>
     </ErrorBoundary>
   );
 
   const command = page === 'home' && !lite;
+  const affected = live ? live.stations.filter((x) => x.risk >= 0.45 || live.forecast.stations?.[x.id]?.arrival_s > 0).length : 0;
+  const introByPage = {
+    home: { title: affected ? `${affected} water point${affected > 1 ? 's' : ''} affected` : 'The river is clear', sub: live ? `Updated ${fmtClock(live.clock.epoch_ms)}. Sensor readings are ${live.clock.mode === 'sim' ? 'simulated' : 'from the field'}.` : '' },
+    map: { title: 'Watershed', sub: 'Follow the water from Mt. Isarog to Naga City, and see what is driving the risk.' },
+    flow: { title: 'Forecast', sub: 'Where polluted water is expected in the next 4 hours.' },
+    points: { title: 'Water points', sub: 'Readings, controls and history for each site, from the spring to the city.' },
+    maintenance: { title: 'Maintenance', sub: 'Recurring tasks reschedule themselves when you mark them done.' },
+    reports: { title: 'Reports', sub: 'Compliance, events and messages from the last 24 hours.' },
+    about: {},
+  };
+  introByPage.overview = introByPage.home;
+  const intro = introByPage[page] ?? {};
 
   return (
     <div className={command ? 'min-h-full' : 'min-h-full pb-8'}>
@@ -137,57 +136,31 @@ export default function App() {
           </Suspense>
         </ErrorBoundary>
       ) : (
-      <>
-      {/* ---------------- top bar ---------------- */}
-      <header className="sticky top-0 z-30 px-4 pt-4">
-        <div className="glass mx-auto flex max-w-[1560px] flex-wrap items-center gap-x-3 gap-y-2 !bg-white/90 px-4 py-2.5 lg:flex-nowrap">
-          <button onClick={() => go('home')} className="flex shrink-0 items-center gap-2.5">
-            <img src="/favicon.svg" alt="" className="h-9 w-9" />
-            <span className="hidden text-left leading-tight sm:block">
-              <span className="block font-display text-base font-semibold">Bulos 3D</span>
-              <span className="block text-[11px] text-muted">{staticData?.site.title ?? 'Water quality digital twin'}</span>
-            </span>
-          </button>
-          <nav className="order-last flex w-full min-w-0 gap-1 overflow-x-auto rounded-2xl bg-white/60 p-1 lg:order-none lg:mx-auto lg:w-auto">
-            {PAGES.map(([id, label]) => (
-              <button key={id} onClick={() => go(id)} aria-current={page === id ? 'page' : undefined}
-                      className={`shrink-0 whitespace-nowrap rounded-xl px-3.5 py-1.5 text-sm font-medium transition ${page === id ? 'bg-civic text-white shadow-[0_6px_14px_rgba(47,91,231,0.3)]' : 'text-ink-2 hover:bg-white hover:text-ink'}`}>
-                {label}
-              </button>
-            ))}
-          </nav>
-          <div className="ml-auto flex shrink-0 items-center gap-2 lg:ml-0">
-            {live && (
-              <span className="hidden items-center gap-1.5 rounded-xl bg-white/70 px-2.5 py-1.5 text-xs text-ink-2 2xl:inline-flex">
-                <CloudRain size={14} className="text-civic" />{live.rain_mm_hr} mm/h
-              </span>
-            )}
-            <span className={`hidden items-center gap-1.5 rounded-xl bg-white/70 px-2.5 py-1.5 text-xs xl:inline-flex ${status === 'online' ? 'text-ink-2' : 'text-[#a32626]'}`}>
-              <span className={`h-2 w-2 rounded-full ${status === 'online' ? 'bg-good' : 'bg-critical'}`} />
-              {status === 'online' && live ? fmtClock(live.clock.epoch_ms) : 'Offline'}
-            </span>
-            <button onClick={() => setLite(!lite)} title={lite ? 'Turn the 3D map on' : 'Turn the 3D map off for a faster, lighter page'}
-                    className="hidden items-center gap-1.5 whitespace-nowrap rounded-xl bg-white/70 px-2.5 py-1.5 text-xs text-ink-2 hover:bg-white lg:inline-flex">
-              <MapPinned size={14} className={lite ? 'text-muted' : 'text-civic'} />3D map {lite ? 'off' : 'on'}
-            </button>
+      <PageShell
+        pages={PAGES} page={page} go={go} status={status} lite={lite} setLite={setLite} title={intro.title} sub={intro.sub}
+        actions={(
+          <>
             <AlertBell live={live} go={go} />
             {live?.clock.mode === 'sim' && <SimulationMenu speed={live.clock.speed} onScenario={runScenario} onSpeed={setSpeed} />}
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto mt-5 max-w-[1560px] px-4">
+          </>
+        )}
+        footer={(
+          <footer className="mt-5 px-1 text-xs leading-relaxed text-muted">
+            Bulos 3D prototype for the Xylem Global Student Innovation Challenge, Camarines Sur National High School. Not an official
+            government system. Elevation: Copernicus GLO-90 (ESA). Waterways and buildings © OpenStreetMap contributors. Imagery © Esri. Water-point locations are an illustrative pilot layout;
+            standards follow PNSDW 2017.
+          </footer>
+        )}
+      >
         <Connection status={status} hasData={Boolean(live)} />
         <SimulationStatus live={live} onReset={() => runScenario('RESET')} />
         <Advisory live={live} forecast={forecast} onOpen={openPoint} onSend={() => quick('advisory')} />
 
         {(page === 'overview' || page === 'home') && (
-          <Home live={live} forecast={forecast} staticData={staticData} trend={trend?.series} tasks={maint?.tasks}
-                map={map} selectedId={selectedId} onSelectPoint={setSelectedId} onOpenPoint={openPoint} onInspect={onInspect} go={go} quick={quick} />
+          <Home live={live} forecast={forecast} staticData={staticData} trend={trend?.series} tasks={maint?.tasks} onOpenPoint={openPoint} go={go} quick={quick} />
         )}
         {page === 'map' && (
-          <MapPage live={live} staticData={staticData} map={map} layers={layers} setLayers={setLayers} onOpen={openPoint}
-                   heatIndex={heatIndex} setHeatIndex={setHeatIndex} />
+          <MapPage live={live} staticData={staticData} map={map} onOpen={openPoint} />
         )}
         {page === 'flow' && <FlowPage live={live} forecast={forecast} staticData={staticData} onPreempt={setPreempt} onOpen={openPoint} />}
         {page === 'points' && (
@@ -196,15 +169,8 @@ export default function App() {
         )}
         {page === 'maintenance' && <MaintenancePage live={live} tasks={maint?.tasks} quick={quick} />}
         {page === 'reports' && <ReportsPage live={live} />}
-        {page === 'about' && <AboutPage live={live} staticData={staticData} go={go} />}
-      </main>
-
-      <footer className="mx-auto mt-8 max-w-[1560px] px-6 text-xs leading-relaxed text-muted">
-        Bulos 3D prototype for the Xylem Global Student Innovation Challenge, Camarines Sur National High School. Not an official
-        government system. Elevation: Copernicus GLO-90 (ESA). Waterways and buildings © OpenStreetMap contributors. Imagery © Esri. Water-point locations are an illustrative pilot layout;
-        standards follow PNSDW 2017.
-      </footer>
-      </>
+        {page === 'about' && <AboutPage live={live} go={go} />}
+      </PageShell>
       )}
 
       {/* ---------------- dialogs ---------------- */}
@@ -223,7 +189,7 @@ export default function App() {
       {inspected && (
         <ErrorBoundary label="The 3D site view">
           <Suspense fallback={<div className="fixed inset-0 z-50 flex items-center justify-center bg-[#16204a]/30 text-sm text-white">Loading the 3D site view…</div>}>
-            <AssetInspector st={inspected} onClose={() => setInspectId(null)} />
+            <AssetInspector st={inspected} stations={live.stations} onPick={setInspectId} onClose={() => setInspectId(null)} />
           </Suspense>
         </ErrorBoundary>
       )}

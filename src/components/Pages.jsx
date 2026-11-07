@@ -1,4 +1,5 @@
-import { Box, Clock, Lock, LockOpen, MessageSquareText } from 'lucide-react';
+import { useState } from 'react';
+import { Box, Lock, LockOpen, MessageSquareText, Printer } from 'lucide-react';
 import LineChart from './charts/LineChart';
 import RiverSchematic from './RiverSchematic';
 import StationPanel, { StatusBadge } from './StationPanel';
@@ -39,7 +40,7 @@ export function StatusTable({ live, forecast, onOpen }) {
         {live.stations.map((s) => {
           const f = forecast?.stations?.[s.id];
           return (
-            <tr key={s.id} onClick={() => onOpen(s.id)} className="cursor-pointer hover:bg-page">
+            <tr key={s.id} onClick={() => onOpen(s.id)} className="cursor-pointer hover:bg-panel-2">
               <td>
                 <Dot id={s.id} /><span className="font-medium">{s.name}</span>
                 <div className="ml-[18px] text-xs text-muted">{s.id}, {fmt(s.elevation_m, 0)} m above sea level</div>
@@ -60,33 +61,11 @@ export function StatusTable({ live, forecast, onOpen }) {
   );
 }
 
-/* ------------------------------------------------------------------ bulletins */
 const KIND_LABEL = {
   FORECAST_ADVISORY: 'Water advisory', EDGE_AUTO_TRIP: 'Intake closed automatically', CMD_PREEMPT_SHUT: 'Intake closed ahead of plume',
   ANOMALY: 'Contamination detected', BIOFOULING: 'Sensor maintenance needed', RESERVE_LOW: 'Stored water running low',
-  REARM_RECOMMENDED: 'Safe to reopen intake', RECOVERED: 'Back to normal', TRANSIT_CALIBRATION: 'Model updated from field data',
+  SCENARIO: 'Simulation', REARM_RECOMMENDED: 'Safe to reopen intake', RECOVERED: 'Back to normal', TRANSIT_CALIBRATION: 'Model updated from field data',
 };
-
-export function Bulletins({ live, limit = 8 }) {
-  if (!live) return <Wait />;
-  const items = live.events.filter((e) => KIND_LABEL[e.type]).slice(0, limit);
-  if (!items.length) return <p className="text-sm text-muted">No bulletins in this period. All water points are at their normal baseline.</p>;
-  return (
-    <ul className="divide-y divide-line">
-      {items.map((e, i) => (
-        <li key={`${e.t_ms}-${i}`} className="py-2.5 first:pt-0 last:pb-0">
-          <div className="flex items-baseline justify-between gap-3">
-            <span className="text-sm font-semibold" style={{ color: e.severity === 'danger' ? '#a32626' : e.severity === 'warning' ? '#7a5600' : '#14212b' }}>
-              {KIND_LABEL[e.type]}{e.station ? `, ${e.station}` : ''}
-            </span>
-            <span className="shrink-0 text-xs text-muted tabular">{fmtClock(e.t_ms)}</span>
-          </div>
-          <p className="mt-0.5 text-[13px] leading-relaxed text-ink-2">{e.message}</p>
-        </li>
-      ))}
-    </ul>
-  );
-}
 
 /* ------------------------------------------------------------------ forecast pieces */
 function ForecastChart({ live, forecast, staticData, height = 200 }) {
@@ -98,7 +77,7 @@ function ForecastChart({ live, forecast, staticData, height = 200 }) {
       .concat(forecast.stations[id].series.map((p) => ({ x: p.tau / 60, y: p.risk }))),
   }));
   return (
-    <LineChart series={series} height={height} xFormat={(x) => `+${Math.round(x)} min`} yFormat={(y) => y.toFixed(2)}
+    <LineChart series={series} height={height} xFormat={(x) => (x < 1 ? "Now" : `+${(x / 60).toFixed(1)} h`)} yFormat={(y) => y.toFixed(2)}
                yDomain={[0, 1]} refLines={[{ y: thr.suspect, label: 'watch level' }, { y: thr.trip, label: 'close intake' }]} directLabels={false} />
   );
 }
@@ -119,7 +98,7 @@ function ArrivalTable({ forecast, live }) {
               <td className="num">{f.arrival_s == null ? '—' : f.arrival_s === 0 ? 'now' : fmtMin(f.arrival_s)}</td>
               <td className="num">{f.peak_s == null ? '—' : fmtMin(f.peak_s)}</td>
               <td className="num">{f.clear_s == null ? (f.arrival_s == null ? '—' : 'over 4 h') : fmtMin(f.clear_s)}</td>
-              <td><span className="inline-flex items-center gap-1 text-xs font-medium" style={{ color: band.ink }}><band.Icon size={13} style={{ color: band.color }} />{fmt(f.peak_risk, 2)} {band.label.toLowerCase()}</span></td>
+              <td><span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium" style={{ color: band.ink }}><band.Icon size={13} style={{ color: band.color }} />{fmt(f.peak_risk, 2)} {band.label.toLowerCase()}</span></td>
             </tr>
           );
         })}
@@ -128,35 +107,7 @@ function ArrivalTable({ forecast, live }) {
   );
 }
 
-/* ================================================================== OVERVIEW */
-export function OverviewPage({ live, forecast, staticData, map, onOpen }) {
-  return (
-    <div className="grid gap-4">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-        <Section title="Watershed map" note="3D terrain with live water points, flow and contamination risk." flush>
-          <div className="h-[460px]">{map}</div>
-        </Section>
-        <Section title="Status of water points" note="Click a row for readings, controls and the 3D site view." flush>
-          <StatusTable live={live} forecast={forecast} onOpen={onOpen} />
-        </Section>
-      </div>
-      <Section title="River line diagram" note={staticData ? `${staticData.site.subtitle}. Water colour shows the modelled contamination right now.` : ''}
-               right={<RiverLegend />} flush>
-        <div className="h-[150px] px-2"><RiverSchematic live={live} forecast={forecast} staticData={staticData} onSelect={onOpen} /></div>
-      </Section>
-      <div className="grid gap-4 xl:grid-cols-2">
-        <Section title="Contamination forecast, next 4 hours" note="When polluted water is expected at each intake.">
-          {live && forecast?.stations ? <ArrivalTable forecast={forecast} live={live} /> : <Wait />}
-        </Section>
-        <Section title="Latest bulletins">
-          <Bulletins live={live} limit={6} />
-        </Section>
-      </div>
-    </div>
-  );
-}
-
-function RiverLegend() {
+export function RiverLegend() {
   return (
     <div className="hidden items-center gap-4 text-xs text-muted md:flex">
       <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-6 rounded" style={{ background: 'linear-gradient(90deg,rgb(64,191,255),rgb(140,140,90),rgb(204,100,150))' }} />clear to polluted</span>
@@ -169,37 +120,13 @@ function RiverLegend() {
 /* ================================================================== WATERSHED MAP */
 const EVIDENCE = ['turbidity', 'orp', 'ph', 'tds', 'bio', 'rain'];
 const EV_LABEL = { turbidity: 'Turbidity', orp: 'ORP drop', ph: 'pH shift', tds: 'TDS rise', bio: 'Biological', rain: 'Rainfall' };
-const HEAT_LABEL = { risk: 'Overall contamination risk', turbidity: 'Turbidity', ph: 'pH', tds: 'Total dissolved solids', bio: 'Biological indicator (TLF)' };
 const seq = (t) => ['#f3f6f9', '#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#1c5cab'][Math.min(5, Math.round(t * 5))];
 
-export function MapPage({ live, staticData, map, layers, setLayers, onOpen, heatIndex, setHeatIndex }) {
-  const toggle = (k) => setLayers((l) => ({ ...l, [k]: !l[k] }));
-  const items = [['heatmap', 'Contamination risk heatmap'], ['particles', 'Animated water flow'], ['pipes', 'Gravity pipelines'], ['columns', 'Risk columns'], ['streams', 'Streams from the elevation model'], ['catchment', 'Watershed boundary']];
+export function MapPage({ live, staticData, map, onOpen }) {
   return (
-    <div className="grid gap-4">
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
-      <Section title="Watershed digital twin" note="Drag to rotate, scroll to zoom. Use the time bar to replay the last 6 hours or look 4 hours ahead." flush>
-        <div className="p-2"><div className="relative aspect-[4/3] w-full overflow-hidden rounded-[18px] bg-panel-2">{map}</div></div>
-      </Section>
-      <div className="grid content-start gap-4">
-        <Section title="Map layers">
-          <div className="grid gap-1.5">
-            {items.map(([k, label]) => (
-              <label key={k} className="flex items-center gap-2 text-sm text-ink-2">
-                <input type="checkbox" checked={layers[k]} onChange={() => toggle(k)} className="h-4 w-4 accent-[#0b4f8a]" /> {label}
-              </label>
-            ))}
-          </div>
-          <label className="mt-4 grid gap-1 text-sm">
-            <span className="font-medium text-ink-2">Heatmap shows</span>
-            <select value={heatIndex} onChange={(e) => setHeatIndex(e.target.value)}>
-              {(staticData?.heat_indices ?? Object.keys(HEAT_LABEL)).map((k) => <option key={k} value={k}>{HEAT_LABEL[k] ?? k}</option>)}
-            </select>
-          </label>
-          <p className="mt-3 text-xs text-muted">{HEAT_LABEL[heatIndex]}: colour</p>
-          <div className="mt-1 h-2 rounded" style={{ background: 'linear-gradient(90deg, rgba(250,200,120,0.3), rgb(220,115,75), rgb(190,30,30))' }} />
-          <div className="mt-0.5 flex justify-between text-xs text-muted"><span>none</span><span>severe</span></div>
-        </Section>
+    <div className="grid gap-3">
+      {map}
+      <div className="grid items-start gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)]">
         {staticData && live && (
           <Section title="About this watershed">
             <dl className="grid grid-cols-2 gap-y-2 text-sm">
@@ -208,6 +135,7 @@ export function MapPage({ live, staticData, map, layers, setLayers, onOpen, heat
               <dt className="text-muted">Highest point on river</dt><dd className="tabular">{Math.round(live.channel.elev_m[0]).toLocaleString()} m</dd>
               <dt className="text-muted">Stream reaches</dt><dd className="tabular">{staticData.streams.length}</dd>
               <dt className="text-muted">Elevation data</dt><dd>Copernicus 90 m</dd>
+              <dt className="text-muted">River and roads</dt><dd>OpenStreetMap</dd>
             </dl>
           </Section>
         )}
@@ -218,7 +146,7 @@ export function MapPage({ live, staticData, map, layers, setLayers, onOpen, heat
               {EVIDENCE.map((k) => <span key={k} className="pb-1 text-center leading-tight text-muted">{EV_LABEL[k]}</span>)}
               {live.stations.map((s) => (
                 <div key={s.id} className="contents">
-                  <button onClick={() => onOpen(s.id)} className="self-center text-left font-mono text-ink-2 hover:text-civic">{s.id}</button>
+                  <button onClick={() => onOpen(s.id)} className="self-center text-left text-[13px] font-medium text-ink-2 hover:text-civic">{s.id}</button>
                   {EVIDENCE.map((k) => {
                     const v = s.risk_parts?.[k] ?? 0;
                     return (
@@ -232,8 +160,7 @@ export function MapPage({ live, staticData, map, layers, setLayers, onOpen, heat
           </Section>
         )}
       </div>
-    </div>
-    <TwinLoop live={live} />
+      <TwinLoop live={live} />
     </div>
   );
 }
@@ -247,74 +174,44 @@ export function FlowPage({ live, forecast, staticData, onPreempt, onOpen }) {
   const next = Object.entries(forecast.stations).map(([id, f]) => ({ id, ...f })).filter((f) => f.arrival_s > 0)
     .sort((a, b) => a.arrival_s - b.arrival_s)[0];
   return (
-    <div className="grid gap-4">
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
-        <Section title="Contamination forecast, next 4 hours" note="Expected contamination risk at each water point. Updated every 5 minutes.">
-          <ForecastChart live={live} forecast={forecast} staticData={staticData} />
-        </Section>
-        <Section title="Next expected arrival">
-          <div className="flex items-start gap-3">
-            <Clock size={28} className={next ? 'text-[#7a5600]' : 'text-civic'} />
-            <div>
-              <p className="font-display text-2xl font-semibold">{next ? `${next.id} in ${fmtMin(next.arrival_s)}` : 'None expected'}</p>
-              <p className="mt-0.5 text-sm text-ink-2">
-                {next ? `Worst in ${fmtMin(next.peak_s)}, peak risk ${fmt(next.peak_risk, 2)}. Clears in ${next.clear_s ? fmtMin(next.clear_s) : 'over 4 hours'}.`
-                  : 'No polluted water is forecast to reach any intake in the next 4 hours.'}
-              </p>
-            </div>
-          </div>
-          <label className="mt-4 flex items-start gap-2 border-t border-line pt-3 text-sm text-ink-2">
-            <input type="checkbox" className="mt-0.5 h-4 w-4 accent-[#0b4f8a]" checked={live.auto_preempt} onChange={(e) => onPreempt(e.target.checked)} />
-            Close intakes automatically up to 30 minutes before forecast contamination arrives
+    <div className="grid gap-3">
+      <section className="section grid lg:grid-cols-[300px_minmax(0,1fr)]">
+        <div className={`flex flex-col rounded-t-xl p-4 text-white lg:rounded-l-xl lg:rounded-tr-none ${next ? 'bg-[#b5302a]' : 'bg-civic'}`}>
+          <p className="text-[13px] opacity-85">Next polluted water</p>
+          <p className="mt-0.5 font-display text-[32px] font-semibold leading-tight">{next ? `${next.id} in ${fmtMin(next.arrival_s)}` : 'None expected'}</p>
+          <p className="mt-1.5 text-sm leading-relaxed opacity-90">
+            {next ? `Worst in ${fmtMin(next.peak_s)}, peak risk ${fmt(next.peak_risk, 2)}. Clears in ${next.clear_s ? fmtMin(next.clear_s) : 'over 4 hours'}.`
+              : 'No polluted water is forecast to reach any intake in the next 4 hours.'}
+          </p>
+          <label className="mt-auto flex items-start gap-2 pt-4 text-[13px]">
+            <input type="checkbox" className="mt-0.5 h-4 w-4 accent-white" checked={live.auto_preempt} onChange={(e) => onPreempt(e.target.checked)} />
+            Close intakes automatically up to 30 minutes before contamination arrives
           </label>
-        </Section>
-      </div>
-      <Section title="Arrival windows" flush><ArrivalTable forecast={forecast} live={live} /></Section>
-      <Section title="River line diagram" right={<RiverLegend />} flush>
+        </div>
+        <div className="min-w-0 p-3">
+          <p className="mb-1 px-1 text-[13px] font-semibold">Risk at each water point, next 4 hours</p>
+          <ForecastChart live={live} forecast={forecast} staticData={staticData} height={260} />
+        </div>
+      </section>
+
+      <Section title="The next 4 hours at a glance" note="Each row is a water point, each block is 15 minutes. Blue is safe, red is polluted." flush>
+        <RiskStrip live={live} forecast={forecast} onOpen={onOpen} />
+      </Section>
+
+      <Section title="Where the water is now" right={<RiverLegend />} flush>
         <div className="h-[150px] px-2"><RiverSchematic live={live} forecast={forecast} staticData={staticData} onSelect={onOpen} /></div>
       </Section>
-      <div className="grid gap-4 xl:grid-cols-2">
-        <Section title="Water speed along the river" note={`Manning equation on slopes from the elevation model. Current runoff ${fmt(live.runoff_mm_hr, 1)} mm/h.`}>
-          <LineChart series={[{ id: 'v', label: 'Velocity', color: '#0b4f8a', points: ch.velocity_mps.map((y, i) => ({ x: km[i], y })) }]}
-                     height={170} xFormat={(x) => `${x.toFixed(0)} km`} yFormat={(y) => `${y.toFixed(1)}`} yLabel="m/s" markers={mk} directLabels={false} />
-        </Section>
-        <Section title="Modelled turbidity in the river now" note="NTU above each point's normal level.">
-          <LineChart series={[{ id: 't', label: 'Turbidity above normal', color: '#0b4f8a', area: true, points: ch.turb_excess.map((y, i) => ({ x: km[i], y })) }]}
-                     height={170} xFormat={(x) => `${x.toFixed(0)} km`} yFormat={(y) => y.toFixed(0)} markers={mk}
-                     directLabels={false} yDomain={[0, Math.max(10, ...ch.turb_excess) * 1.1]} />
-        </Section>
-      </div>
-      <div className="grid gap-4 xl:grid-cols-2">
-        <Section title="Gravity-fed pipelines" note="Hazen–Williams flow from the elevation drop; stops when telemetry reports an empty source tank." flush className="xl:col-span-2">
-          <table className="data">
-            <thead><tr><th>Line</th><th>Route</th><th>Length</th><th>Pipe</th><th>Head</th><th>Flow</th><th>Speed</th><th>Status</th></tr></thead>
-            <tbody>
-              {(staticData?.pipes ?? []).map((p) => {
-                const d = live.pipes?.find((x) => x.id === p.id);
-                return (
-                  <tr key={p.id}>
-                    <td><b>{p.id}</b><div className="text-xs text-muted">{p.name}</div></td>
-                    <td className="num">{p.src} → {p.dst}</td>
-                    <td className="num">{(p.length_m / 1000).toFixed(1)} km</td>
-                    <td className="num">{Math.round(p.diameter_m * 1000)} mm {p.material}</td>
-                    <td className="num">{fmt(p.static_head_m, 0)} m</td>
-                    <td className="num">{d ? `${fmt(d.flow_lps, 1)} L/s` : '—'}</td>
-                    <td className="num">{d ? `${fmt(d.velocity_mps, 2)} m/s` : '—'}</td>
-                    <td><span className={`pill ${d?.flowing ? 'pill-good' : 'pill-amber'}`}>{d?.status ?? '—'}</span></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </Section>
+
+      <div className="grid gap-3 xl:grid-cols-2">
+        <Section title="Arrival windows" flush><ArrivalTable forecast={forecast} live={live} /></Section>
         <Section title="Travel time between water points" flush>
           <table className="data">
-            <thead><tr><th>Stretch</th><th>Length</th><th>Slope</th><th>Speed</th><th>Travel time</th><th>Tuned</th></tr></thead>
+            <thead><tr><th>Stretch</th><th>Length</th><th>Speed</th><th>Travel time</th><th>Tuned</th></tr></thead>
             <tbody>
               {live.reaches.map((r) => (
                 <tr key={r.reach}>
                   <td className="num">{r.reach}</td><td className="num">{(r.length_m / 1000).toFixed(1)} km</td>
-                  <td className="num">{(r.slope * 100).toFixed(1)}%</td><td className="num">{fmt(r.mean_velocity_mps, 2)} m/s</td>
+                  <td className="num">{fmt(r.mean_velocity_mps, 2)} m/s</td>
                   <td className="num">{fmtMin(r.travel_time_s)}</td>
                   <td className="num">{r.velocity_factor !== 1 ? `×${fmt(r.velocity_factor, 2)}` : 'not yet'}</td>
                 </tr>
@@ -322,21 +219,87 @@ export function FlowPage({ live, forecast, staticData, onPreempt, onOpen }) {
             </tbody>
           </table>
         </Section>
-        <Section title="Model updates from field measurements" note="Each pollution pulse that passes two sensors measures the real travel time.">
-          {live.calibration.length === 0 ? (
-            <p className="text-sm text-muted">No pulse measured yet. Run the piggery spill simulation to see the model correct itself.</p>
-          ) : (
-            <table className="data">
-              <thead><tr><th>Stretch</th><th>Measured</th><th>Model said</th><th>New factor</th></tr></thead>
-              <tbody>
-                {[...live.calibration].reverse().map((c) => (
-                  <tr key={`${c.reach}-${c.t}`}><td className="num">{c.reach}</td><td className="num">{fmtMin(c.measured_s)}</td>
-                    <td className="num">{fmtMin(c.modelled_s)}</td><td className="num">×{c.velocity_factor}</td></tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+      </div>
+
+      <div className="grid gap-3 xl:grid-cols-2">
+        <Section title="Water speed along the river" note={`From the real slope. Current runoff ${fmt(live.runoff_mm_hr, 1)} mm/h.`}>
+          <LineChart series={[{ id: 'v', label: 'Velocity', color: '#2f5be7', points: ch.velocity_mps.map((y, i) => ({ x: km[i], y })) }]}
+                     height={170} xFormat={(x) => `${x.toFixed(0)} km`} yFormat={(y) => `${y.toFixed(1)}`} yLabel="m/s" markers={mk} directLabels={false} />
         </Section>
+        <Section title="Modelled turbidity in the river now" note="NTU above each point's normal level.">
+          <LineChart series={[{ id: 't', label: 'Turbidity above normal', color: '#2f5be7', area: true, points: ch.turb_excess.map((y, i) => ({ x: km[i], y })) }]}
+                     height={170} xFormat={(x) => `${x.toFixed(0)} km`} yFormat={(y) => y.toFixed(0)} markers={mk}
+                     directLabels={false} yDomain={[0, Math.max(10, ...ch.turb_excess) * 1.1]} />
+        </Section>
+      </div>
+
+      <Section title="Gravity-fed pipelines" note="Proposed routes along real roads. Flow comes from the elevation drop and stops when a source tank runs empty." flush>
+        <table className="data">
+          <thead><tr><th>Line</th><th>Route</th><th>Length</th><th>Pipe</th><th>Head</th><th>Flow</th><th>Speed</th><th>Status</th></tr></thead>
+          <tbody>
+            {(staticData?.pipes ?? []).map((p) => {
+              const d = live.pipes?.find((x) => x.id === p.id);
+              return (
+                <tr key={p.id}>
+                  <td><b>{p.id}</b><div className="text-xs text-muted">{p.name}</div></td>
+                  <td className="num">{p.src} to {p.dst}</td>
+                  <td className="num">{(p.length_m / 1000).toFixed(1)} km</td>
+                  <td className="num">{Math.round(p.diameter_m * 1000)} mm {p.material}</td>
+                  <td className="num">{fmt(p.static_head_m, 0)} m</td>
+                  <td className="num">{d ? `${fmt(d.flow_lps, 1)} L/s` : '—'}</td>
+                  <td className="num">{d ? `${fmt(d.velocity_mps, 2)} m/s` : '—'}</td>
+                  <td><span className={`pill ${d?.flowing ? 'pill-good' : 'pill-amber'}`}>{d?.status ?? '—'}</span></td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </Section>
+
+      <Section title="Model updates from field measurements" note="Each pollution pulse that passes two sensors measures the real travel time.">
+        {live.calibration.length === 0 ? (
+          <p className="text-sm text-muted">No pulse measured yet. Run the piggery spill simulation to see the model correct itself.</p>
+        ) : (
+          <table className="data">
+            <thead><tr><th>Stretch</th><th>Measured</th><th>Model said</th><th>New factor</th></tr></thead>
+            <tbody>
+              {[...live.calibration].reverse().map((c) => (
+                <tr key={`${c.reach}-${c.t}`}><td className="num">{c.reach}</td><td className="num">{fmtMin(c.measured_s)}</td>
+                  <td className="num">{fmtMin(c.modelled_s)}</td><td className="num">×{c.velocity_factor}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Section>
+    </div>
+  );
+}
+
+/** Forecast risk as a grid: rows are water points, columns are time. */
+const riskColor = (r) => (r >= 0.6 ? '#d03b3b' : r >= 0.45 ? '#ec835a' : r >= 0.25 ? '#f2c200' : r >= 0.1 ? '#9ec0ff' : '#dfe8ff');
+
+function RiskStrip({ live, forecast, onOpen }) {
+  const hours = [0, 1, 2, 3, 4];
+  return (
+    <div className="px-4 pb-3">
+      <div className="grid grid-cols-[150px_minmax(0,1fr)] gap-x-3 gap-y-1">
+        {live.stations.map((st) => {
+          const series = forecast.stations[st.id]?.series ?? [];
+          const cells = Array.from({ length: 16 }, (_, i) => {
+            const part = series.filter((p) => p.tau > i * 900 && p.tau <= (i + 1) * 900);
+            return part.length ? Math.max(...part.map((p) => p.risk)) : 0;
+          });
+          return (
+            <div key={st.id} className="contents">
+              <button onClick={() => onOpen(st.id)} className="truncate text-left text-[13px] font-medium hover:text-civic"><Dot id={st.id} />{st.id}</button>
+              <div className="grid grid-cols-16 gap-[3px]" style={{ gridTemplateColumns: 'repeat(16, minmax(0, 1fr))' }}>
+                {cells.map((r, i) => <span key={i} title={`${st.id}, +${(i + 1) * 15} min: risk ${fmt(r, 2)}`} className="h-[22px] rounded-[3px]" style={{ background: riskColor(r) }} />)}
+              </div>
+            </div>
+          );
+        })}
+        <span />
+        <div className="flex justify-between pt-0.5 text-[11.5px] text-muted">{hours.map((h) => <span key={h}>{h ? `+${h} h` : 'Now'}</span>)}</div>
       </div>
     </div>
   );
@@ -349,81 +312,84 @@ export function WaterPointsPage({ live, selected, history, staticData, onSelect,
   const t0 = s[0]?.t_ms ?? 0;
   const pts = (k) => s.map((h) => ({ x: (h.t_ms - t0) / 3.6e6, y: h[k] }));
   return (
-    <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
-      <Section title="Water points" flush className="self-start">
-        <ul>
-          {live.stations.map((st) => {
-            const status = stationStatus(st);
-            const on = st.id === selected.id;
-            return (
-              <li key={st.id}>
-                <button onClick={() => onSelect(st.id)}
-                        className={`flex w-full items-start gap-2 border-b border-line px-4 py-3 text-left last:border-0 ${on ? 'bg-[#e8f0f8] shadow-[inset_3px_0_0_#0b4f8a]' : 'hover:bg-page'}`}>
-                  <Dot id={st.id} />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium">{st.name}</div>
-                    <div className="mt-1 flex items-center gap-2"><StatusBadge status={status} /><span className="text-xs text-muted">{st.id}</span></div>
-                  </div>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      </Section>
-      <div className="grid content-start gap-4">
-        <Section title={selected.name} note={`${selected.owner}. ${selected.kind.replaceAll('_', ' ').toLowerCase()}.`}
-                 right={<button onClick={() => onInspect(selected.id)} className="inline-flex items-center gap-1.5 rounded bg-civic px-3 py-1.5 text-xs font-semibold text-white hover:bg-civic-dark"><Box size={14} />Open 3D site view</button>}
-                 flush>
-          <StationPanel key={selected.id} st={selected} history={history} forecast={live.forecast.stations} pnsdw={staticData?.pnsdw ?? {}}
-                        onChanged={onChanged} />
-        </Section>
-        {s.length > 1 && (
-          <Section title="Readings, last 6 hours">
-            <div className="grid gap-4 md:grid-cols-3">
-              {[['turbidity', 'Turbidity (NTU)', 0], ['orp', 'ORP (mV)', 0], ['risk', 'Contamination risk', 2]].map(([k, label, d]) => (
-                <div key={k}>
-                  <p className="mb-1 text-xs text-muted">{label}</p>
-                  <LineChart series={[{ id: k, label, color: '#0b4f8a', points: pts(k) }]} height={110}
-                             xFormat={(x) => fmtClock(t0 + x * 3.6e6)} yFormat={(y) => y.toFixed(d)} directLabels={false}
-                             yDomain={k === 'risk' ? [0, 1] : undefined} />
-                </div>
-              ))}
-            </div>
-          </Section>
-        )}
+    <div className="grid gap-3">
+      {/* The five sites in river order, upstream first */}
+      <div className="point-tabs" role="tablist" aria-label="Water points, upstream to downstream">
+        {live.stations.map((st) => {
+          const status = stationStatus(st);
+          return (
+            <button key={st.id} role="tab" aria-selected={st.id === selected.id} onClick={() => onSelect(st.id)} className="point-tab">
+              <span className="flex items-center justify-between gap-2">
+                <span className="text-[13px] font-semibold">{st.id}</span>
+                <span className="point-score font-display text-[17px] font-semibold tabular">{st.wqhi.score}</span>
+              </span>
+              <span className="mt-0.5 block truncate text-left text-[12px] opacity-80">{st.name}</span>
+              <span className="mt-1 flex items-center gap-1.5 text-[11.5px]"><i className="h-2 w-2 rounded-full" style={{ background: status.color }} />{status.label}</span>
+            </button>
+          );
+        })}
       </div>
+      <Section title={selected.name} note={`${selected.owner}. Sensor readings are simulated.`}
+               right={<button onClick={() => onInspect(selected.id)} className="btn-primary !py-1.5"><Box size={14} />Open 3D site view</button>} flush>
+        <StationPanel key={selected.id} st={selected} history={history} forecast={live.forecast.stations} pnsdw={staticData?.pnsdw ?? {}} onChanged={onChanged} />
+      </Section>
+      {s.length > 1 && (
+        <Section title="Readings, last 6 hours">
+          <div className="grid gap-4 md:grid-cols-3">
+            {[['turbidity', 'Turbidity (NTU)', 0], ['orp', 'ORP (mV)', 0], ['risk', 'Contamination risk', 2]].map(([k, label, d]) => (
+              <div key={k}>
+                <p className="mb-1 text-xs text-muted">{label}</p>
+                <LineChart series={[{ id: k, label, color: '#2f5be7', points: pts(k) }]} height={120}
+                           xFormat={(x) => fmtClock(t0 + x * 3.6e6)} yFormat={(y) => y.toFixed(d)} directLabels={false}
+                           yDomain={k === 'risk' ? [0, 1] : undefined} />
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
     </div>
   );
 }
 
 /* ================================================================== REPORTS */
+const pctClass = (v) => (v >= 99 ? 'text-ink' : v >= 90 ? 'bg-[#fff3cf] text-[#7a5600]' : 'bg-[#fde6e6] text-[#a32626]');
+const FILTERS = [['all', 'All', () => true], ['alerts', 'Alerts', (e) => e.severity !== 'info'], ['actions', 'Actions', (e) => /^(CMD_|TASK_|ADVISORY)/.test(e.type)]];
+
 export function ReportsPage({ live }) {
   const { data } = usePoll('/api/compliance?hours=24', 15000);
+  const [filter, setFilter] = useState('all');
+  const keep = FILTERS.find(([k]) => k === filter)[2];
   return (
-    <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
-      <div className="grid content-start gap-4">
-        <Section title="Drinking-water standard compliance, last 24 hours"
-                 note="Share of raw intake samples within the Philippine National Standards for Drinking Water (PNSDW 2017)." flush>
-          {!data ? <div className="section-body"><Wait /></div> : (
-            <table className="data">
-              <thead><tr><th>Water point</th><th>Samples</th><th>Turbidity ≤ {data.limits.turbidity_ntu} NTU</th><th>pH {data.limits.ph_min}–{data.limits.ph_max}</th><th>TDS ≤ {data.limits.tds_mgL}</th><th>Avg WQHI</th><th>Intake closed</th></tr></thead>
-              <tbody>
-                {data.stations.map((s) => (
-                  <tr key={s.station_id}>
-                    <td><Dot id={s.station_id} />{s.station_id}</td><td className="num">{s.samples}</td><td className="num">{s.turbidity_pct}%</td>
-                    <td className="num">{s.ph_pct}%</td><td className="num">{s.tds_pct}%</td><td className="num">{s.wqhi_avg}</td><td className="num">{s.intake_closed_pct}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </Section>
-        <Section title="Event log" flush>
+    <div className="grid gap-3">
+      <Section title="Drinking-water compliance, last 24 hours"
+               note="Share of raw intake samples within the Philippine National Standards for Drinking Water (PNSDW 2017). Readings are simulated."
+               right={<button onClick={() => window.print()} className="btn-ghost no-print inline-flex items-center gap-1.5 !py-1.5"><Printer size={14} />Print report</button>} flush>
+        {!data ? <div className="section-body"><Wait /></div> : (
+          <table className="data">
+            <thead><tr><th>Water point</th><th>Samples</th><th>Turbidity ≤ {data.limits.turbidity_ntu} NTU</th><th>pH {data.limits.ph_min}–{data.limits.ph_max}</th><th>TDS ≤ {data.limits.tds_mgL}</th><th>Avg WQHI</th><th>Intake closed</th></tr></thead>
+            <tbody>
+              {data.stations.map((s) => (
+                <tr key={s.station_id}>
+                  <td><Dot id={s.station_id} />{s.station_id}</td><td className="num">{s.samples}</td>
+                  {[s.turbidity_pct, s.ph_pct, s.tds_pct].map((v, i) => <td key={i} className={`num ${pctClass(v)}`}>{v}%</td>)}
+                  <td className="num">{s.wqhi_avg}</td><td className="num">{s.intake_closed_pct}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </Section>
+      <div className="grid items-start gap-3 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <Section title="Event log" flush right={(
+          <div className="no-print flex rounded-lg bg-panel-2 p-0.5" role="group" aria-label="Filter events">
+            {FILTERS.map(([k, label]) => <button key={k} onClick={() => setFilter(k)} aria-pressed={filter === k} className={`rounded-md px-2.5 py-1 text-xs font-semibold ${filter === k ? 'bg-white text-civic shadow-sm' : 'text-ink-2'}`}>{label}</button>)}
+          </div>
+        )}>
           {!live ? <div className="section-body"><Wait /></div> : (
             <table className="data">
               <thead><tr><th>Time</th><th>Water point</th><th>Event</th></tr></thead>
               <tbody>
-                {live.events.slice(0, 40).map((e, i) => (
+                {live.events.filter(keep).slice(0, 40).map((e, i) => (
                   <tr key={`${e.t_ms}-${i}`}>
                     <td className="num whitespace-nowrap">{fmtClock(e.t_ms)}</td>
                     <td className="num">{e.station ?? 'system'}</td>
@@ -439,21 +405,19 @@ export function ReportsPage({ live }) {
             </table>
           )}
         </Section>
+        <Section title="Text message log" note={live?.sms_provider === 'outbox' ? 'Prototype: no phone numbers are set up, so nothing is really sent. This shows what each contact would receive.' : `Sent through ${live?.sms_provider}.`}>
+          {!live || live.sms.length === 0 ? <p className="text-sm text-muted">No advisories yet. Run a simulation to see what contacts would receive.</p> : (
+            <ul className="m-0 divide-y divide-line p-0">
+              {live.sms.map((m, i) => (
+                <li key={`${m.t}-${i}`} className="list-none py-2.5 first:pt-0">
+                  <div className="flex items-center gap-1.5 text-xs text-muted"><MessageSquareText size={13} />To {m.role}</div>
+                  <p className="mt-1 text-[13px] leading-relaxed">{m.message}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Section>
       </div>
-      <Section title="Text messages sent" className="self-start"
-               note={live?.sms_provider === 'outbox' ? 'No SMS gateway configured, so messages are logged here only.' : `Sent through ${live?.sms_provider}.`}>
-        {!live || live.sms.length === 0 ? <p className="text-sm text-muted">No messages sent yet.</p> : (
-          <ul className="divide-y divide-line">
-            {live.sms.map((m, i) => (
-              <li key={`${m.t}-${i}`} className="py-2.5 first:pt-0">
-                <div className="flex items-center gap-1.5 text-xs text-muted"><MessageSquareText size={13} />To {m.role}, {m.status}</div>
-                <p className="mt-1 text-[13px] leading-relaxed">{m.message}</p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Section>
     </div>
   );
 }
-

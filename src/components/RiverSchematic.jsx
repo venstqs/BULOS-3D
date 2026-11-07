@@ -81,7 +81,7 @@ export default function RiverSchematic({ live, forecast, staticData, selectedId,
               <circle cx={x} cy={y} r={3.5} fill={STATION_COLOR[s.id]} />
               {s.valve && !s.valve.open && <rect x={x - 3} y={y + 12} width={6} height={6} fill="#a32626" />}
               <text x={x} y={y + (s.valve && !s.valve.open ? 30 : 24)} fontSize={11} fill={sel ? '#14212b' : '#3e4f5c'} textAnchor="middle"
-                    fontFamily="JetBrains Mono, monospace" fontWeight={sel ? 600 : 400}>{s.id}</text>
+                    fontWeight={sel ? 600 : 400}>{s.id}</text>
               {eta != null && (
                 <g transform={`translate(${x}, ${Math.max(14, y - 24)})`}>
                   <rect x={-34} y={-11} width={68} height={18} rx={9} fill="#f2c200" />

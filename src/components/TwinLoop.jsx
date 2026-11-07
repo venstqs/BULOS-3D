@@ -42,7 +42,7 @@ export default function TwinLoop({ live }) {
                 <span className="font-display text-sm font-semibold">{i + 1}. {name}</span>
               </div>
               <p className="mt-2 text-xs text-ink-2">{what}</p>
-              <p className="mt-2 font-mono text-[11px] text-civic">{metric}</p>
+              <p className="mt-2 text-[12px] font-medium text-civic">{metric}</p>
             </li>
           ))}
         </ol>
