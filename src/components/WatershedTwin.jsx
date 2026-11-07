@@ -4,6 +4,7 @@ import { usePoll } from '../api';
 import { fmt } from '../lib/format';
 import { useTwinTime } from '../lib/useTwinTime';
 import { Floating } from '../lib/floating';
+import MapCredits from './MapCredits';
 
 const TwinMapScene = lazy(() => import('./TwinMapScene'));
 
@@ -209,7 +210,7 @@ export default function WatershedTwin({ live, forecast, staticData, layers, lite
           <div className="px-3.5 pb-3.5">
             <h2 className="font-display text-[17px] font-semibold leading-snug">{stopped ? stopped.name : 'Where does the water go?'}</h2>
             <p className="mt-1 text-[13px] leading-relaxed text-ink-2">
-              {stopped ? stopped.note : phase === 'done' ? 'The drop has reached the end of the river, in Naga City. Anything spilled upstream takes this same path.' : 'Follow one drop down the real Naga River, from Mt. Isarog to the city, and see what it passes on the way.'}
+              {stopped ? stopped.note : phase === 'done' ? 'The drop has reached the end of the river, in Naga City. Anything spilled upstream takes this same path.' : 'Follow one drop down the mapped river, from the slopes of Mt. Isarog to Naga City, and see what it passes on the way.'}
             </p>
             {river && phase !== 'idle' && (
               <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2.5 border-t border-line pt-3">
@@ -242,8 +243,11 @@ export default function WatershedTwin({ live, forecast, staticData, layers, lite
 
         {!lite && (
           <Floating id="shed-layers" grip={false} className="pointer-events-auto absolute right-3 top-3">
-            <div className="seg shadow-[0_1px_2px_rgba(16,24,40,0.2),0_4px_14px_rgba(16,24,40,0.14)]" role="group" aria-label="Show on the map">
-              {LAYERS.map(([k, name]) => <button key={k} aria-pressed={index === k} onClick={() => setIndex(k)}>{name}</button>)}
+            <div className="flex items-center gap-2">
+              <div className="seg shadow-[0_1px_2px_rgba(16,24,40,0.2),0_4px_14px_rgba(16,24,40,0.14)]" role="group" aria-label="Show on the map">
+                {LAYERS.map(([k, name]) => <button key={k} aria-pressed={index === k} onClick={() => setIndex(k)}>{name}</button>)}
+              </div>
+              <MapCredits className="relative" drop="down" />
             </div>
           </Floating>
         )}

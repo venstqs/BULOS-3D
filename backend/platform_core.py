@@ -389,7 +389,20 @@ class Platform:
         """Terrain products, computed once."""
         if self._static is None:
             T = self.terrain
-            ring = T.boundary_ring(self.twin.catchment)
+            # Diagonal pinch points stop the outline walk early, so close them for drawing only
+            solid = self.twin.catchment.copy()
+            for dr in (-1, 0, 1):
+                for dc in (-1, 0, 1):
+                    solid |= np.roll(np.roll(self.twin.catchment, dr, 0), dc, 1)
+            # Cells touching only at a corner would also split the walk, so join them
+            while True:
+                a, b, c, d = solid[:-1, :-1], solid[:-1, 1:], solid[1:, :-1], solid[1:, 1:]
+                one, two = a & d & ~b & ~c, b & c & ~a & ~d
+                if not (one.any() or two.any()):
+                    break
+                b |= one
+                a |= two
+            ring = T.boundary_ring(solid)
             self._static = dict(
                 site=dict(id=C.SITE_ID, title=C.SITE["title"], subtitle=C.SITE["subtitle"]),
                 dem=dict(source=T.source, north=T.north, south=T.south, west=T.west, east=T.east,

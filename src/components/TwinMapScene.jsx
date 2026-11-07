@@ -134,7 +134,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
     let map;
     try {
       map = new maplibregl.Map({
-        container: host.current, ...home, centerClampedToGround: false, maxZoom: 22.4, pixelRatio: Math.min(window.devicePixelRatio, 1.25), fadeDuration: 0, refreshExpiredTiles: false, maxPitch: 80, attributionControl: { compact: true }, canvasContextAttributes: { antialias: true },
+        container: host.current, attributionControl: false, ...home, centerClampedToGround: false, maxZoom: 22.4, pixelRatio: Math.min(window.devicePixelRatio, 1.25), fadeDuration: 0, refreshExpiredTiles: false, maxPitch: 80, canvasContextAttributes: { antialias: true },
         style: {
           version: 8,
           glyphs: 'https://tiles.openfreemap.org/fonts/{fontstack}/{range}.pbf',
@@ -184,7 +184,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
             { id: 'road-names', type: 'symbol', source: 'osm', 'source-layer': 'transportation_name', minzoom: 14.5, layout: { 'symbol-placement': 'line', 'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name']], 'text-font': ['Noto Sans Regular'], 'text-size': 11, 'text-max-angle': 30 }, paint: { 'text-color': '#ffffff', 'text-halo-color': 'rgba(10,25,50,0.85)', 'text-halo-width': 1.3 } },
             { id: 'poi-dots', type: 'circle', source: 'osm', 'source-layer': 'poi', minzoom: 15, filter: ['in', ['get', 'class'], ['literal', ['school', 'college', 'hospital', 'town_hall', 'place_of_worship', 'police', 'fire_station']]], paint: { 'circle-radius': 3.5, 'circle-color': ['match', ['get', 'class'], 'hospital', '#d03b3b', 'school', '#e0a800', 'college', '#e0a800', '#2f5be7'], 'circle-stroke-color': '#ffffff', 'circle-stroke-width': 1.2 } },
             { id: 'poi-names', type: 'symbol', source: 'osm', 'source-layer': 'poi', minzoom: 15, filter: ['in', ['get', 'class'], ['literal', ['school', 'college', 'hospital', 'town_hall', 'place_of_worship', 'police', 'fire_station']]], layout: { 'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name']], 'text-font': ['Noto Sans Regular'], 'text-size': 11, 'text-anchor': 'top', 'text-offset': [0, 0.5], 'text-max-width': 9, 'text-optional': true }, paint: { 'text-color': '#ffffff', 'text-halo-color': 'rgba(10,25,50,0.85)', 'text-halo-width': 1.3 } },
-            { id: 'peaks', type: 'symbol', source: 'osm', 'source-layer': 'mountain_peak', minzoom: 10, layout: { 'text-field': ['concat', ['coalesce', ['get', 'name:en'], ['get', 'name']], ['case', ['has', 'ele'], ['concat', '\n', ['to-string', ['get', 'ele']], ' m'], '']], 'text-font': ['Noto Sans Regular'], 'text-size': 11.5 }, paint: { 'text-color': '#ffffff', 'text-halo-color': 'rgba(10,25,50,0.85)', 'text-halo-width': 1.4 } },
+            { id: 'peaks', type: 'symbol', source: 'osm', 'source-layer': 'mountain_peak', minzoom: 10, layout: { 'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name']], 'text-font': ['Noto Sans Regular'], 'text-size': 11.5 }, paint: { 'text-color': '#ffffff', 'text-halo-color': 'rgba(10,25,50,0.85)', 'text-halo-width': 1.4 } },
             { id: 'names', type: 'symbol', source: 'names', layout: { 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Regular'], 'text-size': 15, 'text-letter-spacing': 0.06 }, paint: { 'text-color': '#c9ecff', 'text-halo-color': 'rgba(8,30,60,0.9)', 'text-halo-width': 1.8 } },
             { id: 'barangay-dots', type: 'circle', source: 'barangays', minzoom: 11, paint: { 'circle-radius': 4, 'circle-stroke-width': 1.2, 'circle-stroke-color': '#ffffff', 'circle-color': ['step', ['get', 'km'], '#2eb872', 1.5, '#f2c200', 3, '#ec835a', 6, '#d03b3b'] } },
             { id: 'places', type: 'symbol', source: 'osm', 'source-layer': 'place', minzoom: 9, filter: ['in', ['get', 'class'], ['literal', ['city', 'town', 'village', 'suburb']]], layout: { 'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name']], 'text-font': ['Noto Sans Regular'], 'text-size': ['match', ['get', 'class'], 'city', 15, 'town', 13, 11.5] }, paint: { 'text-color': '#ffffff', 'text-halo-color': 'rgba(10,25,50,0.82)', 'text-halo-width': 1.5 } },
@@ -601,7 +601,6 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
       setReady(true);
     });
     map.on('click', pickAt);
-    map.once('idle', () => { for (const n of host.current?.querySelectorAll('.maplibregl-compact-show') ?? []) { n.classList.remove('maplibregl-compact-show'); n.removeAttribute('open'); } });
     map.addControl(new maplibregl.ScaleControl({ maxWidth: 110, unit: 'metric' }), 'bottom-right');
     map.on('rotate', () => { if (needle?.current) needle.current.style.transform = `rotate(${-map.getBearing()}deg)`; });
     map.on('mousemove', (e) => {

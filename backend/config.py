@@ -79,20 +79,20 @@ SITES = {
                  note="Elevated tank at the solar well feeds the clinic and school by gravity."),
         ],
         farm_confluence_index=113,
-        rain_gauge=dict(id="ARG-NAGA", name="DOST-ASTI automated rain gauge (Naga City)",
+        rain_gauge=dict(id="ARG-NAGA", name="Simulated rain gauge (Naga City)",
                         lat=13.6260, lon=123.2600),
         stations=_stations(
             idx=[40, 120, 150, 185, 225],
             names=["Mt. Isarog Communal Spring Intake", "Agricultural Runoff Sentinel",
                    "Barangay Communal Water Kiosk", "Solar-Pumped Shallow Well",
                    "Rural Health Unit & School Intake"],
-            owners=["City Water Office", "DOST Region V (Bicol)", "Barangay Council",
+            owners=["City Water Office", "Proposed partner: DOST Region V", "Barangay Council",
                     "Barangay Water Association", "City Health Office"],
             gateways=["LGU-GW-Isarog", "DOST-GW-Bicol", "LGU-GW-Isarog", "LGU-GW-Naga", "LGU-GW-Naga"],
             notes=[
                 "Spring box on the forested Isarog slope feeding the upland gravity line. "
                 "Supplemental Bulos edge node.",
-                "Existing government water-quality sonde below the farm tributary. Ingested, not owned.",
+                "Proposed river station below the farm tributary. A real rollout would read a government sonde here; none is connected today.",
                 "Creek intake -> cartridge filter -> 5,000 L tank -> 4 taps. 450 households.",
                 "Riverbank shallow well; solar pump lifts to a 10,000 L elevated tank. "
                 "Draws induced river infiltration, so it sees creek contamination.",

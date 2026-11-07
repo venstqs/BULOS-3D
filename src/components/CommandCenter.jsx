@@ -1,11 +1,12 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Activity, Box, Check, Layers as LayersIcon, LayoutPanelLeft, Shapes, Table2, ChevronUp, Clock, Crosshair, Cpu, Droplets, FlaskConical, Lock, LockOpen, Menu, Minus, Navigation, Pause, Plane, Play, Plus, RotateCcw, Search, Send, Tag, TriangleAlert, Users, X,
+  Activity, Box, Check, ChevronDown, Eye, Layers as LayersIcon, LayoutPanelLeft, Shapes, SlidersHorizontal, Table2, ChevronUp, Clock, Crosshair, Cpu, Droplets, FlaskConical, Lock, LockOpen, Menu, Minus, Navigation, Pause, Plane, Play, Plus, RotateCcw, Search, Send, Tag, TriangleAlert, Users, X,
 } from 'lucide-react';
 import { get, post, usePoll } from '../api';
 import { BAND, EDGE_LABEL, MAINT, fmt, fmtClock, fmtMin, stationStatus } from '../lib/format';
 import { AHEAD_S, PAST_S, exposure, fmtOffset } from '../lib/twinField';
 import { useTwinTime } from '../lib/useTwinTime';
+import MapCredits from './MapCredits';
 import { Floating, MapWindow, resetPanels, usePanelsMoved } from '../lib/floating';
 
 const TwinMapScene = lazy(() => import('./TwinMapScene'));
@@ -21,23 +22,37 @@ function Figure({ value, label, alert = false }) {
   );
 }
 
-/** Recorded history, now, and the forecast on one line, with alerts marked where they happened. */
+/** Recorded history, now and the forecast on one line, with alerts marked where they happened. */
 function Timeline({ live, time }) {
-  const at = (s) => `${((s + PAST_S) / (PAST_S + AHEAD_S)) * 100}%`;
+  const span = PAST_S + AHEAD_S;
+  const pct = (s) => ((s + PAST_S) / span) * 100;
   const marks = live.events.filter((e) => (e.severity === 'danger' || e.severity === 'warning') && e.t_ms > live.clock.epoch_ms - PAST_S * 1000).slice(0, 40);
+  const ticks = [-6, -4, -2, 0, 2, 4];
+  const at = pct(time.tauStep);
+  const isNow = time.tauStep === 0;
   return (
-    <div className={`${card} flex min-w-[260px] flex-1 items-center gap-2.5 px-2.5 py-1.5`}>
-      <button onClick={time.togglePlay} aria-label={time.playing ? 'Pause' : 'Play the last 6 hours and next 4 hours'} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-civic text-white">
-        {time.playing ? <Pause size={12} /> : <Play size={12} />}
+    <div className="flex min-w-[300px] flex-1 items-center gap-2">
+      <button onClick={time.togglePlay} aria-label={time.playing ? 'Pause' : 'Play through time'} title={time.playing ? 'Pause' : 'Play'} className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-civic text-white">
+        {time.playing ? <Pause size={13} /> : <Play size={13} />}
       </button>
-      <span className="shrink-0 text-[11px] text-muted">−6 h</span>
-      <div className="relative min-w-0 flex-1">
-        <input type="range" min={-PAST_S} max={AHEAD_S} step={time.step} value={time.tauStep} aria-label="Time" onChange={(e) => time.scrub(Number(e.target.value))} className="block w-full accent-[#2f5be7]" />
-        <i className="pointer-events-none absolute -bottom-0.5 -top-0.5 w-px bg-ink-2" style={{ left: at(0) }} />
-        {marks.map((e, i) => <i key={`${e.t_ms}-${i}`} className="pointer-events-none absolute top-1/2 h-2 w-[3px] -translate-x-1/2 -translate-y-1/2" style={{ left: at((e.t_ms - live.clock.epoch_ms) / 1000), background: e.severity === 'danger' ? '#d03b3b' : '#e0a800' }} />)}
+      <button onClick={time.nextSpeed} aria-label={`Playback speed ${time.speed} times`} title="Change playback speed" className="h-7 w-8 shrink-0 rounded-md bg-[#eef2fb] text-[12px] font-semibold text-ink-2 hover:text-civic">{time.speed}×</button>
+      <div className="relative mx-3.5 h-[34px] min-w-0 flex-1">
+        <div className="absolute inset-x-0 top-[7px] h-[6px] overflow-hidden rounded-full bg-[#dbe4f8]">
+          <i className="time-forecast absolute inset-y-0 right-0" style={{ left: `${pct(0)}%` }} />
+          <i className="absolute inset-y-0 left-0 bg-civic" style={{ width: `${at}%` }} />
+        </div>
+        {marks.map((e, k) => <i key={`${e.t_ms}-${k}`} className="pointer-events-none absolute top-[5px] h-[10px] w-[3px] -translate-x-1/2 rounded-sm" style={{ left: `${pct((e.t_ms - live.clock.epoch_ms) / 1000)}%`, background: e.severity === 'danger' ? '#d03b3b' : '#e0a800' }} />)}
+        <i className="pointer-events-none absolute top-[10px] h-[15px] w-[15px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white bg-civic shadow-[0_1px_3px_rgba(16,24,40,0.45)]" style={{ left: `${at}%` }} />
+        {ticks.map((h) => (
+          <span key={h} className={`pointer-events-none absolute top-[19px] -translate-x-1/2 whitespace-nowrap text-[11px] ${h === 0 ? 'font-semibold text-ink' : 'text-muted'}`} style={{ left: `${pct(h * 3600)}%` }}>{h === 0 ? 'Now' : `${h > 0 ? '+' : '−'}${Math.abs(h)} h`}</span>
+        ))}
+        <input type="range" min={-PAST_S} max={AHEAD_S} step={time.step} value={time.tauStep} aria-label="Time" aria-valuetext={isNow ? 'Now' : fmtOffset(time.tauStep)} onChange={(e) => time.scrub(Number(e.target.value))} className="time-range" />
       </div>
-      <span className="shrink-0 text-[11px] text-muted">+4 h</span>
-      <button onClick={time.toNow} disabled={time.tauStep === 0} className="w-[64px] shrink-0 text-right text-[12px] font-semibold tabular-nums text-civic disabled:text-muted">{time.tauStep === 0 ? 'Now' : fmtOffset(time.tauStep)}</button>
+      <div className="w-[76px] shrink-0 text-right leading-tight">
+        <div className="text-[13px] font-semibold tabular-nums">{fmtClock(live.clock.epoch_ms + time.tauStep * 1000)}</div>
+        {isNow ? <div className="text-[11.5px] text-muted">Now</div>
+          : <button onClick={time.toNow} className="text-[11.5px] font-semibold text-civic hover:underline">Back to now</button>}
+      </div>
     </div>
   );
 }
@@ -243,6 +258,9 @@ const SWATCH = {
   buildings: 'bg-[#dfe5ee] border border-[#b7c2d3]', streams: 'line #62c0ff', pipes: 'line #2f9fd8', network: 'line #35e0c2', catchment: 'dash', particles: 'flow', labels: 'text', barangays: 'dots', assets: 'dot #2aa58c',
 };
 const OFF_BY_DEFAULT = ['network', 'barangays'];
+const UI_KEY = 'bulos-ui';
+const DEFAULT_UI = { glass: false, timeline: true, colourBar: true, coords: true };
+const KEYS = [['H', 'Presentation mode'], ['L', 'Layers'], ['G', 'Legend'], ['D', 'Data'], ['C', 'Customize']];
 const TOGGLES = [['buildings', 'Real 3D buildings'], ['labels', 'Roads and place names'], ['streams', 'Streams'], ['pipes', 'Main pipelines'], ['network', 'Proposed barangay network'], ['barangays', 'Barangay access dots'], ['assets', 'Water district facilities'], ['particles', 'Water flow'], ['catchment', 'Watershed']];
 
 function Swatch({ k }) {
@@ -310,6 +328,39 @@ function LayersWindow({ view, setView, layers, setLayers }) {
   );
 }
 
+/** How the screen itself looks and behaves. */
+function CustomizeWindow({ ui, setUi, view, setView, onPresent }) {
+  const flip = (k) => setUi((u) => ({ ...u, [k]: !u[k] }));
+  const line = (label, on, change) => (
+    <label key={label} className="flex cursor-pointer items-center justify-between gap-3 py-1 text-ink-2">
+      {label}<input type="checkbox" role="switch" className="switch" checked={on} onChange={change} />
+    </label>
+  );
+  return (
+    <div className="px-3 pb-3 text-[13px]">
+      <button onClick={onPresent} className="btn-primary w-full justify-center"><Eye size={14} />Presentation mode</button>
+      <p className="mt-1.5 text-[12px] leading-snug text-muted">Hides every panel so only the map shows. Good for your pitch.</p>
+      <h3 className="mt-3 border-t border-line pt-3 font-display text-[13px] font-semibold">Panels</h3>
+      <div className="seg-flat mt-1.5">
+        <button role="tab" aria-selected={!ui.glass} onClick={() => setUi((u) => ({ ...u, glass: false }))}>Solid white</button>
+        <button role="tab" aria-selected={ui.glass} onClick={() => setUi((u) => ({ ...u, glass: true }))}>See-through</button>
+      </div>
+      <h3 className="mt-3 border-t border-line pt-3 font-display text-[13px] font-semibold">Show on screen</h3>
+      <div className="mt-1">
+        {line('Time bar', ui.timeline, () => flip('timeline'))}
+        {line('Layer colour bar', ui.colourBar, () => flip('colourBar'))}
+        {line('Coordinates', ui.coords, () => flip('coords'))}
+        {line('Water point labels', view.mapLabels !== false, () => setView((v) => ({ ...v, mapLabels: v.mapLabels === false })))}
+      </div>
+      <h3 className="mt-3 border-t border-line pt-3 font-display text-[13px] font-semibold">Keyboard shortcuts</h3>
+      <dl className="mt-1.5 grid grid-cols-[auto_1fr] items-center gap-x-2.5 gap-y-1 text-ink-2">
+        {KEYS.map(([k, label]) => <div key={k} className="contents"><dt><kbd className="key">{k}</kbd></dt><dd>{label}</dd></div>)}
+      </dl>
+      <button onClick={() => { setUi(DEFAULT_UI); resetPanels(); }} className="btn-ghost mt-3 w-full justify-center">Reset screen layout</button>
+    </div>
+  );
+}
+
 /** What everything on the map means. Only lists what is switched on right now. */
 function LegendWindow({ view, layers }) {
   const h = HAZARDS[view.hazard];
@@ -343,10 +394,10 @@ function LegendWindow({ view, layers }) {
 }
 
 const SOURCES = [
-  ['Real', 'pill-good', ['Terrain: Copernicus GLO-90 elevation', 'Satellite imagery: Esri', 'River, streams, roads, buildings: OpenStreetMap', 'Water district facilities and barangay names: OpenStreetMap', 'Weather right now: Open-Meteo, live']],
-  ['Computed', 'pill-blue', ['River speed and travel time, from real slope', 'Well exposure and runoff layers, from the 90 m elevation model', 'Forecasts and risk scores, from the twin']],
-  ['Simulated', 'pill-amber', ['All sensor readings at the five water points', 'Spills, storms in Simulate, valves, tanks and SMS']],
-  ['Illustrative', 'pill-grey', ['The five water points are a proposed layout, not existing sites', 'Pipelines and the barangay network follow real roads, but they are proposed routes', 'Building and people models, and the rain gauge position']],
+  ['Real', 'pill-good', ['Elevation model: Copernicus GLO-90 (90 m cells)', '3D map terrain: open elevation tiles on AWS', 'Satellite imagery: Esri. Capture dates are not known', 'River, streams, roads and building outlines: OpenStreetMap', 'Water district facilities and barangay names: OpenStreetMap', 'Weather right now: Open-Meteo weather model, not a local rain gauge', 'River flow estimate: global model through Open-Meteo, too coarse for this small river']],
+  ['Computed', 'pill-blue', ['River speed and travel time, from real slope', 'Watershed outline and drainage areas. These are rough in the flat lowlands near the city', 'Well exposure and runoff layers, from the 90 m elevation model', 'Forecasts and risk scores, from the twin']],
+  ['Simulated', 'pill-amber', ['All sensor readings at the five water points', 'The rain the twin uses, which does not follow the real weather', 'Spills, valves, tanks, text messages, signal strength and battery levels']],
+  ['Illustrative', 'pill-grey', ['The five water points are a proposed layout, not existing sites', 'People served and household counts', 'AG-02 and the rain gauge show where government stations could connect. No DOST data is connected', 'Pipelines and the barangay network follow real roads, but they are proposed routes', 'Most building heights are a 5 m default', 'Facility and people models']],
 ];
 
 function DataPanel() {
@@ -359,7 +410,15 @@ function DataPanel() {
           <ul className="mt-1 grid list-disc gap-0.5 pl-4">{items.map((t) => <li key={t}>{t}</li>)}</ul>
         </div>
       ))}
-      <p className="mt-2 border-t border-line pt-2 text-[11px]">Real sensors can replace the simulated ones without changing the twin: they send readings to the same data server.</p>
+      <div className="mt-3 rounded-lg bg-[#f2f6ff] px-2.5 py-2">
+        <div className="font-semibold text-ink">How we checked</div>
+        <ul className="mt-1 grid list-disc gap-0.5 pl-4">
+          <li>Elevations matched SRTM data within 4 m at 10 test points.</li>
+          <li>The highest point in the model is 1,966 m, the published height of Mt. Isarog.</li>
+          <li>The river is 29.6 km: 14.4 km mapped as the Naga River, and 15.2 km of unnamed stream above it.</li>
+        </ul>
+      </div>
+      <p className="mt-2 text-[12px]">Real sensors can replace the simulated ones without changing the twin: they send readings to the same data server.</p>
     </div>
   );
 }
@@ -417,17 +476,27 @@ function HazardCard({ spot, live, onClose, onSpill }) {
   );
 }
 
-function Legend({ view, onOpen }) {
+/** What colours the map right now, with a quick way to change it. */
+function LayerPicker({ view, setView, onLegend }) {
+  const [open, setOpen] = useState(false);
   const h = HAZARDS[view.hazard];
-  if (!h?.low) return null;
   const [a, b, c] = PALETTE_CSS[view.palette];
+  const pick = (k) => { setView((v) => ({ ...v, hazard: k })); setOpen(false); };
   return (
-    <button onClick={onOpen} className={`${card} flex max-w-[460px] items-center gap-2 px-3 py-1.5 text-[11px] text-ink-2`} title="Open the legend">
-      <span className="whitespace-nowrap font-semibold text-ink">{h.label}</span>
-      <span>{h.low}</span>
-      <i className="h-2.5 w-20 rounded-sm" style={{ background: `linear-gradient(90deg, ${a}, ${b}, ${c})` }} />
-      <span>{h.high}</span>
-    </button>
+    <div className="relative shrink-0 border-l border-line pl-3">
+      <button onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="true" className="block w-[176px] text-left">
+        <span className="flex items-center justify-between gap-1 text-[12.5px] font-semibold"><span className="truncate">{h?.low ? h.label : 'No colour layer'}</span><ChevronDown size={14} className={`shrink-0 text-muted ${open ? 'rotate-180' : ''}`} /></span>
+        {h?.low ? (
+          <span className="mt-1 flex items-center gap-1.5 text-[11px] text-muted">{h.low}<i className="h-[7px] flex-1 rounded-sm" style={{ background: `linear-gradient(90deg, ${a}, ${b}, ${c})` }} />{h.high}</span>
+        ) : <span className="mt-1 block text-[11px] text-muted">Pick one to colour the map</span>}
+      </button>
+      {open && (
+        <div className="site-panel absolute right-0 top-[calc(100%+10px)] z-40 w-[230px] p-1.5">
+          {Object.entries(HAZARDS).map(([k, x]) => <button key={k} onClick={() => pick(k)} aria-pressed={view.hazard === k} className="layer-row">{x.label}</button>)}
+          <button onClick={() => { setOpen(false); onLegend(); }} className="mt-1 w-full border-t border-line px-2 pb-1 pt-2 text-left text-[12.5px] font-semibold text-civic hover:underline">Open the legend</button>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -474,7 +543,21 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
   const [spot, setSpot] = useState(null);
   const [detail, setDetail] = useState(false);
   const [panel, setPanel] = useState(true);
-  const [wins, setWins] = useState({ layers: false, legend: false, data: false });
+  const [wins, setWins] = useState({ layers: false, legend: false, data: false, custom: false });
+  const [presenting, setPresenting] = useState(false);
+  const [ui, setUi] = useState(() => { try { return { ...DEFAULT_UI, ...JSON.parse(localStorage.getItem(UI_KEY)) }; } catch { return DEFAULT_UI; } });
+  useEffect(() => { try { localStorage.setItem(UI_KEY, JSON.stringify(ui)); } catch { /* it still applies, it just will not be remembered */ } }, [ui]);
+  useEffect(() => {
+    const press = (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.target.matches?.('input:not([type=checkbox]):not([type=radio]):not([type=range]), textarea, select')) return;
+      const k = e.key.toLowerCase();
+      if (k === 'h') setPresenting((p) => !p);
+      else if (k === 'escape') setPresenting(false);
+      else if ({ l: 'layers', g: 'legend', d: 'data', c: 'custom' }[k]) { const name = { l: 'layers', g: 'legend', d: 'data', c: 'custom' }[k]; setWins((w) => ({ ...w, [name]: !w[name] })); setTop(name); }
+    };
+    window.addEventListener('keydown', press);
+    return () => window.removeEventListener('keydown', press);
+  }, []);
   const [top, setTop] = useState('layers');
   const toggleWin = (k) => { setWins((w) => ({ ...w, [k]: !w[k] })); setTop(k); };
   const winZ = (k) => (top === k ? 'z-[35]' : 'z-[30]');
@@ -517,25 +600,29 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
   const isLive = time.tauStep === 0;
 
   return (
-    <div className="relative min-h-full overflow-x-hidden bg-[#eef2f6] lg:fixed lg:inset-0 lg:overflow-hidden">
+    <div data-present={presenting || undefined} data-glass={ui.glass || undefined} className="map-root relative min-h-full overflow-x-hidden bg-[#eef2f6] lg:fixed lg:inset-0 lg:overflow-hidden">
       <div className="relative h-[60vh] min-h-[380px] lg:absolute lg:inset-0 lg:h-auto">
         <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-muted">Loading the map…</div>}>
           <TwinMapScene
             staticData={staticData} live={live} hazard={hazardPath ? hazardGrid : null} view={view} atTime={time.atTime} tauStep={time.tauStep} selectedId={selectedId}
             onPick={pick} onInspect={onInspect} layers={layers} controls={controls} onTour={setTouring} onCaption={setCaption} onProbe={checkSpot} probe={probe}
-            insets={{ left: panel ? 364 : 20, right: rightOpen ? 372 : 64, top: 16, bottom: 72 }} readout={readout} needle={needle}
+            insets={presenting ? { left: 20, right: 20, top: 16, bottom: 20 } : { left: panel ? 364 : 20, right: rightOpen ? 372 : 64, top: 92, bottom: 24 }} readout={readout} needle={needle}
           />
         </Suspense>
+        <MapCredits className="absolute bottom-3 right-3 z-[36]" />
       </div>
 
       {/* Left: everything about the river, one panel */}
       <Floating id="map-main" label="Move this panel" role="region" aria-label="Bulos 3D" className={`${card} relative z-20 m-2 flex flex-col lg:absolute lg:left-3 lg:top-3 lg:m-0 lg:max-h-[calc(100vh-24px)] lg:w-[340px]`}>
-        <div className="flex items-center gap-2 p-2">
+        <div className="flex items-center gap-1.5 px-2 pt-1">
           <button onClick={() => setMenu((m) => !m)} aria-expanded={menu} aria-label="Menu" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-2 hover:bg-panel-2"><Menu size={18} /></button>
-          <img src="/favicon.svg" alt="" className="h-7 w-7 shrink-0" />
-          <div className="min-w-0 flex-1"><SearchBox live={live} tasks={tasks} onPick={focus} go={go} /></div>
+          <button onClick={() => { controls.current.home?.(); }} title="Back to the whole river" className="flex min-w-0 flex-1 items-center gap-2 text-left">
+            <img src="/favicon.svg" alt="" className="h-8 w-8 shrink-0" />
+            <span className="truncate font-display text-[17px] font-semibold">Bulos 3D</span>
+          </button>
           <button onClick={() => setPanel((v) => !v)} aria-expanded={panel} aria-label={panel ? 'Collapse panel' : 'Expand panel'} className="hidden h-9 w-7 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-panel-2 lg:flex"><ChevronUp size={16} className={panel ? '' : 'rotate-180'} /></button>
         </div>
+        <div className="px-2 pb-2 pt-1.5"><SearchBox live={live} tasks={tasks} onPick={focus} go={go} /></div>
         {menu && (
           <nav className="grid grid-cols-2 gap-0.5 border-t border-line p-1.5">
             {pages.map(([id, label]) => (
@@ -589,9 +676,10 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
             <button onClick={() => setView((v) => ({ ...v, mapLabels: !v.mapLabels }))} aria-pressed={!view.mapLabels} aria-label={view.mapLabels ? 'Hide map labels' : 'Show map labels'} title={view.mapLabels ? 'Hide labels' : 'Show labels'} className={`${tool} ${view.mapLabels ? '' : 'bg-[#e9efff] text-civic'}`}><Tag size={15} /></button>
             <button onClick={() => (touring ? controls.current.stopTour?.() : controls.current.startTour?.())} aria-pressed={touring} aria-label="Tour" title="Tour the five water points" className={`${tool} ${touring ? 'bg-[#e9efff] text-civic' : ''}`}><Plane size={15} /></button>
             <button onClick={() => { const on = !following; setFollowing(on); controls.current.setFollow?.(on); }} aria-pressed={following} aria-label="Follow the plume" title="Follow the plume" className={`${tool} ${following ? 'bg-[#e9efff] text-civic' : ''}`}><Crosshair size={15} /></button>
-          {panelsMoved && (
+          <hr className="border-line" />
+            <button onClick={() => toggleWin('custom')} aria-pressed={wins.custom} aria-label="Customize" title="Customize the screen" className={tool}><SlidersHorizontal size={15} /></button>
+            {panelsMoved && (
               <>
-                <hr className="border-line" />
                 <button onClick={resetPanels} aria-label="Reset panels" title="Put all panels back" className={tool}><LayoutPanelLeft size={15} /></button>
               </>
             )}
@@ -599,7 +687,7 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
 
           {/* Right: details, only when asked for */}
           {rightOpen && (
-            <Floating id="map-detail" title="Details" label="Move the details panel" className={`${card} relative z-10 m-2 overflow-y-auto lg:absolute lg:right-[60px] lg:top-[64px] lg:m-0 lg:max-h-[calc(100vh-150px)] lg:w-[300px]`}>
+            <Floating id="map-detail" title="Details" label="Move the details panel" className={`${card} relative z-10 m-2 overflow-y-auto lg:absolute lg:right-[60px] lg:top-[92px] lg:m-0 lg:max-h-[calc(100vh-140px)] lg:w-[300px]`}>
               {probe ? (
                 <HazardCard
                   spot={spot} live={live} onClose={() => { setProbe(null); setSpot(null); }}
@@ -615,27 +703,37 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
 
           {/* Separate windows, opened from the main panel */}
           {wins.layers && (
-            <MapWindow id="win-layers" title="Layers" onClose={() => toggleWin('layers')} onRaise={() => setTop('layers')} className={`${winZ('layers')} lg:left-[364px] lg:top-3 lg:w-[290px]`}>
+            <MapWindow id="win-layers" title="Layers" onClose={() => toggleWin('layers')} onRaise={() => setTop('layers')} className={`${winZ('layers')} lg:left-[364px] lg:top-[92px] lg:w-[290px]`}>
               <LayersWindow view={view} setView={setView} layers={layers} setLayers={setLayers} />
             </MapWindow>
           )}
+          {wins.custom && (
+            <MapWindow id="win-custom" title="Customize" dock={3} onClose={() => toggleWin('custom')} onRaise={() => setTop('custom')} className={`${winZ('custom')} lg:right-[60px] lg:top-[92px] lg:w-[270px]`}>
+              <CustomizeWindow ui={ui} setUi={setUi} view={view} setView={setView} onPresent={() => setPresenting(true)} />
+            </MapWindow>
+          )}
           {wins.legend && (
-            <MapWindow id="win-legend" title="Legend" dock={1} onClose={() => toggleWin('legend')} onRaise={() => setTop('legend')} className={`${winZ('legend')} lg:left-[666px] lg:top-3 lg:w-[250px]`}>
+            <MapWindow id="win-legend" title="Legend" dock={1} onClose={() => toggleWin('legend')} onRaise={() => setTop('legend')} className={`${winZ('legend')} lg:left-[666px] lg:top-[92px] lg:w-[250px]`}>
               <LegendWindow view={view} layers={layers} />
             </MapWindow>
           )}
           {wins.data && (
-            <MapWindow id="win-data" title="Data" dock={2} onClose={() => toggleWin('data')} onRaise={() => setTop('data')} className={`${winZ('data')} lg:left-[364px] lg:top-[120px] lg:w-[580px]`}>
+            <MapWindow id="win-data" title="Data" dock={2} onClose={() => toggleWin('data')} onRaise={() => setTop('data')} className={`${winZ('data')} lg:left-[364px] lg:top-[200px] lg:!max-h-[calc(100vh-212px)] lg:w-[580px]`}>
               <Tables live={live} tasks={tasks} quick={quick} onPick={focus} weather={weather} access={staticData?.access} />
             </MapWindow>
           )}
 
-          {/* Bottom: legend for the active layer, then time */}
-          <Floating id="map-time" grip={false} className={`z-10 flex flex-wrap items-end gap-2 p-2 lg:absolute lg:bottom-3 lg:right-[220px] lg:p-0 ${panel ? 'lg:left-[364px]' : 'lg:left-3'}`}>
-            <Legend view={view} onOpen={() => { setWins((w) => ({ ...w, legend: true })); setTop('legend'); }} />
-            <Timeline live={live} time={time} />
-          </Floating>
-          <div className={`${card} absolute bottom-[12px] right-[38px] z-10 hidden w-[172px] whitespace-nowrap px-2 py-1 text-right text-[10.5px] tabular-nums text-ink-2 lg:block`}><span ref={readout}>Move over the map</span></div>
+          {/* Top: time, and what colours the map */}
+          {(ui.timeline || ui.colourBar) && (
+            <Floating id="map-time" label="Move the time bar" className={`${card} relative z-[25] m-2 lg:absolute lg:left-[364px] lg:right-[190px] lg:top-3 lg:m-0`}>
+              <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1.5 px-2.5 pb-1.5 pt-1 lg:pt-0">
+                {ui.timeline && <Timeline live={live} time={time} />}
+                {ui.colourBar && <LayerPicker view={view} setView={setView} onLegend={() => { setWins((w) => ({ ...w, legend: true })); setTop('legend'); }} />}
+              </div>
+            </Floating>
+          )}
+          {presenting && <button onClick={() => setPresenting(false)} className={`${card} absolute bottom-4 left-1/2 z-40 -translate-x-1/2 px-3.5 py-2 text-[13px] font-semibold text-civic`}>Exit presentation (H)</button>}
+          <div className={`${card} map-readout absolute bottom-3 right-[48px] z-10 hidden w-[172px] whitespace-nowrap px-2 py-1 text-right text-[10.5px] tabular-nums text-ink-2 ${ui.coords ? 'lg:block' : ''}`}><span ref={readout}>Move over the map</span></div>
 
           {caption && (
             <div className={`${card} absolute bottom-[72px] left-1/2 z-10 hidden max-w-[440px] -translate-x-1/2 px-4 py-2 text-center lg:block`}>

@@ -205,7 +205,8 @@ class Terrain:
             return []
         start = next(iter(edges))
         ring, cur = [start], edges[start]
-        while _key(cur) != start and len(ring) <= len(edges):
+        total = len(edges)                               # fixed here: edges shrinks as the walk uses them
+        while _key(cur) != start and len(ring) <= total:
             ring.append(_key(cur))
             cur = edges.pop(_key(cur), None)
             if cur is None:

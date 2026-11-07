@@ -16,9 +16,9 @@ CONDITION = {0: "Clear", 1: "Mostly clear", 2: "Partly cloudy", 3: "Overcast", 4
              81: "Showers", 82: "Violent showers", 95: "Thunderstorm", 96: "Thunderstorm", 99: "Thunderstorm"}
 
 
-def _get(url, params):
+def _get(url, params, timeout=2.5):
     req = urllib.request.Request(f"{url}?{urllib.parse.urlencode(params)}", headers={"User-Agent": "Bulos3D-student-project"})
-    with urllib.request.urlopen(req, timeout=2.5) as r:
+    with urllib.request.urlopen(req, timeout=timeout) as r:
         return json.load(r)
 
 
@@ -39,7 +39,7 @@ def live_weather(lat, lon):
     except Exception as e:                           # the twin must keep working without this feed
         return _cache["value"] or dict(available=False, source="Open-Meteo", error=str(e)[:120])
     try:
-        f = _get("https://flood-api.open-meteo.com/v1/flood", dict(latitude=lat, longitude=lon, daily="river_discharge", forecast_days=3))
+        f = _get("https://flood-api.open-meteo.com/v1/flood", dict(latitude=lat, longitude=lon, daily="river_discharge", forecast_days=3), timeout=20)
         value["discharge_m3s"] = f["daily"]["river_discharge"][0]
     except Exception:
         pass                                         # river flow is a bonus; weather alone is fine
