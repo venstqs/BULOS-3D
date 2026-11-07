@@ -3,7 +3,7 @@ export default function MapWatermark({ className = 'bottom-5 left-5' }) {
   return (
     <div aria-hidden="true" className={`map-watermark ${className}`}>
       <img src="/favicon.svg" alt="" />
-      <div><b>Bulos 3D</b><span>Digital twin</span></div>
+      <b>Bulos 3D</b>
     </div>
   );
 }

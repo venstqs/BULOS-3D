@@ -13,6 +13,6 @@ export default defineConfig({
   preview: { host: '127.0.0.1', port: 5173 },
   build: {
     chunkSizeWarningLimit: 6000,
-    rollupOptions: { input: { main: 'index.html', landing: 'landing.html' } },
+    rollupOptions: { input: { main: 'index.html', landing: 'landing.html', phone: 'phone.html' } },
   },
 });

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Bulos 3D on your phone</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet" />
+  </head>
+  <body>
+    <main class="stage">
+      <section class="copy">
+        <a class="brand" href="/"><img src="/favicon.svg" alt="" width="40" height="40" />Bulos 3D</a>
+        <h1>This is the phone app<i class="stop"></i></h1>
+        <p>It is made for a phone, so here it runs in a phone-sized frame. Everything works, so try it with your mouse.</p>
+        <div class="scan">
+          <div id="qr" role="img" aria-label="QR code that opens the app on your phone"></div>
+          <p>Scan to open it on your phone. There is nothing to install.</p>
+        </div>
+        <a class="wide" href="/twin/">Open Bulos 3D for computers</a>
+      </section>
+      <div class="phone" id="phone"><iframe id="app" title="The Bulos 3D phone app"></iframe></div>
+    </main>
+    <script type="module" src="/src/phone/main.js"></script>
+  </body>
+</html>

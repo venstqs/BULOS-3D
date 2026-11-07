@@ -40,3 +40,4 @@ docs/*.aep
 
 # The phone-browser build, on its way into mobile/dist
 mobile/.hosted-app/
+mobile/.expo-go/

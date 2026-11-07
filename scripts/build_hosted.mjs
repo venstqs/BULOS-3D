@@ -4,7 +4,7 @@
 //   /app/    the mobile app, for any phone browser
 // The Mapbox token stays out: this build uses the free open map layers.
 import { execSync } from 'node:child_process';
-import { copyFileSync, cpSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs';
+import { copyFileSync, cpSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -16,6 +16,7 @@ rmSync(out, { recursive: true, force: true });
 
 run(`npx vite build --outDir "${out}" --emptyOutDir`, root, {
   VITE_API: 'demo', VITE_HOSTED: '1', VITE_TWIN_URL: '/twin/', VITE_MAPBOX_TOKEN: '', VITE_APK_URL: process.env.VITE_APK_URL ?? '',
+  VITE_EXPO_GO_URL: 'exp://u.expo.dev/e9142e41-5c3c-4c62-9b1f-330733d52242?runtime-version=exposdk%3A58.0.0&channel-name=production',
 });
 mkdirSync(join(out, 'twin'));
 renameSync(join(out, 'index.html'), join(out, 'twin', 'index.html'));
@@ -36,5 +37,11 @@ if (existsSync(join(out, 'app', 'index.html'))) {
   for (const name of screens) {
     if (!existsSync(join(out, 'app', `${name}.html`))) copyFileSync(join(out, 'app', 'index.html'), join(out, 'app', `${name}.html`));
   }
+}
+// A computer opening the phone app sees it in a phone-sized frame instead of stretched across the screen
+const toFrame = '<script>(function(){var p=/Android.+Mobile|iPhone|iPod/.test(navigator.userAgent)||(matchMedia("(pointer: coarse)").matches&&Math.min(screen.width,screen.height)<600);if(!p&&window.top===window)location.replace("/phone.html#"+encodeURIComponent(location.pathname+location.search));})();</script>';
+for (const name of readdirSync(join(out, 'app')).filter((f) => f.endsWith('.html'))) {
+  const file = join(out, 'app', name);
+  writeFileSync(file, readFileSync(file, 'utf8').replace('<head>', `<head>${toFrame}`));
 }
 console.log(`\nBuilt ${readdirSync(out).length} top-level items in mobile/dist`);

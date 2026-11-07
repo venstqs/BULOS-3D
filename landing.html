@@ -14,11 +14,10 @@
     <div id="intro" aria-hidden="true"><img src="/favicon.svg" alt="" /><b>Bulos 3D</b></div>
     <canvas id="world" aria-label="3D model of the Naga River watershed"></canvas>
     <div id="tags" aria-hidden="true"></div>
-    <div id="mark" aria-hidden="true"><img src="/favicon.svg" alt="" /><div><b>Bulos 3D</b><span>Digital twin</span></div></div>
 
     <header class="bar">
-      <a class="brand" href="#spill"><img src="/favicon.svg" alt="" width="58" height="58" />Bulos 3D</a>
-      <a class="open" href="/" data-twin>Open the twin</a>
+      <a class="brand" href="#spill"><img src="/favicon.svg" alt="" width="40" height="40" />Bulos 3D</a>
+      <a class="open" href="/" data-twin>Open Bulos 3D</a>
     </header>
 
     <nav class="stream" aria-label="Page sections">
@@ -26,7 +25,7 @@
       <i id="stream-drop"></i>
       <a href="#spill" style="top:0%"><span>Spill</span></a>
       <a href="#how" style="top:25%"><span>How it works</span></a>
-      <a href="#bicol" style="top:50%"><span>All of Bicol</span></a>
+      <a href="#bicol" style="top:50%"><span>Beyond Naga</span></a>
       <a href="#app" style="top:75%"><span>The app</span></a>
       <a href="#truth" style="top:100%"><span>What is real</span></a>
     </nav>
@@ -39,10 +38,6 @@
           <div class="actions">
             <button id="try" class="primary" type="button">Spill at the farm stream</button>
             <button id="reset" class="plain" type="button" hidden>Clean the river</button>
-            <div class="switch" role="group" aria-label="Run the spill with or without the twin">
-              <button id="with" type="button" aria-pressed="true">With the twin</button>
-              <button id="without" type="button" aria-pressed="false">Without it</button>
-            </div>
           </div>
           <p id="also" class="also">Or spill at <button type="button" data-spill="spring">the mountain spring</button> or <button type="button" data-spill="kiosk">just above the kiosk</button></p>
         </div>
@@ -63,8 +58,8 @@
 
       <section id="bicol" class="bicol">
         <div class="card wide">
-          <h2>Now make it rain on all of Bicol<i class="stop"></i></h2>
-          <p>Real terrain shows where water gathers. Change the rain, then point at the map to read any place.</p>
+          <h2>Naga first. Any town next<i class="stop"></i></h2>
+          <p>Bulos 3D runs on open terrain and weather data, so the next town can start from the same setup. Change the rain, then point at any town to see where runoff risk climbs.</p>
           <div class="presets" role="group" aria-label="Rain presets">
             <button type="button" data-rain="0">Dry day</button>
             <button type="button" data-rain="20" aria-pressed="true">Rainy day</button>
@@ -88,8 +83,18 @@
             <div class="disc"><span class="wave"></span><b id="dial-title">Home</b><small id="dial-note">The river at a glance</small></div>
           </div>
           <div id="try-phone" class="try" hidden>
-            <div id="qr" role="img" aria-label="QR code that opens the app"></div>
-            <div><h3>Try it on your phone</h3><p>Scan to open the app in your browser. There is nothing to install.</p><a href="/app/">Open the app</a><a id="apk" href="/" hidden>Download for Android</a></div>
+            <h3>Try it on your phone</h3>
+            <div class="ways">
+              <div class="way">
+                <div class="qr" id="qr-web" role="img" aria-label="QR code that opens the app in your phone's browser"></div>
+                <div><b>In your browser</b><span>Any phone. There is nothing to install.</span><a id="open-web" href="/app/">Open the app</a></div>
+              </div>
+              <div class="way" id="way-go" hidden>
+                <div class="qr" id="qr-go" role="img" aria-label="QR code that opens the app in Expo Go"></div>
+                <div><b>In Expo Go</b><span>Smoother, with vibration. Android only for now.</span><a id="open-go" href="/" hidden>Open in Expo Go</a><a href="https://play.google.com/store/apps/details?id=host.exp.exponent">Get Expo Go</a></div>
+              </div>
+            </div>
+            <a id="apk" class="apk" href="/" hidden>Download the Android app</a>
           </div>
         </div>
         <div class="phone-stage" id="stage"><div class="phone" id="phone"><img id="screen" src="/landing/home-calm.jpg" alt="The Bulos 3D Home screen" width="600" height="1298" /></div></div>
@@ -116,8 +121,7 @@
       <section class="end">
         <img src="/favicon.svg" alt="" width="120" height="120" />
         <h2>Know the water is safe before it reaches the tap<i class="stop"></i></h2>
-        <a class="primary" href="/" data-twin>Open the twin</a>
-        <p>Made by students of Camarines Sur National High School for the Xylem Global Student Innovation Challenge. Not an official government system.</p>
+        <a class="primary" href="/" data-twin>Open Bulos 3D</a>
         <p class="credits">Elevation: Copernicus GLO-90 (ESA/Airbus). Waterways: OpenStreetMap contributors. Region V boundary: geoBoundaries (NAMRIA, PSA, OCHA), CC BY 3.0 IGO. Weather: Open-Meteo.</p>
       </section>
     </main>

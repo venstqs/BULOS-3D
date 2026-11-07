@@ -11,17 +11,37 @@ const STOP = '<i class="stop"></i>';
 const fmtTime = (min) => { const m = Math.round(min); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`; };
 
 /* ---------------- parts of the page that need no 3D ---------------- */
-// The hosted site keeps this page at / and the twin at /twin/
-const TWIN = import.meta.env.VITE_TWIN_URL ?? '/';
-document.querySelectorAll('[data-twin]').forEach((a) => { a.href = TWIN; });
-if (import.meta.env.VITE_HOSTED === '1') {
+// Phones get the phone app, computers get the full 3D map. The hosted site keeps the map at /twin/.
+const HOSTED = import.meta.env.VITE_HOSTED === '1';
+const IS_PHONE = /Android.+Mobile|iPhone|iPod/.test(navigator.userAgent) || (matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 600);
+const IS_IPHONE = /iPhone|iPod/.test(navigator.userAgent);
+const toApp = HOSTED && IS_PHONE;
+document.querySelectorAll('[data-twin]').forEach((a) => {
+  a.href = toApp ? '/app/' : import.meta.env.VITE_TWIN_URL ?? '/';
+  a.textContent = 'Open Bulos 3D';
+});
+if (IS_PHONE) document.documentElement.classList.add('phone-user');
+if (HOSTED) {
+  // On a computer, scan a code. On a phone, tap a button.
   import('qrcode-generator').then(({ default: qrcode }) => {
-    const code = qrcode(0, 'M');
-    code.addData(new URL('/app/', window.location.href).href);
-    code.make();
-    $('#qr').innerHTML = code.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+    const draw = (el, text) => {
+      const code = qrcode(0, 'M');
+      code.addData(text);
+      code.make();
+      el.innerHTML = code.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+    };
+    draw($('#qr-web'), new URL('/app/', window.location.href).href);
+    const go = import.meta.env.VITE_EXPO_GO_URL;
+    // Expo Go on iPhone only opens projects from the signed-in Expo account, so iPhones use the browser
+    if (go && !IS_IPHONE) {
+      draw($('#qr-go'), go);
+      $('#open-go').href = go;
+      $('#open-go').hidden = !IS_PHONE;
+      $('#way-go').hidden = false;
+    }
     $('#try-phone').hidden = false;
   });
+  $('#open-web').href = IS_PHONE ? '/app/' : '/phone.html';
   if (import.meta.env.VITE_APK_URL) { $('#apk').href = import.meta.env.VITE_APK_URL; $('#apk').hidden = false; }
 }
 
@@ -35,7 +55,7 @@ const SCREENS = [
   ['3D map', 'map-spill', 'Fly the real watershed', 'The 3D map during a simulated spill'],
   ['Forecast', 'forecast-spill', 'See what arrives, and when', 'The four-hour forecast screen'],
   ['Is it safe?', 'safe-stop', 'A plain answer', 'The water safety answer'],
-  ['Bicol', 'map-bicol', 'Runoff risk, region-wide', 'The whole Bicol layer'],
+  ['Warnings', 'home-spill', 'Know before it arrives', 'A warning on the Home screen during a simulated spill'],
   ['Intake', 'point-closed', 'Close it, in simulation', 'A water point with its intake closed'],
 ];
 const dial = $('#dial');
@@ -111,7 +131,7 @@ try {
 }
 if (renderer) start().catch(() => { document.documentElement.classList.add('no3d'); liftIntro(); });
 else {
-  liftIntro(); $('#try').hidden = true; $('#lead').textContent = 'This is the real Naga River, from Mt. Isarog to Naga City. Open the twin to explore it in 3D.'; }
+  liftIntro(); $('#try').hidden = true; $('#lead').textContent = 'This is the real Naga River, from Mt. Isarog to Naga City. Open Bulos 3D to explore it.'; }
 
 function relief({ rows, cols, height, inside, sx, sz, base, extra }) {
   const pos = []; const top = []; const more = [];
@@ -266,9 +286,6 @@ async function start() {
   pen.drawImage(logo, 8, 8, 112, 112);
   pen.fillStyle = '#fff'; pen.font = '700 88px Sora, Inter, sans-serif'; pen.textBaseline = 'middle';
   pen.fillText('Bulos 3D', 136, 68);
-  const nameEnd = 136 + pen.measureText('Bulos 3D').width;
-  pen.font = '500 46px Inter, sans-serif'; pen.fillStyle = '#d9e4ff';
-  pen.fillText('Digital twin', nameEnd + 44, 72);
   const map = new THREE.CanvasTexture(sign); map.colorSpace = THREE.SRGBColorSpace; map.anisotropy = 8;
   const plaque = new THREE.Mesh(new THREE.PlaneGeometry(8.8, 1.1), new THREE.MeshBasicMaterial({ map, transparent: true }));
   plaque.position.set((-n.cols / 2) * sx - 0.03, -0.58, 2.5); plaque.rotation.y = -Math.PI / 2;
@@ -353,7 +370,6 @@ async function start() {
   const MIN_PER_SECOND = 30;
   const CLOSE_AHEAD = 30;
   let spill = null;
-  let twinOn = true;
   const headline = $('#headline'); const lead = $('#lead'); const log = $('#log'); const events = $('#events'); const clock = $('#clock');
   const safeN = $('#safe-n'); const hitN = $('#hit-n'); const also = $('#also');
   const original = { head: headline.innerHTML, lead: lead.textContent };
@@ -377,7 +393,7 @@ async function start() {
     reset();
     const start = clamp(frac, 0.02, 0.93);
     const below = pins.filter((p) => p.frac > start);
-    spill = { start, t0: performance.now(), startMin: minutesAt(start), below, seen: false, saved: 0, reached: 0, late: null, done: false, twin: twinOn };
+    spill = { start, t0: performance.now(), startMin: minutesAt(start), below, seen: false, saved: 0, reached: 0, late: null, done: false };
     safeN.textContent = '0'; hitN.textContent = '0';
     headline.innerHTML = 'Would you have known<i class="stop"></i>'; headline.classList.add('alarm');
     lead.textContent = 'Polluted water is moving down the river. The twin only knows what its sensors tell it.';
@@ -394,12 +410,7 @@ async function start() {
     clock.textContent = `+${fmtTime(elapsed)}`;
     const eta = (p) => minutesAt(p.frac) - s.startMin;
     const gates = s.below.filter((p) => p.valve);
-    if (!s.twin && !s.seen && s.below[0] && elapsed >= eta(s.below[0])) {
-      s.seen = true;
-      headline.innerHTML = `Nobody noticed${STOP}`;
-      lead.textContent = 'With no sensor and no model, nothing warns anyone. The water still looks clean.';
-    }
-    if (s.twin && !s.seen && s.below[0] && elapsed >= eta(s.below[0])) {
+    if (!s.seen && s.below[0] && elapsed >= eta(s.below[0])) {
       s.seen = true; s.detect = elapsed;
       note(`${s.below[0].id} detects it`, 'bad', elapsed);
       const next = gates.find((p) => eta(p) > elapsed);
@@ -409,7 +420,7 @@ async function start() {
     }
     s.below.forEach((p) => {
       const at = eta(p);
-      if (s.twin && s.seen && p.valve && p.state === 'calm' && elapsed >= at - CLOSE_AHEAD) {
+      if (s.seen && p.valve && p.state === 'calm' && elapsed >= at - CLOSE_AHEAD) {
         p.state = 'closed';
         p.tag.textContent = `${p.id} closed`; p.tag.className = 'tag safe';
         const early = at - elapsed;
@@ -426,10 +437,7 @@ async function start() {
     });
     if (!s.done && head >= 0.985) {
       s.done = true; s.end = elapsed;
-      if (!s.twin) {
-        headline.innerHTML = `Nobody knew in time${STOP}`; headline.classList.add('alarm');
-        lead.textContent = s.reached ? `Without the twin, the spill reached every water point below it. That is ${s.reached.toLocaleString()} people in this simulation, using an illustrative layout.` : 'No water points lie below this spot.';
-      } else if (s.saved) {
+      if (s.saved) {
         headline.innerHTML = 'Know before it reaches the tap<i class="stop"></i>';
         lead.textContent = `In this simulation, ${s.saved.toLocaleString()} people were moved to stored water before the pollution arrived.${s.late ? ` ${s.late.id} got almost no warning, which is why sensors sit upstream.` : ''} The layout is illustrative.`;
       } else {
@@ -441,13 +449,6 @@ async function start() {
   $('#try').addEventListener('click', () => startSpill(pins[1].frac - 0.05));
   const SPOTS = { spring: () => pins[0].frac - 0.03, kiosk: () => pins.find((p) => p.id === 'KS-03').frac - 0.012 };
   document.querySelectorAll('[data-spill]').forEach((el) => el.addEventListener('click', () => startSpill(SPOTS[el.dataset.spill]())));
-  const setTwin = (on) => {
-    twinOn = on;
-    $('#with').setAttribute('aria-pressed', on); $('#without').setAttribute('aria-pressed', !on);
-    if (spill) startSpill(spill.start);
-  };
-  $('#with').addEventListener('click', () => setTwin(true));
-  $('#without').addEventListener('click', () => setTwin(false));
   $('#reset').addEventListener('click', reset);
 
   const hint = makeTag('', 'cue');
@@ -547,7 +548,6 @@ async function start() {
     const nextStage = inHero ? 0 : toBicol > 0.5 ? 2 : 1;
     if (nextStage !== stage) { stage = nextStage; orbit.goal = 0; }
     orbit.now = lerp(orbit.now, orbit.goal, 1 - Math.exp(-dt * 7));
-    $('#mark').style.opacity = 0.62 * clamp((toBicol - 0.6) / 0.4) * clamp(appTop / (vh * 0.5));
 
     watershed.visible = toBicol < 0.98;
     watershed.scale.set(1, Math.max(0.002, growing * (1 - toBicol)), 1);
@@ -598,6 +598,7 @@ async function start() {
     });
     cities.forEach((c) => place(c.el, c.p, toBicol > 0.85));
     place(hint, cueAt, inHero && !spill && drawn > 0.98, 1);
+    if (bicol.visible) stepRain(dt);
     if (toBicol > 0.85) {
       if (rainGoal != null) {
         const v = lerp(rain.value, rainGoal, 1 - Math.exp(-dt * 5));
@@ -605,7 +606,6 @@ async function start() {
         setRain(landed ? rainGoal : v); rainInput.value = rain.value;
         if (landed) rainGoal = null;
       }
-      stepRain(dt);
     }
     readout.style.display = toBicol > 0.85 && readPlace() ? '' : 'none';
 
