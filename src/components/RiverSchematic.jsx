@@ -1,15 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { STATION_COLOR, fmtMin, stationStatus } from '../lib/format';
-
-/* Water colour from turbidity excess and ORP deficit: clear blue -> sediment brown -> anoxic magenta. */
-function water(te, od) {
-  const t = Math.min(1, te / 60);
-  const o = Math.min(1, od / 200);
-  const r = Math.round(255 * Math.min(1, 0.25 + 0.55 * t + 0.25 * o));
-  const g = Math.round(255 * Math.max(0, 0.75 - 0.35 * t - 0.4 * o));
-  const b = Math.round(255 * Math.max(0, 1 - 0.7 * t - 0.4 * o));
-  return `rgb(${r},${g},${b})`;
-}
+import { waterCss } from '../lib/waterColour';
 
 /**
  * The network at a glance: the DEM long profile as a living river from the
@@ -38,7 +29,7 @@ export default function RiverSchematic({ live, forecast, staticData, selectedId,
   const area = `${line}L${pts.at(-1)[0]},${H - m.b + 6}L${pts[0][0]},${H - m.b + 6}Z`;
   const stops = ch.chainage_m.filter((_, i) => i % 4 === 0 || i === ch.chainage_m.length - 1).map((s) => {
     const i = ch.chainage_m.indexOf(s);
-    return { off: s / L, c: water(ch.turb_excess[i], ch.orp_deficit[i]) };
+    return { off: s / L, c: waterCss(ch.turb_excess[i], ch.orp_deficit[i]) };
   });
   const raining = live.rain_mm_hr > 0.5;
   const fc = forecast?.stations ?? live.forecast.stations ?? {};

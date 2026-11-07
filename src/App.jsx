@@ -1,4 +1,4 @@
-import { Suspense, lazy, useCallback, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { Bell, ChevronDown, PlayCircle, TriangleAlert, X } from 'lucide-react';
 import Home, { MaintenancePage } from './components/Home';
 import { FlowPage, MapPage, ReportsPage, WaterPointsPage } from './components/Pages';
@@ -218,7 +218,7 @@ function AlertBell({ live, go }) {
         {recent.length > 0 && <span className="absolute -right-1 -top-1 min-w-[18px] rounded-full bg-critical px-1 text-center text-[10px] font-bold leading-[18px] text-white">{Math.min(99, recent.length)}</span>}
       </button>
       {open && (
-        <div className="glass absolute right-0 top-11 z-40 w-96 bg-white/95 p-3">
+        <div className="site-panel absolute right-0 top-11 z-40 w-96 p-3">
           <div className="mb-2 flex items-center justify-between px-1">
             <span className="font-semibold">Alerts, last 6 hours</span>
             <button onClick={() => { setOpen(false); go('reports'); }} className="link">See all</button>
@@ -242,13 +242,22 @@ function AlertBell({ live, go }) {
 /* ------------------------------------------------------------- simulation */
 function SimulationMenu({ speed, onScenario, onSpeed }) {
   const [open, setOpen] = useState(false);
+  const box = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const away = (e) => { if (!box.current?.contains(e.target)) setOpen(false); };
+    const esc = (e) => { if (e.key === 'Escape') setOpen(false); };
+    window.addEventListener('pointerdown', away);
+    window.addEventListener('keydown', esc);
+    return () => { window.removeEventListener('pointerdown', away); window.removeEventListener('keydown', esc); };
+  }, [open]);
   return (
-    <div className="relative">
+    <div ref={box} className="relative">
       <button onClick={() => setOpen((o) => !o)} aria-expanded={open} className="btn-primary !px-3 !py-2">
         <PlayCircle size={16} /> Simulate <ChevronDown size={14} />
       </button>
       {open && (
-        <div className="glass absolute right-0 top-11 z-40 w-80 bg-white/95 p-2">
+        <div className="site-panel absolute right-0 top-11 z-40 w-80 p-2">
           <div className="px-2 pb-1 pt-1 text-sm font-semibold">Simulate a field event</div>
           {SCENARIOS.map(([id, label, desc]) => (
             <button key={id} onClick={() => { onScenario(id); setOpen(false); }} className="block w-full rounded-xl px-2.5 py-2 text-left hover:bg-panel-2">
@@ -339,7 +348,7 @@ function Advisory({ live, forecast, onOpen, onSend }) {
         {closed.length > 0 && <p>Intakes closed at {closed.map((s) => s.name).join(', ')}; these sites are serving stored water.</p>}
         <p className="text-ink-2">Do not drink untreated water from the river, springs or shallow wells along this stretch. Boil water for at least one minute.</p>
       </div>
-      <button onClick={onSend} className="btn-primary self-start">Send SMS advisory</button>
+      <button onClick={onSend} className="btn-primary self-start">Send advisory</button>
     </section>
   );
 }

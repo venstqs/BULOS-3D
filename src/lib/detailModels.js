@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { animatePerson, person } from './people';
+import { waterDirt, waterRgb } from './waterColour';
 import {
   add, angleBar, banana, box, coconut, cyl, boxUV, fence, fern, gableRoof, gateValve, grassTufts, hillside, house, kit, ladder, lean, mergeStatic,
   patch, path, pipe, polyTank, reseed, ribbon, rnd, rock, signPanel, slab, solarPanel, strut, tankStand, tree, waterMaterial,
@@ -640,10 +641,16 @@ export function buildSite(id) {
 }
 
 const CLEAR = new THREE.Color('#3f86b8');
-const MUDDY = new THREE.Color('#8a5a2b');
+const dirty = new THREE.Color();
 /** Show the latest reading on the model: water colour, valve state and running taps. */
 export function applyReading(ctx, st) {
-  if (ctx.waterMat && ctx.waterMat !== ctx.lagoon && st.reading) ctx.waterMat.color.lerpColors(CLEAR, MUDDY, Math.min(1, Math.max(0, (st.reading.turbidity - 1) / 80)));
+  if (ctx.waterMat && ctx.waterMat !== ctx.lagoon && st.reading) {
+    // A dirty probe reads high turbidity while the water itself is fine
+    const te = st.classification === 'SENSOR_BIOFOULING' ? 0 : st.reading.turbidity - (st.baseline?.turbidity ?? 0);
+    const od = (st.baseline?.orp ?? st.reading.orp) - st.reading.orp;
+    const [r, g, b] = waterRgb(te, od);
+    ctx.waterMat.color.copy(CLEAR).lerp(dirty.setRGB(r / 255, g / 255, b / 255, THREE.SRGBColorSpace), waterDirt(te, od));
+  }
   const closed = st.valve && !st.valve.open;
   ctx.valve?.color.set(closed ? '#d03b3b' : '#22a35a');
   ctx.valve?.emissive.set(closed ? '#d03b3b' : '#22a35a');

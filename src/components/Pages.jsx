@@ -6,6 +6,7 @@ import StationPanel, { StatusBadge } from './StationPanel';
 import TwinLoop from './TwinLoop';
 import { usePoll } from '../api';
 import { BAND, STATION_COLOR, fmt, fmtClock, fmtMin, stationStatus } from '../lib/format';
+import { WATER_KEY } from '../lib/waterColour';
 
 export function Section({ title, note, right, children, flush = false, className = '' }) {
   return (
@@ -110,7 +111,7 @@ function ArrivalTable({ forecast, live }) {
 export function RiverLegend() {
   return (
     <div className="hidden items-center gap-4 text-xs text-muted md:flex">
-      <span className="inline-flex items-center gap-1.5"><span className="h-1.5 w-6 rounded" style={{ background: 'linear-gradient(90deg,rgb(64,191,255),rgb(140,140,90),rgb(204,100,150))' }} />clear to polluted</span>
+      {WATER_KEY.map(([label, color]) => <span key={label} className="inline-flex items-center gap-1.5"><span className="h-1.5 w-5 rounded" style={{ background: color }} />{label}</span>)}
       <span className="inline-flex items-center gap-1.5"><span className="inline-block h-2 w-2 bg-[#a32626]" />intake closed</span>
       <span className="inline-flex items-center gap-1.5"><span className="inline-block h-3 w-6 rounded-full bg-advisory" />expected arrival</span>
     </div>
@@ -194,7 +195,7 @@ export function FlowPage({ live, forecast, staticData, onPreempt, onOpen }) {
         </div>
       </section>
 
-      <Section title="The next 4 hours at a glance" note="Each row is a water point, each block is 15 minutes. Blue is safe, red is polluted." flush>
+      <Section title="The next 4 hours at a glance" note="Each row is a water point, each block is 15 minutes." flush>
         <RiskStrip live={live} forecast={forecast} onOpen={onOpen} />
       </Section>
 
@@ -276,7 +277,8 @@ export function FlowPage({ live, forecast, staticData, onPreempt, onOpen }) {
 }
 
 /** Forecast risk as a grid: rows are water points, columns are time. */
-const riskColor = (r) => (r >= 0.6 ? '#d03b3b' : r >= 0.45 ? '#ec835a' : r >= 0.25 ? '#f2c200' : r >= 0.1 ? '#9ec0ff' : '#dfe8ff');
+const GRID_KEY = [['Clear', '#dfe8ff'], ['Rising', '#9ec0ff'], ['Moderate', BAND.MODERATE.color], ['High', BAND.HIGH.color], ['Severe', BAND.SEVERE.color]];
+const riskColor = (r) => GRID_KEY[r >= 0.6 ? 4 : r >= 0.45 ? 3 : r >= 0.25 ? 2 : r >= 0.1 ? 1 : 0][1];
 
 function RiskStrip({ live, forecast, onOpen }) {
   const hours = [0, 1, 2, 3, 4];
@@ -300,6 +302,9 @@ function RiskStrip({ live, forecast, onOpen }) {
         })}
         <span />
         <div className="flex justify-between pt-0.5 text-[11.5px] text-muted">{hours.map((h) => <span key={h}>{h ? `+${h} h` : 'Now'}</span>)}</div>
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-ink-2">
+        {GRID_KEY.map(([label, color]) => <span key={label} className="inline-flex items-center gap-1.5"><i className="h-3 w-3 rounded-[3px]" style={{ background: color }} />{label}</span>)}
       </div>
     </div>
   );

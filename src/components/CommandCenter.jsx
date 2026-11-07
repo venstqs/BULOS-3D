@@ -3,7 +3,8 @@ import {
   Activity, Box, Check, ChevronDown, Eye, Layers as LayersIcon, LayoutPanelLeft, Shapes, SlidersHorizontal, Table2, ChevronUp, Clock, Crosshair, Cpu, Droplets, FlaskConical, Lock, LockOpen, Menu, Minus, Navigation, Pause, Plane, Play, Plus, RotateCcw, Search, Send, Tag, TriangleAlert, Users, X,
 } from 'lucide-react';
 import { get, post, usePoll } from '../api';
-import { BAND, EDGE_LABEL, MAINT, fmt, fmtClock, fmtMin, stationStatus } from '../lib/format';
+import { BAND, CLOSED_EARLY, EDGE_LABEL, fmt, fmtClock, fmtMin, stationStatus } from '../lib/format';
+import { WATER_KEY } from '../lib/waterColour';
 import { AHEAD_S, PAST_S, exposure, fmtOffset } from '../lib/twinField';
 import { useTwinTime } from '../lib/useTwinTime';
 import MapCredits from './MapCredits';
@@ -241,10 +242,10 @@ function Tables({ live, tasks, quick, onPick, weather, access }) {
 
 const HAZARDS = {
   none: { label: 'None', group: 'Water quality' },
-  risk: { label: 'Overall contamination risk', group: 'Water quality', low: 'Low', high: 'Severe', note: 'How likely the water is to be contaminated, using all the sensors together.' },
-  turbidity: { label: 'Turbidity', group: 'Water quality', low: 'Clear', high: 'Cloudy', note: 'How cloudy the water is. Cloudy water can carry germs.' },
-  ph: { label: 'pH', group: 'Water quality', low: 'Normal', high: 'Off range', note: 'How far the water is from a safe, neutral level.' },
-  tds: { label: 'Total dissolved solids', group: 'Water quality', low: 'Low', high: 'High', note: 'How much mineral and salt is dissolved in the water.' },
+  risk: { label: 'Overall contamination risk', group: 'Water quality', low: 'Moderate', high: 'Severe', steps: ['Moderate', 'High', 'Severe'], note: 'How likely the water is to be contaminated, using all the sensors together. Low risk is left clear.' },
+  turbidity: { label: 'Turbidity', group: 'Water quality', low: 'Clear', high: 'Cloudy', note: 'How cloudy the water is. Cloudy water can carry germs. The middle of the scale is the safe limit.' },
+  ph: { label: 'pH', group: 'Water quality', low: 'Normal', high: 'Off range', note: 'How far the water is from a neutral level. The middle of the scale is the safe limit.' },
+  tds: { label: 'Total dissolved solids', group: 'Water quality', low: 'Low', high: 'High', note: 'How much mineral and salt is dissolved in the water. The middle of the scale is the safe limit.' },
   bio: { label: 'Biological indicator', group: 'Water quality', low: 'Low', high: 'High', note: 'A sign of sewage or animal waste in the water.' },
   wells: { label: 'Shallow well exposure', group: 'Water access', low: 'Lower', high: 'Higher', note: 'Low ground near the river, where wells draw in river water. Our estimate.' },
   runoff: { label: 'Runoff sources', group: 'Water access', low: 'Low', high: 'High', note: 'Wet, steep ground that sends rain and pollution into the river. Our estimate.' },
@@ -255,10 +256,11 @@ const PALETTE_CSS = { hazard: ['#ffe05a', '#fa9628', '#e0342c'], ocean: ['#bae6f
 const VIEW_KEY = 'bulos-view';
 const DEFAULT_VIEW = { mapLabels: true, hazard: 'risk', opacity: 0.7, palette: 'hazard', base: 'satellite', relief: 1.5 };
 const SWATCH = {
-  buildings: 'bg-[#dfe5ee] border border-[#b7c2d3]', streams: 'line #62c0ff', pipes: 'line #2f9fd8', network: 'line #35e0c2', catchment: 'dash', particles: 'flow', labels: 'text', barangays: 'dots', assets: 'dot #2aa58c',
+  buildings: 'bg-[#dfe5ee] border border-[#b7c2d3]', streams: 'line #62c0ff', pipes: 'line #4fd2ff', network: 'line #35e0c2', catchment: 'dash', particles: 'flow', labels: 'text', barangays: 'dots', assets: 'dot #2aa58c',
 };
 const OFF_BY_DEFAULT = ['network', 'barangays'];
 const UI_KEY = 'bulos-ui';
+const rampCss = (h, [a, b, c]) => (h?.steps ? `linear-gradient(90deg, ${a} 0 33.3%, ${b} 33.3% 66.6%, ${c} 66.6%)` : `linear-gradient(90deg, ${a}, ${b}, ${c})`);
 const DEFAULT_UI = { glass: false, timeline: true, colourBar: true, coords: true };
 const KEYS = [['H', 'Presentation mode'], ['L', 'Layers'], ['G', 'Legend'], ['D', 'Data'], ['C', 'Customize']];
 const TOGGLES = [['buildings', 'Real 3D buildings'], ['labels', 'Roads and place names'], ['streams', 'Streams'], ['pipes', 'Main pipelines'], ['network', 'Proposed barangay network'], ['barangays', 'Barangay access dots'], ['assets', 'Water district facilities'], ['particles', 'Water flow'], ['catchment', 'Watershed']];
@@ -372,23 +374,34 @@ function LegendWindow({ view, layers }) {
       {h?.low && (
         <>
           <h3 className={heading}>{h.label}</h3>
-          <i className="mt-1.5 block h-3 rounded-sm" style={{ background: `linear-gradient(90deg, ${a}, ${b}, ${c})` }} />
-          <div className="mt-0.5 flex justify-between text-[12px]"><span>{h.low}</span><span>{h.high}</span></div>
+          <i className="mt-1.5 block h-3 rounded-sm" style={{ background: rampCss(h, [a, b, c]) }} />
+          {h.steps ? <div className="mt-0.5 grid grid-cols-3 text-[11.5px]">{h.steps.map((x) => <span key={x}>{x}</span>)}</div>
+            : <div className="mt-0.5 flex justify-between text-[12px]"><span>{h.low}</span><span>{h.high}</span></div>}
+          <p className="mt-1 text-[12px] text-muted">Fades out when you zoom in close.</p>
         </>
       )}
       <h3 className={heading}>Water points</h3>
       <ul className="mt-1">
-        {['LOW', 'MODERATE', 'HIGH', 'SEVERE'].map((k) => row(k, <i className="h-3 w-3 rounded-full border-2 border-white shadow-[0_0_0_1px_#b7c2d3]" style={{ background: BAND[k].color }} />, `${BAND[k].label} risk`))}
-        {row('maint', <i className="h-3 w-3 rounded-full border-2 border-white shadow-[0_0_0_1px_#b7c2d3]" style={{ background: MAINT.color }} />, 'Sensor maintenance')}
+        {[['Low risk', BAND.LOW.color], ['Moderate risk, plume coming, or sensor check', BAND.MODERATE.color], ['High risk', BAND.HIGH.color], ['Severe risk', BAND.SEVERE.color], ['Closed early, before the plume', CLOSED_EARLY]].map(([label, color]) => row(label, <i className="h-3 w-3 rounded-full border-2 border-white shadow-[0_0_0_1px_#b7c2d3]" style={{ background: color }} />, label))}
       </ul>
       <p className="mt-1 text-[12px] text-muted">The number beside each name is its water health out of 100.</p>
       <h3 className={heading}>River</h3>
-      <i className="mt-1.5 block h-3 rounded-sm" style={{ background: 'linear-gradient(90deg, #33a8e6, #c25738, #e0261e)' }} />
-      <div className="mt-0.5 flex justify-between text-[12px]"><span>Clean</span><span>Polluted</span></div>
+      <ul className="mt-1">
+        {WATER_KEY.map(([label, color]) => row(label, <i className="h-[5px] w-6 rounded-full" style={{ background: color }} />, label))}
+      </ul>
       <h3 className={heading}>Lines and places</h3>
       <ul className="mt-1">
-        {TOGGLES.filter(([k]) => isOn(layers, k) && k !== 'labels').map(([k, label]) => row(k, <Swatch k={k} />, label))}
+        {TOGGLES.filter(([k]) => isOn(layers, k) && k !== 'labels' && k !== 'barangays').map(([k, label]) => row(k, <Swatch k={k} />, label))}
       </ul>
+      {isOn(layers, 'pipes') && <p className="mt-1 text-[12px] text-muted">Pipelines turn yellow to red when their source water is polluted.</p>}
+      {(isOn(layers, 'barangays') || view.hazard === 'access') && (
+        <>
+          <h3 className={heading}>Barangay distance to water</h3>
+          <ul className="mt-1">
+            {[['Under 1.5 km', '#2eb872'], ['1.5 to 3 km', '#f2c200'], ['3 to 6 km', '#ec835a'], ['Over 6 km', '#d03b3b']].map(([label, color]) => row(label, <i className="h-2.5 w-2.5 rounded-full border border-white shadow-[0_0_0_1px_#b7c2d3]" style={{ background: color }} />, label))}
+          </ul>
+        </>
+      )}
     </div>
   );
 }
@@ -477,7 +490,7 @@ function HazardCard({ spot, live, onClose, onSpill }) {
 }
 
 /** What colours the map right now, with a quick way to change it. */
-function LayerPicker({ view, setView, onLegend }) {
+function LayerPicker({ view, setView, onLegend, past }) {
   const [open, setOpen] = useState(false);
   const h = HAZARDS[view.hazard];
   const [a, b, c] = PALETTE_CSS[view.palette];
@@ -486,9 +499,9 @@ function LayerPicker({ view, setView, onLegend }) {
     <div className="relative shrink-0 border-l border-line pl-3">
       <button onClick={() => setOpen((o) => !o)} aria-expanded={open} aria-haspopup="true" className="block w-[176px] text-left">
         <span className="flex items-center justify-between gap-1 text-[12.5px] font-semibold"><span className="truncate">{h?.low ? h.label : 'No colour layer'}</span><ChevronDown size={14} className={`shrink-0 text-muted ${open ? 'rotate-180' : ''}`} /></span>
-        {h?.low ? (
-          <span className="mt-1 flex items-center gap-1.5 text-[11px] text-muted">{h.low}<i className="h-[7px] flex-1 rounded-sm" style={{ background: `linear-gradient(90deg, ${a}, ${b}, ${c})` }} />{h.high}</span>
-        ) : <span className="mt-1 block text-[11px] text-muted">Pick one to colour the map</span>}
+        {h?.low && !past ? (
+          <span className="mt-1 flex items-center gap-1.5 text-[11px] text-muted">{h.low}<i className="h-[7px] flex-1 rounded-sm" style={{ background: rampCss(h, [a, b, c]) }} />{h.high}</span>
+        ) : past ? <span className="mt-1 block text-[11px] text-muted">Shown at Now only. The river still changes.</span> : <span className="mt-1 block text-[11px] text-muted">Pick one to colour the map</span>}
       </button>
       {open && (
         <div className="site-panel absolute right-0 top-[calc(100%+10px)] z-40 w-[230px] p-1.5">
@@ -664,7 +677,7 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
       {live && (
         <>
           {/* Top right: account-level actions, then map controls */}
-          <div className="map-actions absolute right-3 top-3 z-20 hidden items-center gap-2 lg:flex">{actions}</div>
+          <div className="map-actions absolute right-3 top-3 z-[28] hidden items-center gap-2 lg:flex">{actions}</div>
           <Floating id="map-tools" label="Move the map tools" className={`${card} absolute right-3 top-[64px] z-10 hidden flex-col overflow-hidden lg:flex`}>
             <button onClick={() => controls.current.zoom?.(0.8)} aria-label="Zoom in" title="Zoom in" className={tool}><Plus size={17} /></button>
             <button onClick={() => controls.current.zoom?.(-0.8)} aria-label="Zoom out" title="Zoom out" className={tool}><Minus size={17} /></button>
@@ -728,7 +741,7 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
             <Floating id="map-time" label="Move the time bar" className={`${card} relative z-[25] m-2 lg:absolute lg:left-[364px] lg:right-[190px] lg:top-3 lg:m-0`}>
               <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1.5 px-2.5 pb-1.5 pt-1 lg:pt-0">
                 {ui.timeline && <Timeline live={live} time={time} />}
-                {ui.colourBar && <LayerPicker view={view} setView={setView} onLegend={() => { setWins((w) => ({ ...w, legend: true })); setTop('legend'); }} />}
+                {ui.colourBar && <LayerPicker view={view} setView={setView} past={time.tauStep !== 0} onLegend={() => { setWins((w) => ({ ...w, legend: true })); setTop('legend'); }} />}
               </div>
             </Floating>
           )}

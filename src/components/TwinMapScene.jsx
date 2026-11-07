@@ -4,9 +4,10 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import * as THREE from 'three';
 import { applyReading, buildSite, setNightGlow, tickSite, updateDisplay } from '../lib/detailModels';
 import { bakeShadow, sky } from '../lib/siteKit';
-import { fmt, stationStatus } from '../lib/format';
+import { BAND, CLOSED_EARLY, fmt, stationStatus } from '../lib/format';
 import { riverAt } from '../lib/twinField';
 import { PIPE_FRAG, RIVER_FRAG, paintRiver } from '../lib/waterShaders';
+import { waterCss } from '../lib/waterColour';
 
 // The command view: a real 3D map with detailed facilities and people on it.
 // Free open data by default; VITE_MAPBOX_TOKEN switches the imagery and terrain to Mapbox.
@@ -26,11 +27,6 @@ const SCREENS_FROM_ZOOM = 18;
 const bandOf = (r) => (r >= 0.6 ? 'SEVERE' : r >= 0.45 ? 'HIGH' : r >= 0.25 ? 'MODERATE' : 'LOW');
 const line = (coords) => ({ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords.map(([a, b]) => [a, b]) } });
 const empty = { type: 'FeatureCollection', features: [] };
-const waterCss = (t, o) => {
-  const [a, b] = [Math.min(1, t / 30), Math.min(1, o / 150)];
-  return `rgb(${Math.round(Math.min(255, (0.2 + 0.56 * a + 0.34 * b) * 255))},${Math.round(Math.max(0, (0.66 - 0.32 * a - 0.46 * b) * 255))},${Math.round(Math.max(0, (1 - 0.8 * a - 0.68 * b) * 255))})`;
-};
-
 function rasterUrl(grid, ramp) {
   const canvas = document.createElement('canvas');
   canvas.width = grid.ncols; canvas.height = grid.nrows;
@@ -53,7 +49,7 @@ function ramp(palette, stepped, floor) {
   const mix = (p, q, f) => p.map((v, i) => v + (q[i] - v) * f);
   return (t) => {
     if (t < floor) return [0, 0, 0, 0];
-    if (stepped) return [...(t < 0.34 ? a : t < 0.67 ? b : c), 165];
+    if (stepped) return [...(t < 0.45 ? a : t < 0.6 ? b : c), 165];   // the same limits as Moderate, High and Severe
     return [...(t < 0.5 ? mix(a, b, t * 2) : mix(b, c, (t - 0.5) * 2)), 150];
   };
 }
@@ -702,7 +698,10 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
       const fc = live.forecast.stations?.[st.id];
       const eta = tauStep === 0 && fc?.arrival_s > 0 ? `ETA ${Math.round(fc.arrival_s / 60)} min` : '';
       const at = w.sites[st.id];
-      tagList.push({ ...tag('station', at.lon, at.lat, `${st.id}  ${closed ? 'closed' : eta || st.wqhi.score}`, color), id: st.id });
+      // Low risk does not mean nothing is happening: closed early and plume on the way each get their own colour
+      const calm = tauStep === 0 && stationStatus(st).color === BAND.LOW.color;
+      const dot = calm && closed ? CLOSED_EARLY : calm && eta ? BAND.MODERATE.color : color;
+      tagList.push({ ...tag('station', at.lon, at.lat, `${st.id}  ${closed ? 'closed' : eta || st.wqhi.score}`, dot), id: st.id });
       tagList.at(-1).properties = { ...tagList.at(-1).properties, id: st.id, picked: st.id === selectedId, detail: `${st.name}\nWater health ${st.wqhi.score}/100, turbidity ${fmt(st.reading?.turbidity, 1)} NTU, pH ${fmt(st.reading?.ph, 2)}` };
     }
     map.getSource('tags').setData({ type: 'FeatureCollection', features: tagList });
@@ -745,7 +744,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
     if (map.hazardKey !== key) {
       map.hazardKey = key;
       const stepped = hazard.index === 'risk';
-      const url = rasterUrl(hazard, ramp(view.palette, stepped, hazard.index === 'access' ? 0.02 : 0.06));
+      const url = rasterUrl(hazard, ramp(view.palette, stepped, stepped ? 0.25 : hazard.index === 'access' ? 0.02 : 0.06));
       const coordinates = [[hazard.west, hazard.north], [hazard.east, hazard.north], [hazard.east, hazard.south], [hazard.west, hazard.south]];
       const src = map.getSource('hazard');
       if (src) src.updateImage({ url, coordinates });

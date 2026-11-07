@@ -504,9 +504,9 @@ class Twin:
         if index == "turbidity":
             return float(np.clip(r["turbidity"] / (2 * p["turbidity_ntu"]), 0, 1))
         if index == "ph":
-            return float(np.clip((abs(r["ph"] - 7.5) - 0.5) / 1.5, 0, 1))
+            return float(np.clip(abs(r["ph"] - 7.5) / 2.0, 0, 1))        # PNSDW 6.5 to 8.5 sits at 0.5
         if index == "tds":
-            return float(np.clip((r["tds"] - 300) / (p["tds_mgL"] - 300) * 0.8, 0, 1))
+            return float(np.clip(r["tds"] / (2 * p["tds_mgL"]), 0, 1))
         if index == "bio":
             return 0.0 if r.get("bio") is None else float(np.clip((r["bio"] - 2) / (2 * C.BIO_ALERT_PPB), 0, 1))
         return st.risk

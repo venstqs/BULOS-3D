@@ -1,4 +1,6 @@
 // Water and rain shaders shared by the 3D views.
+import { waterDirt, waterRgb } from './waterColour';
+
 export const NOISE = `
 float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float noise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
@@ -67,14 +69,7 @@ export function paintRiver(px, field) {
   let lastDirty = -1;
   for (let i = 0; i < 256; i += 1) {
     const k = Math.min(n - 1, Math.round((i / 255) * (n - 1)));
-    const t = Math.min(1, (field.turb[k] ?? 0) / 30);
-    const o = Math.min(1, (field.orp[k] ?? 0) / 150);
-    px.set([
-      Math.min(255, (0.23 + 0.5 * t + 0.34 * o) * 255),
-      Math.max(0, (0.66 - 0.32 * t - 0.46 * o) * 255),
-      Math.max(0, (1 - 0.8 * t - 0.68 * o) * 255),
-      Math.max(t, o) * 255,
-    ], i * 4);
+    px.set([...waterRgb(field.turb[k], field.orp[k]), waterDirt(field.turb[k], field.orp[k]) * 255], i * 4);
     if ((field.turb[k] ?? 0) > 3 || (field.orp[k] ?? 0) > 25) lastDirty = i;
   }
   return lastDirty;

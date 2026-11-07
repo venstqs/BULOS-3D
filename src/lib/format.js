@@ -8,6 +8,7 @@ export const BAND = {
   SEVERE: { color: '#d03b3b', ink: '#a32626', label: 'Severe', Icon: OctagonAlert },
 };
 
+export const CLOSED_EARLY = '#2f5be7';
 export const MAINT = { color: '#fab219', ink: '#7a5600', label: 'Sensor maintenance', Icon: Wrench };
 
 /** Station identity colours, upstream -> downstream. */
