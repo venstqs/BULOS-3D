@@ -1,6 +1,6 @@
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Activity, Box, Check, Clock, CloudRain, Compass, Crosshair, Cpu, Database, Droplets, FlaskConical, Lock, LockOpen, Minus, Pause, Plane, Play, Plus, RotateCcw, Search, Send, ShieldCheck, SlidersHorizontal, Tag, TriangleAlert, Users, X,
+  Activity, Box, Check, ChevronUp, Clock, Crosshair, Cpu, Droplets, FlaskConical, Lock, LockOpen, Menu, Minus, Navigation, Pause, Plane, Play, Plus, RotateCcw, Search, Send, Tag, TriangleAlert, Users, X,
 } from 'lucide-react';
 import { get, post, usePoll } from '../api';
 import { EDGE_LABEL, fmt, fmtClock, fmtMin, stationStatus } from '../lib/format';
@@ -8,17 +8,35 @@ import { AHEAD_S, PAST_S, exposure, fmtOffset } from '../lib/twinField';
 import { useTwinTime } from '../lib/useTwinTime';
 
 const TwinMapScene = lazy(() => import('./TwinMapScene'));
-const card = 'rounded-2xl bg-white/95 shadow-[0_8px_26px_rgba(30,50,110,0.12)] backdrop-blur';
+// One surface for everything that hangs over the map: plain white, so the map keeps the colour
+const card = 'rounded-xl bg-white shadow-[0_1px_2px_rgba(16,24,40,0.2),0_4px_14px_rgba(16,24,40,0.14)]';
 
-function Stat({ Icon, label, value, sub, tone = 'text-civic' }) {
+function Figure({ value, label, alert = false }) {
   return (
-    <div className={`${card} flex w-[172px] shrink-0 items-center gap-2.5 px-3 py-2`}>
-      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#e9efff] ${tone}`}><Icon size={17} /></span>
-      <div className="min-w-0">
-        <div className="text-[10.5px] text-muted">{label}</div>
-        <div className="truncate font-display text-lg font-semibold leading-tight tabular-nums">{value}</div>
-        <div className="truncate text-[10.5px] text-ink-2">{sub}</div>
+    <div>
+      <dd className={`m-0 font-display text-[19px] font-semibold leading-tight tabular-nums ${alert ? 'text-[#a32626]' : 'text-ink'}`}>{value}</dd>
+      <dt className="text-[11.5px] text-muted">{label}</dt>
+    </div>
+  );
+}
+
+/** Recorded history, now, and the forecast on one line, with alerts marked where they happened. */
+function Timeline({ live, time }) {
+  const at = (s) => `${((s + PAST_S) / (PAST_S + AHEAD_S)) * 100}%`;
+  const marks = live.events.filter((e) => (e.severity === 'danger' || e.severity === 'warning') && e.t_ms > live.clock.epoch_ms - PAST_S * 1000).slice(0, 40);
+  return (
+    <div className={`${card} flex min-w-[260px] flex-1 items-center gap-2.5 px-2.5 py-1.5`}>
+      <button onClick={time.togglePlay} aria-label={time.playing ? 'Pause' : 'Play the last 6 hours and next 4 hours'} className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-civic text-white">
+        {time.playing ? <Pause size={12} /> : <Play size={12} />}
+      </button>
+      <span className="shrink-0 text-[11px] text-muted">−6 h</span>
+      <div className="relative min-w-0 flex-1">
+        <input type="range" min={-PAST_S} max={AHEAD_S} step={time.step} value={time.tauStep} aria-label="Time" onChange={(e) => time.scrub(Number(e.target.value))} className="block w-full accent-[#2f5be7]" />
+        <i className="pointer-events-none absolute -bottom-0.5 -top-0.5 w-px bg-ink-2" style={{ left: at(0) }} />
+        {marks.map((e, i) => <i key={`${e.t_ms}-${i}`} className="pointer-events-none absolute top-1/2 h-2 w-[3px] -translate-x-1/2 -translate-y-1/2" style={{ left: at((e.t_ms - live.clock.epoch_ms) / 1000), background: e.severity === 'danger' ? '#d03b3b' : '#e0a800' }} />)}
       </div>
+      <span className="shrink-0 text-[11px] text-muted">+4 h</span>
+      <button onClick={time.toNow} disabled={time.tauStep === 0} className="w-[64px] shrink-0 text-right text-[12px] font-semibold tabular-nums text-civic disabled:text-muted">{time.tauStep === 0 ? 'Now' : fmtOffset(time.tauStep)}</button>
     </div>
   );
 }
@@ -33,7 +51,7 @@ function Inspector({ st, fc, act, quick, onInspect, onDetails, onClose, onStreet
   const closed = st.valve && !st.valve.open;
   const eta = fc?.arrival_s > 0 ? fc.arrival_s : null;
   return (
-    <div className={`${card} p-3.5`}>
+    <div className="p-3.5">
       <div className="flex items-start gap-2.5">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white" style={{ background: status.color }}><Droplets size={19} /></span>
         <div className="min-w-0 flex-1">
@@ -87,20 +105,20 @@ function Inspector({ st, fc, act, quick, onInspect, onDetails, onClose, onStreet
 }
 
 /** Where the plume is along the river, as a route of water points. */
-function Tracker({ live, danger, quick, time, onPick }) {
+function Tracker({ live, danger, onPick }) {
   const fc = live.forecast.stations ?? {};
   const steps = live.stations.map((s) => {
     const arrival = fc[s.id]?.arrival_s > 0 ? fc[s.id].arrival_s : null;
     const hit = s.risk >= 0.45;
     const closed = s.valve && !s.valve.open;
-    const label = hit ? 'Contaminated' : arrival ? `in ${fmtMin(arrival)}` : s.classification === 'SENSOR_BIOFOULING' ? 'Dirty sensor' : 'Clear';
+    const label = hit ? 'Contaminated' : arrival ? `in ${arrival >= 3600 ? `${Math.floor(arrival / 3600)} h ${Math.round((arrival % 3600) / 60)} m` : `${Math.round(arrival / 60)} min`}` : s.classification === 'SENSOR_BIOFOULING' ? 'Dirty sensor' : 'Clear';
     return { s, hit, arrival, closed, label };
   });
   const active = danger.points > 0;
   return (
-    <div className={`${card} p-3`}>
+    <div className="mt-3 border-t border-line pt-3">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 font-display text-sm font-semibold"><Activity size={15} className="text-civic" />Plume tracking</div>
+        <div className="font-display text-sm font-semibold">Along the river</div>
         <span className={`pill ${active ? 'pill-red' : 'pill-good'}`}>{active ? `${danger.points} water point${danger.points > 1 ? 's' : ''} affected` : 'River clear'}</span>
       </div>
       <ol className="flex items-start">
@@ -117,16 +135,6 @@ function Tracker({ live, danger, quick, time, onPick }) {
           </li>
         ))}
       </ol>
-      <div className="mt-2 flex items-center gap-2 border-t border-line pt-2">
-        <button onClick={time.togglePlay} aria-label={time.playing ? 'Pause' : 'Play the last 6 hours and next 4 hours'} className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-civic text-white">
-          {time.playing ? <Pause size={11} /> : <Play size={11} />}
-        </button>
-        <input type="range" min={-PAST_S} max={AHEAD_S} step={time.step} value={time.tauStep} aria-label="Time" onChange={(e) => time.scrub(Number(e.target.value))} className="min-w-0 flex-1 accent-[#2f5be7]" />
-        <button onClick={time.toNow} disabled={time.tauStep === 0} className="shrink-0 whitespace-nowrap rounded-full border border-line px-2 py-0.5 text-[10.5px] font-semibold text-ink-2 disabled:opacity-60">
-          {time.tauStep === 0 ? 'Live' : `${fmtOffset(time.tauStep)} · Now`}
-        </button>
-        <button onClick={() => quick('advisory')} className="flex shrink-0 items-center gap-1 rounded-full bg-civic px-2.5 py-1 text-[11px] font-semibold text-white"><Send size={11} />Advisory</button>
-      </div>
     </div>
   );
 }
@@ -138,7 +146,7 @@ function Tables({ live, tasks, quick, onPick, weather, access }) {
   const tabs = [['intakes', 'Intakes', live.stations.filter((s) => s.valve).length], ['sensors', 'Sensors', live.stations.length], ['crews', 'Tasks', open.length], ['events', 'Events', feed.length], ['river', 'River', live.reaches.length], ['weather', 'Weather', ''], ['access', 'Access', access?.length ?? 0]];
   const line = 'flex w-full items-center gap-2 border-b border-line py-1.5 text-left text-xs last:border-0 hover:bg-panel-2';
   return (
-    <div className={`${card} p-3`}>
+    <div className="p-3">
       <div className="mb-1 flex gap-2 overflow-x-auto whitespace-nowrap border-b border-line text-[11px] font-semibold" role="tablist">
         {tabs.map(([k, label]) => (
           <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`-mb-px border-b-2 px-0.5 pb-1.5 ${tab === k ? 'border-civic text-civic' : 'border-transparent text-muted hover:text-ink'}`}>
@@ -146,7 +154,7 @@ function Tables({ live, tasks, quick, onPick, weather, access }) {
           </button>
         ))}
       </div>
-      <div className="h-[118px] overflow-y-auto">
+      <div>
         {tab === 'intakes' && live.stations.filter((s) => s.valve).map((s) => (
           <button key={s.id} onClick={() => onPick(s.id)} className={line}>
             <span className="w-12 font-semibold">{s.id}</span>
@@ -233,9 +241,10 @@ const HEAT = ['risk', 'turbidity', 'ph', 'tds', 'bio'];
 const PALETTE_CSS = { hazard: ['#ffe05a', '#fa9628', '#e0342c'], ocean: ['#bae6fd', '#3896f0', '#1432a0'], clear: ['#fde725', '#21918c', '#440154'] };
 const VIEW_KEY = 'bulos-view';
 const DEFAULT_VIEW = { mapLabels: true, hazard: 'risk', opacity: 0.7, palette: 'hazard', base: 'satellite', relief: 1.5 };
+const OFF_BY_DEFAULT = ['network', 'barangays'];
 const TOGGLES = [['buildings', 'Real 3D buildings'], ['labels', 'Roads and place names'], ['streams', 'Streams'], ['pipes', 'Main pipelines'], ['network', 'Proposed barangay network'], ['barangays', 'Barangay access dots'], ['assets', 'Water district facilities'], ['particles', 'Water flow'], ['catchment', 'Watershed']];
 
-function CustomisePanel({ view, setView, layers, setLayers, onClose }) {
+function CustomisePanel({ view, setView, layers, setLayers }) {
   const set = (patch) => setView((v) => ({ ...v, ...patch }));
   const pick = (k, options) => (
     <div className="flex rounded-xl bg-panel-2 p-0.5">
@@ -245,13 +254,10 @@ function CustomisePanel({ view, setView, layers, setLayers, onClose }) {
     </div>
   );
   return (
-    <div className={`${card} absolute right-14 top-[62px] z-20 max-h-[calc(100vh-240px)] w-[262px] overflow-y-auto p-3 text-xs text-ink-2`}>
-      <div className="mb-1 flex items-center justify-between font-display text-sm font-semibold text-ink">Customise the map
-        <button onClick={onClose} aria-label="Close customise" className="rounded p-0.5 hover:bg-panel-2"><X size={14} /></button>
-      </div>
+    <div className="p-3 text-xs text-ink-2">
       {['Water quality', 'Water access'].map((group) => (
         <div key={group}>
-          <div className="mt-2 text-[10px] font-semibold uppercase tracking-wider text-muted">{group}</div>
+          <div className="mt-2 text-[12px] font-semibold text-ink">{group}</div>
           {Object.entries(HAZARDS).filter(([, h]) => h.group === group).map(([k, h]) => (
             <label key={k} className="flex items-center gap-2 py-0.5">
               <input type="radio" name="hazard" checked={view.hazard === k} onChange={() => set({ hazard: k })} className="h-3.5 w-3.5 accent-[#2f5be7]" />{h.label}
@@ -262,17 +268,17 @@ function CustomisePanel({ view, setView, layers, setLayers, onClose }) {
       <label className="mt-1 block">Layer opacity <b>{Math.round(view.opacity * 100)}%</b>
         <input type="range" min={0.2} max={1} step={0.05} value={view.opacity} onChange={(e) => set({ opacity: Number(e.target.value) })} className="w-full accent-[#2f5be7]" />
       </label>
-      <div className="mb-1 mt-2 text-[10px] font-semibold uppercase tracking-wider text-muted">Colours</div>
+      <div className="mb-1 mt-2 text-[12px] font-semibold text-ink">Colours</div>
       {pick('palette', [['hazard', 'Hazard'], ['ocean', 'Water'], ['clear', 'Colour-safe']])}
-      <div className="mb-1 mt-2 text-[10px] font-semibold uppercase tracking-wider text-muted">Base map</div>
+      <div className="mb-1 mt-2 text-[12px] font-semibold text-ink">Base map</div>
       {pick('base', [['satellite', 'Satellite'], ['light', 'Light'], ['dark', 'Dark']])}
       <label className="mt-2 block">Terrain height <b>×{view.relief}</b>
         <input type="range" min={1} max={3} step={0.25} value={view.relief} onChange={(e) => set({ relief: Number(e.target.value) })} className="w-full accent-[#2f5be7]" />
       </label>
-      <div className="mb-1 mt-2 text-[10px] font-semibold uppercase tracking-wider text-muted">Show on the map</div>
+      <div className="mb-1 mt-2 text-[12px] font-semibold text-ink">Show on the map</div>
       {TOGGLES.map(([k, label]) => (
         <label key={k} className="flex items-center gap-2 py-0.5">
-          <input type="checkbox" checked={layers[k] !== false} onChange={() => setLayers((l) => ({ ...l, [k]: l[k] === false }))} className="h-3.5 w-3.5 accent-[#2f5be7]" />{label}
+          <input type="checkbox" checked={OFF_BY_DEFAULT.includes(k) ? layers[k] === true : layers[k] !== false} onChange={() => setLayers((l) => ({ ...l, [k]: OFF_BY_DEFAULT.includes(k) ? l[k] !== true : l[k] === false }))} className="h-3.5 w-3.5 accent-[#2f5be7]" />{label}
         </label>
       ))}
       <button onClick={() => setView(DEFAULT_VIEW)} className="mt-2 w-full rounded-xl border border-line py-1 text-[11px] font-semibold text-ink-2">Reset to default</button>
@@ -287,12 +293,10 @@ const SOURCES = [
   ['Illustrative', 'pill-grey', ['The five water points are a proposed layout, not existing sites', 'Pipelines and the barangay network follow real roads, but they are proposed routes', 'Building and people models, and the rain gauge position']],
 ];
 
-function DataPanel({ onClose }) {
+function DataPanel() {
   return (
-    <div className={`${card} absolute right-14 top-[62px] z-20 max-h-[calc(100vh-240px)] w-[318px] overflow-y-auto p-3 text-xs text-ink-2`}>
-      <div className="mb-1 flex items-center justify-between font-display text-sm font-semibold text-ink">What is real here
-        <button onClick={onClose} aria-label="Close data sources" className="rounded p-0.5 hover:bg-panel-2"><X size={14} /></button>
-      </div>
+    <div className="border-t border-line p-3 text-xs text-ink-2">
+      <div className="mb-1 font-display text-sm font-semibold text-ink">What is real here</div>
       {SOURCES.map(([label, pill, items]) => (
         <div key={label} className="mt-2">
           <span className={`pill ${pill}`}>{label}</span>
@@ -311,14 +315,14 @@ function SearchBox({ live, tasks, onPick, go }) {
   const points = live?.stations.filter((s) => `${s.id} ${s.name} ${s.owner}`.toLowerCase().includes(text)).slice(0, 5) ?? [];
   const jobs = text ? (tasks ?? []).filter((t) => t.status !== 'COMPLETED' && t.title.toLowerCase().includes(text)).slice(0, 3) : [];
   return (
-    <div className="relative hidden w-[210px] shrink-0 xl:block">
-      <Search size={14} className="absolute left-2.5 top-2 text-muted" />
+    <div className="relative">
+      <Search size={14} className="absolute left-2.5 top-[11px] text-muted" />
       <input
         value={q} onChange={(e) => setQ(e.target.value)} onFocus={() => setOpen(true)} onBlur={() => setTimeout(() => setOpen(false), 160)}
-        placeholder="Search water points, tasks…" aria-label="Search" className="h-[30px] w-full rounded-xl border border-line bg-white pl-8 pr-2 text-xs"
+        placeholder="Search water points, tasks…" aria-label="Search" className="h-9 w-full rounded-lg bg-panel-2 pl-8 pr-2 text-[13px]"
       />
       {open && (points.length > 0 || jobs.length > 0) && (
-        <div className={`${card} absolute left-0 top-9 z-30 w-[280px] p-1.5 text-xs`}>
+        <div className={`${card} absolute left-0 top-10 z-30 w-[280px] p-1.5 text-xs`}>
           {points.map((s) => <button key={s.id} onMouseDown={() => { onPick(s.id); setQ(''); }} className="block w-full truncate rounded-lg px-2 py-1.5 text-left hover:bg-panel-2"><b>{s.id}</b> {s.name}</button>)}
           {jobs.map((t) => <button key={t.id} onMouseDown={() => go('maintenance')} className="block w-full truncate rounded-lg px-2 py-1.5 text-left text-ink-2 hover:bg-panel-2">{t.station}: {t.title}</button>)}
         </div>
@@ -332,7 +336,7 @@ function HazardCard({ spot, live, onClose, onSpill }) {
   const st = live.stations.find((x) => x.id === spot?.nearest_id);
   const eta = st ? live.forecast.stations?.[st.id]?.arrival_s : null;
   return (
-    <div className={`${card} p-3`}>
+    <div className="p-3">
       <div className="flex items-center justify-between">
         <div className="font-display text-sm font-semibold">Check this location</div>
         <button onClick={onClose} aria-label="Close location check" className="rounded p-0.5 text-muted hover:bg-panel-2"><X size={14} /></button>
@@ -389,12 +393,11 @@ function ActionCard({ live, act, quick, onPick }) {
   const a = nextAction(live);
   if (!a) return null;
   return (
-    <div className={`${card} border-l-4 border-[#ec835a] p-3`}>
+    <div className="rounded-lg border border-[#f3c4b4] bg-[#fff6f2] p-2.5">
       <div className="flex items-start gap-2">
         <TriangleAlert size={17} className="mt-0.5 shrink-0 text-[#c9551f]" />
         <div className="min-w-0">
-          <div className="text-[10.5px] font-semibold uppercase tracking-wide text-muted">Action needed</div>
-          <div className="font-display text-sm font-semibold leading-tight">{a.title}</div>
+                    <div className="font-display text-sm font-semibold leading-tight">{a.title}</div>
           <div className="mt-0.5 text-xs text-ink-2">{a.text}</div>
         </div>
       </div>
@@ -411,9 +414,15 @@ function ActionCard({ live, act, quick, onPick }) {
 export default function CommandCenter({ live, forecast, tasks, staticData, layers, setLayers, status, selectedId, onSelect, onInspect, onDetails, act, quick, notify, pages, page, go, actions }) {
   const time = useTwinTime(live, forecast);
   const controls = useRef({});
-  const [showInspector, setShowInspector] = useState(false);
-  const [showLayers, setShowLayers] = useState(false);
-  const [showData, setShowData] = useState(false);
+  const [probe, setProbe] = useState(null);
+  const [spot, setSpot] = useState(null);
+  const [detail, setDetail] = useState(false);
+  const [panel, setPanel] = useState(true);
+  const [tab, setTab] = useState('river');
+  const [menu, setMenu] = useState(false);
+  const [flat, setFlat] = useState(false);
+  const readout = useRef(null);
+  const needle = useRef(null);
   const { data: weather } = usePoll('/api/weather', 600000);
   const [touring, setTouring] = useState(false);
   const [following, setFollowing] = useState(false);
@@ -428,8 +437,6 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
   const isHeat = HEAT.includes(view.hazard);
   const hazardPath = view.hazard === 'none' ? null : isHeat ? `/api/heatmap?index=${view.hazard}` : `/api/layer/${view.hazard}`;
   const { data: hazardGrid } = usePoll(hazardPath, isHeat ? 8000 : 0);
-  const [probe, setProbe] = useState(null);
-  const [spot, setSpot] = useState(null);
   const checkSpot = useMemo(() => (at) => {
     setProbe(at);
     setSpot(null);
@@ -438,117 +445,126 @@ export default function CommandCenter({ live, forecast, tasks, staticData, layer
   const selected = live?.stations.find((s) => s.id === selectedId);
   const danger = live ? exposure(live) : null;
 
-  const pick = useMemo(() => (id) => { onSelect(id); setShowInspector(true); }, [onSelect]);
+  const pick = useMemo(() => (id) => { onSelect(id); setDetail(true); setProbe(null); }, [onSelect]);
   const focus = (id) => { pick(id); controls.current.focus?.(id); };
   const total = live?.stations.reduce((a, s) => a + (s.population ?? 0), 0) ?? 0;
   const avg = live ? Math.round(live.stations.reduce((a, s) => a + s.wqhi.score, 0) / live.stations.length) : 0;
   const valves = live?.stations.filter((s) => s.valve) ?? [];
   const closed = valves.filter((s) => !s.valve.open).length;
-  const tool = 'flex h-8 w-8 items-center justify-center rounded-xl text-ink-2 hover:bg-panel-2 hover:text-civic';
+  const tool = 'flex h-[34px] w-[38px] items-center justify-center text-ink-2 hover:bg-panel-2 hover:text-civic';
+  const rightOpen = Boolean(probe) || (detail && Boolean(selected));
   const isLive = time.tauStep === 0;
 
   return (
-    <div className="relative min-h-full overflow-x-hidden bg-gradient-to-b from-[#eef3fc] to-[#e6eeff] lg:fixed lg:inset-0 lg:overflow-hidden">
-      <div className="relative h-[62vh] min-h-[380px] lg:absolute lg:inset-0 lg:h-auto">
-        <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-muted">Building the watershed…</div>}>
+    <div className="relative min-h-full overflow-x-hidden bg-[#eef2f6] lg:fixed lg:inset-0 lg:overflow-hidden">
+      <div className="relative h-[60vh] min-h-[380px] lg:absolute lg:inset-0 lg:h-auto">
+        <Suspense fallback={<div className="flex h-full items-center justify-center text-sm text-muted">Loading the map…</div>}>
           <TwinMapScene
             staticData={staticData} live={live} hazard={hazardPath ? hazardGrid : null} view={view} atTime={time.atTime} tauStep={time.tauStep} selectedId={selectedId}
             onPick={pick} onInspect={onInspect} layers={layers} controls={controls} onTour={setTouring} onCaption={setCaption} onProbe={checkSpot} probe={probe}
+            insets={{ left: panel ? 364 : 20, right: rightOpen ? 372 : 64, top: 16, bottom: 72 }} readout={readout} needle={needle}
           />
         </Suspense>
       </div>
 
-      <header className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 bg-white/90 px-3 py-2 shadow-[0_2px_14px_rgba(30,50,110,0.08)] backdrop-blur">
-        <button onClick={() => go('home')} className="flex shrink-0 items-center gap-2">
-          <img src="/favicon.svg" alt="" className="h-8 w-8" />
-          <span className="hidden text-left leading-tight sm:block">
-            <span className="block font-display text-sm font-semibold">Bulos 3D</span>
-            <span className="block text-[10.5px] text-muted">{staticData?.site.title ?? 'Water quality digital twin'}</span>
-          </span>
-        </button>
-        <nav className="flex min-w-0 flex-1 gap-0.5 overflow-x-auto px-2">
-          {pages.map(([id, label]) => (
-            <button key={id} onClick={() => go(id)} aria-current={page === id ? 'page' : undefined}
-                    className={`shrink-0 whitespace-nowrap rounded-xl px-2.5 py-1 text-[13px] font-medium ${page === id ? 'bg-civic text-white' : 'text-ink-2 hover:bg-[#e9efff]'}`}>{label}</button>
-          ))}
-        </nav>
-        <SearchBox live={live} tasks={tasks} onPick={focus} go={go} />
-        {weather?.available && (
-          <span title="Real weather in Naga, from Open-Meteo" className="hidden shrink-0 items-center gap-1.5 rounded-xl bg-[#e9efff] px-2.5 py-1 text-xs font-medium text-ink-2 2xl:inline-flex">
-            <CloudRain size={13} className="text-civic" />Naga now {fmt(weather.temp_c, 0)}°C · {fmt(weather.rain_mm, 1)} mm
-          </span>
+      {/* Left: everything about the river, one panel */}
+      <section aria-label="Bulos 3D" className={`${card} relative z-20 m-2 flex flex-col lg:absolute lg:left-3 lg:top-3 lg:m-0 lg:max-h-[calc(100vh-24px)] lg:w-[340px]`}>
+        <div className="flex items-center gap-2 p-2">
+          <button onClick={() => setMenu((m) => !m)} aria-expanded={menu} aria-label="Menu" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-ink-2 hover:bg-panel-2"><Menu size={18} /></button>
+          <img src="/favicon.svg" alt="" className="h-7 w-7 shrink-0" />
+          <div className="min-w-0 flex-1"><SearchBox live={live} tasks={tasks} onPick={focus} go={go} /></div>
+          <button onClick={() => setPanel((v) => !v)} aria-expanded={panel} aria-label={panel ? 'Collapse panel' : 'Expand panel'} className="hidden h-9 w-7 shrink-0 items-center justify-center rounded-lg text-muted hover:bg-panel-2 lg:flex"><ChevronUp size={16} className={panel ? '' : 'rotate-180'} /></button>
+        </div>
+        {menu && (
+          <nav className="grid grid-cols-2 gap-0.5 border-t border-line p-1.5">
+            {pages.map(([id, label]) => (
+              <button key={id} onClick={() => { setMenu(false); go(id); }} aria-current={page === id ? 'page' : undefined} className={`rounded-lg px-2.5 py-1.5 text-left text-[13px] font-medium ${page === id ? 'bg-[#e9efff] text-civic' : 'text-ink-2 hover:bg-panel-2'}`}>{label}</button>
+            ))}
+          </nav>
         )}
-        <span className={`hidden min-w-[122px] shrink-0 items-center justify-center gap-1.5 rounded-xl px-2.5 py-1 text-xs font-semibold tabular-nums md:inline-flex ${status === 'online' ? (isLive ? 'bg-[#e3f6ea] text-[#157a3e]' : 'bg-[#e7edff] text-civic') : 'bg-[#fde6e6] text-[#a32626]'}`}>
-          <span className={`h-1.5 w-1.5 rounded-full ${status === 'online' ? 'bg-good' : 'bg-critical'}`} />
-          {status !== 'online' ? 'Offline' : isLive ? `Live ${live ? fmtClock(live.clock.epoch_ms) : ''}` : `${time.tauStep > 0 ? 'Forecast' : 'Replay'} ${fmtOffset(time.tauStep)}`}
-        </span>
-        {actions}
-      </header>
+        {live && <div className="px-2 pb-2 empty:hidden"><ActionCard live={live} act={act} quick={quick} onPick={focus} /></div>}
+        {panel && live && (
+          <>
+            <div className="flex gap-4 border-b border-t border-line px-3" role="tablist">
+              {[['river', 'River'], ['layers', 'Layers'], ['data', 'Data']].map(([k, label]) => (
+                <button key={k} role="tab" aria-selected={tab === k} onClick={() => setTab(k)} className={`-mb-px border-b-2 py-2 text-[13px] font-semibold ${tab === k ? 'border-civic text-civic' : 'border-transparent text-muted hover:text-ink'}`}>{label}</button>
+              ))}
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {tab === 'river' && (
+                <div className="p-3">
+                  <p className="font-display text-[17px] font-semibold leading-snug">{danger.points ? `${danger.points} water point${danger.points > 1 ? 's' : ''} affected` : 'The river is clear'}</p>
+                  <p className="mt-0.5 text-[12.5px] text-ink-2">{status !== 'online' ? 'The data server is offline.' : `${isLive ? 'Updated' : time.tauStep > 0 ? 'Forecast for' : 'Replay of'} ${isLive ? fmtClock(live.clock.epoch_ms) : fmtOffset(time.tauStep)}. Readings are ${live.clock.mode === 'sim' ? 'simulated' : 'from the field'}.`}</p>
+                  <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2.5">
+                    <Figure value={`${avg}%`} label="Water quality" />
+                    <Figure value={(total - danger.people).toLocaleString()} label="People not affected" alert={danger.people > 0} />
+                    <Figure value={`${valves.length - closed} of ${valves.length}`} label="Intakes open" alert={closed > 0} />
+                    <Figure value={danger.next ? fmtMin(danger.next.s) : 'None'} label={danger.next ? `Next plume, ${danger.next.id}` : 'Next plume'} alert={Boolean(danger.next)} />
+                  </dl>
+                  <Tracker live={live} danger={danger} onPick={focus} />
+                  <button onClick={() => quick('advisory')} className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-civic py-2 text-[13px] font-semibold text-white"><Send size={13} />Send advisory</button>
+                </div>
+              )}
+              {tab === 'layers' && (
+                <>
+                  <CustomisePanel view={view} setView={setView} layers={layers} setLayers={setLayers} />
+                  <DataPanel />
+                </>
+              )}
+              {tab === 'data' && <Tables live={live} tasks={tasks} quick={quick} onPick={focus} weather={weather} access={staticData?.access} />}
+            </div>
+          </>
+        )}
+        {!live && <p className="p-3 text-sm text-muted">{status === 'offline' ? 'The data server is not running. Run npm start in the project folder.' : 'Connecting to the twin…'}</p>}
+      </section>
 
-      {live ? (
+      {live && (
         <>
-          <div className="z-10 flex gap-2 overflow-x-auto p-2 lg:absolute lg:left-3 lg:top-[62px] lg:overflow-visible lg:p-0">
-            <Stat Icon={Droplets} label="Water quality" value={`${avg}%`} sub={danger.points ? 'Event in progress' : 'All water points good'} />
-            <Stat Icon={Users} label="People not affected" value={(total - danger.people).toLocaleString()} sub={danger.people ? `${danger.people.toLocaleString()} in the path` : `of ${total.toLocaleString()} served`} tone={danger.people ? 'text-[#d03b3b]' : 'text-civic'} />
-            <Stat Icon={ShieldCheck} label="Intakes open" value={`${valves.length - closed} of ${valves.length}`} sub={closed ? `${closed} closed for safety` : 'All running'} tone={closed ? 'text-[#d03b3b]' : 'text-civic'} />
-            <Stat Icon={Clock} label="Next arrival" value={danger.next ? fmtMin(danger.next.s) : 'None'} sub={danger.next ? `at ${danger.next.id}` : 'No plume forecast'} tone={danger.next ? 'text-[#c47a00]' : 'text-civic'} />
-          </div>
-
-          <div className={`${card} absolute right-3 top-[62px] z-10 hidden flex-col p-1 lg:flex`}>
-            <button onClick={() => controls.current.zoom?.(0.8)} aria-label="Zoom in" className={tool}><Plus size={16} /></button>
-            <button onClick={() => controls.current.zoom?.(-0.8)} aria-label="Zoom out" className={tool}><Minus size={16} /></button>
-            <button onClick={() => controls.current.tilt?.()} aria-label="Rotate view" title="Rotate" className={tool}><Compass size={15} /></button>
+          {/* Top right: account-level actions, then map controls */}
+          <div className="map-actions absolute right-3 top-3 z-20 hidden items-center gap-2 lg:flex">{actions}</div>
+          <div className={`${card} absolute right-3 top-[64px] z-10 hidden flex-col overflow-hidden lg:flex`}>
+            <button onClick={() => controls.current.zoom?.(0.8)} aria-label="Zoom in" title="Zoom in" className={tool}><Plus size={17} /></button>
+            <button onClick={() => controls.current.zoom?.(-0.8)} aria-label="Zoom out" title="Zoom out" className={tool}><Minus size={17} /></button>
+            <hr className="border-line" />
+            <button onClick={() => controls.current.north?.()} aria-label="Point north" title="Point north" className={tool}><span ref={needle} className="block"><Navigation size={15} className="fill-[#d03b3b] text-[#d03b3b]" /></span></button>
+            <button onClick={() => { const on = !flat; setFlat(on); controls.current.tilt3d?.(on); }} aria-pressed={flat} aria-label={flat ? 'Switch to 3D' : 'Switch to 2D'} title={flat ? 'Switch to 3D' : 'Switch to 2D'} className={`${tool} text-[12px] font-bold`}>{flat ? '3D' : '2D'}</button>
             <button onClick={() => { setFollowing(false); controls.current.home?.(); }} aria-label="Reset view" title="Back to the whole river" className={tool}><RotateCcw size={15} /></button>
-            <button
-              onClick={() => setView((v) => ({ ...v, mapLabels: !v.mapLabels }))} aria-pressed={!view.mapLabels}
-              aria-label={view.mapLabels ? 'Hide map labels' : 'Show map labels'} title={view.mapLabels ? 'Hide the labels on the map' : 'Show the labels on the map'}
-              className={`${tool} ${view.mapLabels ? '' : 'bg-civic text-white hover:text-white'}`}
-            >
-              <Tag size={15} />
-            </button>
-            <button onClick={() => { setShowData(false); setShowLayers((v) => !v); }} aria-label="Customise" title="Customise the map" className={tool}><SlidersHorizontal size={15} /></button>
-            <button onClick={() => { setShowLayers(false); setShowData((v) => !v); }} aria-label="What is real" title="What is real here" className={tool}><Database size={15} /></button>
-            <button onClick={() => (touring ? controls.current.stopTour?.() : controls.current.startTour?.())} aria-label="Tour" title="Guided tour of all five water points" className={`${tool} ${touring ? 'bg-civic text-white' : ''}`}><Plane size={15} /></button>
-            <button onClick={() => { const on = !following; setFollowing(on); controls.current.setFollow?.(on); }} aria-label="Follow the plume" title="Follow the plume" className={`${tool} ${following ? 'bg-civic text-white' : ''}`}><Crosshair size={15} /></button>
+            <hr className="border-line" />
+            <button onClick={() => setView((v) => ({ ...v, mapLabels: !v.mapLabels }))} aria-pressed={!view.mapLabels} aria-label={view.mapLabels ? 'Hide map labels' : 'Show map labels'} title={view.mapLabels ? 'Hide labels' : 'Show labels'} className={`${tool} ${view.mapLabels ? '' : 'bg-[#e9efff] text-civic'}`}><Tag size={15} /></button>
+            <button onClick={() => (touring ? controls.current.stopTour?.() : controls.current.startTour?.())} aria-pressed={touring} aria-label="Tour" title="Tour the five water points" className={`${tool} ${touring ? 'bg-[#e9efff] text-civic' : ''}`}><Plane size={15} /></button>
+            <button onClick={() => { const on = !following; setFollowing(on); controls.current.setFollow?.(on); }} aria-pressed={following} aria-label="Follow the plume" title="Follow the plume" className={`${tool} ${following ? 'bg-[#e9efff] text-civic' : ''}`}><Crosshair size={15} /></button>
           </div>
 
-          {showLayers && <CustomisePanel view={view} setView={setView} layers={layers} setLayers={setLayers} onClose={() => setShowLayers(false)} />}
-          {showData && <DataPanel onClose={() => setShowData(false)} />}
+          {/* Right: details, only when asked for */}
+          {rightOpen && (
+            <aside className={`${card} relative z-10 m-2 overflow-y-auto lg:absolute lg:right-[60px] lg:top-[64px] lg:m-0 lg:max-h-[calc(100vh-150px)] lg:w-[300px]`}>
+              {probe ? (
+                <HazardCard
+                  spot={spot} live={live} onClose={() => { setProbe(null); setSpot(null); }}
+                  onSpill={live.clock.mode === 'sim' ? (at) => post('/api/spill', { lat: at.lat, lon: at.lon }).then((r) => { notify?.(true, r.message); setProbe(null); setSpot(null); }).catch((e) => notify?.(false, e.message)) : null}
+                />
+              ) : (
+                <Inspector st={selected} fc={live.forecast.stations?.[selected.id]} act={act} quick={quick} onInspect={onInspect} onDetails={onDetails}
+                           onStreet={(id) => controls.current.street?.(id)} onSensors={(id) => controls.current.sensors?.(id)}
+                           onClose={() => { setDetail(false); controls.current.home?.(); }} />
+              )}
+            </aside>
+          )}
+
+          {/* Bottom: legend for the active layer, then time */}
+          <div className={`z-10 flex flex-wrap items-end gap-2 p-2 lg:absolute lg:bottom-3 lg:right-[220px] lg:p-0 ${panel ? 'lg:left-[364px]' : 'lg:left-3'}`}>
+            <Legend view={view} />
+            <Timeline live={live} time={time} />
+          </div>
+          <div className={`${card} absolute bottom-[12px] right-[38px] z-10 hidden w-[172px] whitespace-nowrap px-2 py-1 text-right text-[10.5px] tabular-nums text-ink-2 lg:block`}><span ref={readout}>Move over the map</span></div>
+
           {caption && (
-            <div className={`${card} absolute bottom-[190px] left-1/2 z-10 hidden max-w-[440px] -translate-x-1/2 px-4 py-2 text-center lg:block`}>
+            <div className={`${card} absolute bottom-[72px] left-1/2 z-10 hidden max-w-[440px] -translate-x-1/2 px-4 py-2 text-center lg:block`}>
               <div className="font-display text-sm font-semibold">{live.stations.find((s) => s.id === caption)?.name}</div>
               <div className="text-xs text-ink-2">{live.stations.find((s) => s.id === caption)?.note}</div>
             </div>
           )}
-          <div className="z-10 grid gap-2 p-2 lg:absolute lg:left-3 lg:top-[146px] lg:w-[330px] lg:p-0">
-            <ActionCard live={live} act={act} quick={quick} onPick={focus} />
-            {probe && (
-              <HazardCard
-                spot={spot} live={live} onClose={() => { setProbe(null); setSpot(null); }}
-                onSpill={live.clock.mode === 'sim' ? (at) => post('/api/spill', { lat: at.lat, lon: at.lon }).then((r) => { notify?.(true, r.message); setProbe(null); setSpot(null); }).catch((e) => notify?.(false, e.message)) : null}
-              />
-            )}
-          </div>
-          <div className="absolute bottom-[34px] left-1/2 z-[9] hidden -translate-x-1/2 xl:block"><Legend view={view} /></div>
-
-          {showInspector && selected && (
-            <div className="z-10 p-2 lg:absolute lg:right-14 lg:top-[62px] lg:max-h-[calc(100vh-272px)] lg:w-[296px] lg:overflow-y-auto lg:rounded-2xl lg:p-0">
-              <Inspector st={selected} fc={live.forecast.stations?.[selected.id]} act={act} quick={quick} onInspect={onInspect} onDetails={onDetails} onStreet={(id) => controls.current.street?.(id)} onSensors={(id) => controls.current.sensors?.(id)} onClose={() => { setShowInspector(false); controls.current.home?.(); }} />
-            </div>
-          )}
-
-          <div className="z-10 p-2 lg:absolute lg:bottom-3 lg:left-3 lg:w-[min(560px,46vw)] lg:p-0">
-            <Tracker live={live} danger={danger} quick={quick} time={time} onPick={focus} />
-          </div>
-          <div className="z-10 p-2 lg:absolute lg:bottom-3 lg:right-3 lg:w-[min(430px,36vw)] lg:p-0">
-            <Tables live={live} tasks={tasks} quick={quick} onPick={focus} weather={weather} access={staticData?.access} />
-          </div>
-          <p className="px-3 pb-3 text-[10px] text-muted lg:absolute lg:bottom-[3px] lg:left-1/2 lg:z-[5] lg:-translate-x-1/2 lg:p-0 lg:text-center">
-            Everything is drawn at true size. Sensor readings come from a {live.clock.mode === 'sim' ? 'simulated field' : 'field network'}.
-          </p>
         </>
-      ) : (
-        <div className="absolute inset-0 z-10 flex items-center justify-center text-sm text-muted">{status === 'offline' ? 'Cannot reach the data server. Run npm start.' : 'Connecting to the twin…'}</div>
       )}
     </div>
   );

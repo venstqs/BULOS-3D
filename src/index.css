@@ -143,5 +143,7 @@ main .grid > *, main .flex > * { min-width: 0; }
   .data td:first-child { white-space: normal; min-width: 130px; }
 }
 
-/* The label button on the 3D map; the pin from a location check stays */
-.hide-map-labels .maplibregl-marker:not(.keep-on-map) { display: none !important; }
+/* The scale bar sits under the coordinate readout, in the same plain white */
+.maplibregl-ctrl-scale { background: #fff; border: 0; border-radius: 6px; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.2); color: #46517c; font: 500 10.5px Inter, sans-serif; padding: 1px 6px; }
+.map-actions button[aria-label$="alerts"] { background: #fff; box-shadow: 0 1px 2px rgba(16, 24, 40, 0.2), 0 4px 14px rgba(16, 24, 40, 0.14); }
+.maplibregl-ctrl-bottom-right .maplibregl-ctrl-scale { margin: 0 12px 44px 0; }

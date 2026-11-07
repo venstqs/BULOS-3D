@@ -113,13 +113,14 @@ const underModels = (material, order, mesh) => {
   mesh.renderOrder = order;
 };
 
-export default function TwinMapScene({ staticData, live, hazard, view, atTime, tauStep, selectedId, onPick, onInspect, layers, controls, onTour, onCaption, onProbe, probe }) {
+export default function TwinMapScene({ staticData, live, hazard, view, atTime, tauStep, selectedId, onPick, onInspect, layers, controls, onTour, onCaption, onProbe, probe, insets, readout, needle }) {
   const host = useRef(null);
   const rainCanvas = useRef(null);
   const mapRef = useRef(null);
   const world = useRef(null);
   const markers = useRef({});
   const handlers = useRef({});
+  const panelGap = useRef({ left: 0, right: 0, top: 0, bottom: 0 });
   const [ready, setReady] = useState(false);
   const [fatal, setFatal] = useState(null);
   if (fatal) throw fatal;
@@ -137,7 +138,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
     const [oLon, oLat] = stem.at(-1);
     const center = [hLon * 0.47 + oLon * 0.53, hLat * 0.47 + oLat * 0.53];
     const bearing = (Math.atan2((hLon - oLon) * 0.97, hLat - oLat) * 180) / Math.PI - 90;
-    const aspect = host.current.clientWidth / Math.max(1, host.current.clientHeight);
+    const aspect = Math.max(0.5, host.current.clientWidth - (host.current.clientWidth > 1000 ? 430 : 0)) / Math.max(1, host.current.clientHeight);
     const home = { center, zoom: 12.3 + Math.min(0, Math.log2(aspect / 1.75)), pitch: 60, bearing };
 
     let map;
@@ -163,10 +164,11 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
               { type: 'Feature', properties: { name: 'Naga River watershed' }, geometry: { type: 'Point', coordinates: [stem[Math.floor(stem.length * 0.4)][0], stem[Math.floor(stem.length * 0.4)][1] + 0.016] } },
             ] } },
             plume: { type: 'geojson', data: empty },
+            tags: { type: 'geojson', data: empty },
           },
           layers: [
             { id: 'background', type: 'background', paint: { 'background-color': '#101a2e' } },
-            { id: 'imagery', type: 'raster', source: 'imagery', paint: { 'raster-saturation': 0.12, 'raster-contrast': 0.06 } },
+            { id: 'imagery', type: 'raster', source: 'imagery', paint: { 'raster-saturation': -0.28, 'raster-contrast': -0.05 } },
             { id: 'basin', type: 'fill', source: 'basin', paint: { 'fill-color': '#56b6ff', 'fill-opacity': 0.1 } },
             { id: 'catchment-glow', type: 'line', source: 'catchment', paint: { 'line-color': '#7fd0ff', 'line-width': 6, 'line-blur': 5, 'line-opacity': 0.5 } },
             { id: 'catchment', type: 'line', source: 'catchment', paint: { 'line-color': '#ffffff', 'line-width': 1.5, 'line-dasharray': [3, 2], 'line-opacity': 0.85 } },
@@ -180,6 +182,9 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
             { id: 'names', type: 'symbol', source: 'names', layout: { 'text-field': ['get', 'name'], 'text-font': ['Noto Sans Regular'], 'text-size': 15, 'text-letter-spacing': 0.06 }, paint: { 'text-color': '#c9ecff', 'text-halo-color': 'rgba(8,30,60,0.9)', 'text-halo-width': 1.8 } },
             { id: 'barangay-dots', type: 'circle', source: 'barangays', minzoom: 11, paint: { 'circle-radius': 4, 'circle-stroke-width': 1.2, 'circle-stroke-color': '#ffffff', 'circle-color': ['step', ['get', 'km'], '#2eb872', 1.5, '#f2c200', 3, '#ec835a', 6, '#d03b3b'] } },
             { id: 'places', type: 'symbol', source: 'osm', 'source-layer': 'place', minzoom: 9, filter: ['in', ['get', 'class'], ['literal', ['city', 'town', 'village', 'suburb']]], layout: { 'text-field': ['coalesce', ['get', 'name:en'], ['get', 'name']], 'text-font': ['Noto Sans Regular'], 'text-size': ['match', ['get', 'class'], 'city', 15, 'town', 13, 11.5] }, paint: { 'text-color': '#ffffff', 'text-halo-color': 'rgba(10,25,50,0.82)', 'text-halo-width': 1.5 } },
+            { id: 'tag-dot', type: 'circle', source: 'tags', maxzoom: 17.5, filter: ['==', ['get', 'kind'], 'station'], paint: { 'circle-radius': ['case', ['get', 'picked'], 8, 6], 'circle-color': ['get', 'color'], 'circle-stroke-color': '#ffffff', 'circle-stroke-width': ['case', ['get', 'picked'], 2.5, 1.5], 'circle-pitch-alignment': 'viewport' } },
+            { id: 'tag-station', type: 'symbol', source: 'tags', maxzoom: 17.5, filter: ['==', ['get', 'kind'], 'station'], layout: { 'text-field': ['get', 'text'], 'text-font': ['Noto Sans Bold'], 'text-size': 12.5, 'text-anchor': 'bottom', 'text-offset': [0, -0.9], 'text-allow-overlap': true }, paint: { 'text-color': '#ffffff', 'text-halo-color': '#0b2231', 'text-halo-width': 2 } },
+            { id: 'tag-other', type: 'symbol', source: 'tags', minzoom: 12.2, filter: ['!=', ['get', 'kind'], 'station'], layout: { 'text-field': ['get', 'text'], 'text-font': ['Noto Sans Regular'], 'text-size': 11.5, 'text-anchor': 'top', 'text-offset': [0, 0.5], 'text-allow-overlap': false }, paint: { 'text-color': ['get', 'color'], 'text-halo-color': '#0b2231', 'text-halo-width': 1.8 } },
           ],
           terrain: { source: 'dem', exaggeration: EXAGGERATION },
           sky: { 'sky-color': '#8db9f2', 'horizon-color': '#dfeaff', 'fog-color': '#e4edff', 'fog-ground-blend': 0.55, 'horizon-fog-blend': 0.6, 'sky-horizon-blend': 0.75, 'atmosphere-blend': 0.55 },
@@ -190,14 +195,16 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
       return undefined;
     }
     mapRef.current = map;
+    const fitBox = new ResizeObserver(() => map.resize());
+    fitBox.observe(host.current);
 
     /* ---------- detailed models, drawn inside the map ---------- */
     const origin = center;
     const sites = {};
     const people = [];
     const scene = new THREE.Scene();
-    const hemi = new THREE.HemisphereLight('#ffffff', '#6d7a66', 2.1);
-    const sun = new THREE.DirectionalLight('#fff3df', 3);
+    const hemi = new THREE.HemisphereLight('#ffffff', '#55604f', 1.35);
+    const sun = new THREE.DirectionalLight('#fff3df', 2.3);
     sun.position.set(-0.5, 1, 0.65);
     scene.add(hemi, sun);
 
@@ -378,7 +385,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
         renderer.autoClear = false;
         renderer.outputColorSpace = THREE.SRGBColorSpace;
       },
-      render(_, args) {
+      render(gl, args) {
         const now = performance.now();
         const dt = Math.min(0.08, (now - last) / 1000);
         last = now;
@@ -422,6 +429,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
         camera.projectionMatrix = m.multiply(l);
         camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
         renderer.resetState();
+        renderer.setViewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
         renderer.render(scene, camera);
         // A steady, modest frame rate: water still flows, and the laptop stays cool
         if (!repaintQueued) {
@@ -432,6 +440,8 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
     };
 
     const pickAt = (e) => {
+      const tagged = map.queryRenderedFeatures([[e.point.x - 8, e.point.y - 8], [e.point.x + 8, e.point.y + 8]], { layers: ['tag-dot', 'tag-station'] })[0];
+      if (tagged?.properties.id) { handlers.current.onPick?.(tagged.properties.id); focus(tagged.properties.id); return; }
       const { width, height } = map.getCanvas().getBoundingClientRect();
       const ndc = new THREE.Vector2((e.point.x / width) * 2 - 1, -(e.point.y / height) * 2 + 1);
       const near = new THREE.Vector3(ndc.x, ndc.y, -1).unproject(camera);
@@ -447,7 +457,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
     // the target off screen. Setting it on arrival keeps the camera aimed at the site.
     const groundAt = ([lon, lat]) => map.queryTerrainElevation([lon, lat]) ?? 0;
     const fly = (options) => {
-      map.flyTo({ ...options, essential: true });
+      map.flyTo({ padding: panelGap.current, ...options, essential: true });
       // Ease to the ground height on arrival: setting it in one step makes the whole view hop
       map.once('moveend', () => {
         const from = map.getCenterElevation();
@@ -467,7 +477,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
       const s = sites[id];
       if (!s) return;
       stopFollow();
-      fly({ center: [s.lon, s.lat], zoom: CLOSE_ZOOM, pitch: 70, bearing: map.getBearing(), duration: 2600 });
+      fly({ center: [s.lon, s.lat], zoom: CLOSE_ZOOM, pitch: 70, bearing: map.getBearing(), duration: 2600, padding: { ...panelGap.current, right: 372 } });
     };
 
     let timer = 0;
@@ -517,31 +527,28 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
         fly({ center: [c.lng, c.lat], zoom: 21.4, pitch: 76, bearing: map.getBearing(), duration: 2400 });
       },
       zoom: (k) => map.easeTo({ zoom: map.getZoom() + k, duration: 350 }),
-      tilt: () => map.easeTo({ bearing: map.getBearing() + 40, duration: 900 }),
+      north: () => map.easeTo({ bearing: 0, duration: 700 }),
+      tilt3d: (flat) => map.easeTo({ pitch: flat ? 0 : 60, duration: 800 }),
       startTour, stopTour,
       setFollow: (on) => { stopTour(); follow = on; if (on) map.easeTo({ zoom: 14.2, pitch: 66, duration: 1400 }); },
     };
 
     // As soon as the style is ready: waiting for 'load' would hold back the water points until every tile arrives
     map.once('style.load', () => {
-      map.addLayer(models);
+      map.addLayer(models, 'places');
       setReady(true);
     });
     map.on('click', pickAt);
-    map.on('sourcedata', (e) => { if (e.sourceId === 'dem' && e.tile) drapesLeft = 12; });
-    const assetTags = Object.values(sites).filter((x) => x.asset).map((x) => {
-      const el = document.createElement('div');
-      el.className = 'whitespace-nowrap rounded-md bg-[#0b6e6e]/95 px-1.5 py-0.5 text-[10.5px] font-semibold text-white shadow';
-      el.textContent = x.asset.name ?? (x.asset.kind === 'water_tower' ? 'Water tower' : 'Pumping station');
-      return new maplibregl.Marker({ subpixelPositioning: true, element: el, anchor: 'bottom', offset: [0, -16], opacityWhenCovered: '1' }).setLngLat([x.lon, x.lat]).addTo(map);
+    map.once('idle', () => { for (const n of host.current?.querySelectorAll('.maplibregl-compact-show') ?? []) { n.classList.remove('maplibregl-compact-show'); n.removeAttribute('open'); } });
+    map.addControl(new maplibregl.ScaleControl({ maxWidth: 110, unit: 'metric' }), 'bottom-right');
+    map.on('rotate', () => { if (needle?.current) needle.current.style.transform = `rotate(${-map.getBearing()}deg)`; });
+    map.on('mousemove', (e) => {
+      if (!readout?.current) return;
+      const z = map.queryTerrainElevation(e.lngLat);
+      const k = map.getTerrain()?.exaggeration || 1;
+      readout.current.textContent = `${e.lngLat.lat.toFixed(4)}, ${e.lngLat.lng.toFixed(4)}${z == null ? '' : `, ${Math.round(z / k)} m`}`;
     });
-    const gateTags = () => {
-      const on = map.getZoom() >= 13 && world.current?.assets !== false;
-      for (const m of assetTags) m.getElement().style.display = on ? '' : 'none';
-      for (const r of Object.keys(markers.current)) if (/^(GL|DM)-/.test(r)) markers.current[r].getElement().style.display = map.getZoom() >= 11.8 ? '' : 'none';
-    };
-    map.on('zoom', gateTags);
-    gateTags();
+    map.on('sourcedata', (e) => { if (e.sourceId === 'dem' && e.tile) drapesLeft = 12; });
     const userMoved = (e) => { if (e.originalEvent) { stopTour(); } };
     map.on('dragstart', userMoved);
 
@@ -554,6 +561,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
     const pins = markers.current;
     return () => {
       clearInterval(timer);
+      fitBox.disconnect();
       document.removeEventListener('visibilitychange', wake);
       stopTour();
       field.dispose();
@@ -590,18 +598,6 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
     const stem = staticData.main_stem;
     const moving = lastDirty >= 0 && lastDirty < n - 6;
     w.front = moving ? [stem[Math.min(stem.length - 1, lastDirty)][0], stem[Math.min(stem.length - 1, lastDirty)][1]] : null;
-    let pf = markers.current.front;
-    if (moving) {
-      if (!pf) {
-        const el = document.createElement('div');
-        el.className = 'whitespace-nowrap rounded-md bg-[#c43b1f] px-1.5 py-0.5 text-[11px] font-bold text-white shadow';
-        el.textContent = 'Plume front';
-        pf = new maplibregl.Marker({ subpixelPositioning: true, element: el }).setLngLat(w.front).addTo(map);
-        markers.current.front = pf;
-      }
-      pf.setLngLat(w.front);
-    } else if (pf) { pf.remove(); delete markers.current.front; }
-
     // Light: the hour on the twin's clock, dimmed further by rain
     const hour = new Date(live.clock.epoch_ms).getHours() + new Date(live.clock.epoch_ms).getMinutes() / 60;
     const night = hour >= 19 || hour < 5 ? 1 : hour >= 17.5 ? (hour - 17.5) / 1.5 : hour < 6.5 ? (6.5 - hour) / 1.5 : 0;
@@ -614,30 +610,20 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
     const lagoon = w.sites.FARM?.lagoon;
     if (lagoon) lagoon.color.set(rainNow < 1 && (atTime['AG-02']?.risk ?? 0) >= 0.25 ? '#6d4a2a' : '#7fa8a0');
 
+    const tagList = [];
+    const tag = (kind, lon, lat, text, color) => ({ type: 'Feature', properties: { kind, text, color, picked: false }, geometry: { type: 'Point', coordinates: [lon, lat] } });
     const BAND_TINT = { LOW: '#4fd2ff', MODERATE: '#ffc533', HIGH: '#ff8b4d', SEVERE: '#ff4436' };
     for (const p of live.pipes ?? []) {
       const r = w.pipeRibbons[p.id];
       if (!r) continue;
       r.uniforms.uFlow.value = p.flowing && layers.particles !== false ? 1 : 0;
       r.uniforms.uTint.value.set(BAND_TINT[p.source_band] ?? BAND_TINT.LOW);
-      let tag = markers.current[p.id];
-      if (!tag) {
-        const el = document.createElement('div');
-        el.className = 'whitespace-nowrap rounded-md bg-[#10325f]/90 px-1.5 py-0.5 text-[10.5px] font-semibold text-white shadow';
-        const mid = r.pts[Math.floor(r.pts.length / 2)];
-        tag = new maplibregl.Marker({ subpixelPositioning: true, element: el, opacityWhenCovered: '1' }).setLngLat([mid.x, mid.y]).addTo(map);
-        markers.current[p.id] = tag;
-      }
-      tag.getElement().textContent = `${p.id} · ${p.flowing ? `${fmt(p.flow_lps, 1)} L/s` : 'stopped'}`;
+      const mid = r.pts[Math.floor(r.pts.length / 2)];
+      tagList.push(tag('pipe', mid.x, mid.y, `${p.id}  ${p.flowing ? `${fmt(p.flow_lps, 1)} L/s` : 'stopped'}`, p.flowing ? '#bfefff' : '#ffb0a5'));
     }
-    let gaugeTag = markers.current.gauge;
-    if (!gaugeTag) {
-      const el = document.createElement('div');
-      el.className = 'whitespace-nowrap rounded-md bg-white/95 px-1.5 py-0.5 text-[10.5px] font-semibold text-ink shadow';
-      gaugeTag = new maplibregl.Marker({ subpixelPositioning: true, element: el, anchor: 'bottom', offset: [0, -18], opacityWhenCovered: '1' }).setLngLat([staticData.rain_gauge.lon, staticData.rain_gauge.lat]).addTo(map);
-      markers.current.gauge = gaugeTag;
-    }
-    gaugeTag.getElement().textContent = `Rain gauge · ${fmt(live.rain_mm_hr, 1)} mm/h`;
+    tagList.push(tag('gauge', staticData.rain_gauge.lon, staticData.rain_gauge.lat, `Rain gauge ${fmt(live.rain_mm_hr, 1)} mm/h`, '#ffffff'));
+    if (w.front) tagList.push(tag('front', w.front[0], w.front[1], 'Plume front', '#ff9a8e'));
+    if (layers.assets !== false) for (const a of Object.values(w.sites)) if (a.asset) tagList.push(tag('asset', a.lon, a.lat, a.asset.name ?? (a.asset.kind === 'water_tower' ? 'Water tower' : 'Pumping station'), '#9ff0dd'));
 
     for (const st of live.stations) {
       const risk = atTime[st.id]?.risk ?? st.risk;
@@ -654,26 +640,14 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
         s.valve?.emissive.set(closed ? '#d03b3b' : '#22a35a');
         for (const tap of s.taps) tap.visible = !closed;
       }
-      let m = markers.current[st.id];
-      if (!m) {
-        const el = document.createElement('button');
-        el.className = 'flex items-center gap-1.5 whitespace-nowrap rounded-lg bg-white/95 px-2 py-1 text-[11px] font-semibold tabular-nums text-ink shadow-[0_4px_12px_rgba(20,30,70,0.3)]';
-        el.innerHTML = '<span data-d class="h-2 w-2 rounded-full"></span><span data-a></span><span data-b class="min-w-[52px] font-medium text-muted"></span>';
-        el.addEventListener('click', (e) => { e.stopPropagation(); handlers.current.onPick?.(st.id); controls.current.focus?.(st.id); });
-        el.addEventListener('dblclick', (e) => { e.stopPropagation(); handlers.current.onInspect?.(st.id); });
-        const at = w.sites[st.id];
-        m = new maplibregl.Marker({ subpixelPositioning: true, element: el, anchor: 'bottom', offset: [0, -34], opacityWhenCovered: '1' }).setLngLat([at.lon, at.lat]).addTo(map);
-        markers.current[st.id] = m;
-      }
-      const el = m.getElement();
       const fc = live.forecast.stations?.[st.id];
       const eta = tauStep === 0 && fc?.arrival_s > 0 ? `ETA ${Math.round(fc.arrival_s / 60)} min` : '';
-      el.querySelector('[data-a]').textContent = st.id;
-      el.querySelector('[data-b]').textContent = closed ? 'Closed' : eta || `WQHI ${st.wqhi.score}`;
-      el.querySelector('[data-d]').style.background = color;
-      el.style.outline = st.id === selectedId ? '2px solid #2f5be7' : 'none';
+      const at = w.sites[st.id];
+      tagList.push({ ...tag('station', at.lon, at.lat, `${st.id}  ${closed ? 'closed' : eta || st.wqhi.score}`, color), id: st.id });
+      tagList.at(-1).properties = { ...tagList.at(-1).properties, id: st.id, picked: st.id === selectedId };
     }
-  }, [live, atTime, tauStep, selectedId, ready, staticData, controls, layers.particles]);
+    map.getSource('tags').setData({ type: 'FeatureCollection', features: tagList });
+  }, [live, atTime, tauStep, selectedId, ready, staticData, layers.particles, layers.assets]);
 
   /* ---------------- layers ---------------- */
   useEffect(() => {
@@ -683,13 +657,14 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
     vis('buildings', layers.buildings !== false);
     vis('roads', layers.labels !== false);
     vis('places', layers.labels !== false);
+    for (const id of ['tag-dot', 'tag-station', 'tag-other']) vis(id, view.mapLabels !== false);
     vis('catchment', layers.catchment !== false);
     vis('streams', layers.streams !== false);
     vis('pipes', layers.pipes !== false);
-    vis('network', layers.network !== false);
-    vis('barangay-dots', layers.barangays !== false);
+    const access = view.hazard === 'access';
+    vis('network', access || layers.network === true);
+    vis('barangay-dots', access || layers.barangays === true);
     if (world.current) world.current.assets = layers.assets !== false;
-    map.fire('zoom');
     vis('catchment-glow', layers.catchment !== false);
     vis('basin', layers.catchment !== false);
     vis('names', layers.catchment !== false);
@@ -698,7 +673,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
       for (const r of Object.values(w.pipeRibbons)) r.mesh.visible = layers.pipes !== false;
       w.riverRibbon.uniforms.uFlow.value = layers.particles !== false ? 1.1 : 0;
     }
-  }, [layers, ready]);
+  }, [layers, ready, view.mapLabels, view.hazard]);
 
   /* ---------------- hazard layer ---------------- */
   useEffect(() => {
@@ -739,6 +714,16 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
     map.setTerrain({ source: 'dem', exaggeration: view.relief });
   }, [view.base, view.relief, ready]);
 
+  /* ---------------- keep the subject clear of the hanging panels ---------------- */
+  const insetKey = insets && window.innerWidth >= 1024 ? `${insets.left}|${insets.right}|${insets.bottom}` : '';
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready || !insetKey) return;
+    const [left, right, bottom] = insetKey.split('|').map(Number);
+    panelGap.current = { left, right, top: 16, bottom };
+    if (!map.isMoving()) map.easeTo({ padding: panelGap.current, duration: 350 });
+  }, [insetKey, ready]);
+
   /* ---------------- location check ---------------- */
   useEffect(() => {
     const map = mapRef.current;
@@ -747,7 +732,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
     delete markers.current.probe;
     if (!probe) return;
     const el = document.createElement('div');
-    el.className = 'keep-on-map h-4 w-4 rounded-full border-[3px] border-white bg-[#2f5be7] shadow-[0_0_0_6px_rgba(47,91,231,0.3)]';
+    el.className = 'h-4 w-4 rounded-full border-[3px] border-white bg-[#2f5be7] shadow-[0_0_0_6px_rgba(47,91,231,0.3)]';
     markers.current.probe = new maplibregl.Marker({ subpixelPositioning: true, element: el, opacityWhenCovered: '1' }).setLngLat([probe.lon, probe.lat]).addTo(map);
   }, [probe, ready]);
 
@@ -784,7 +769,7 @@ export default function TwinMapScene({ staticData, live, hazard, view, atTime, t
   }, []);
 
   return (
-    <div className={`absolute inset-0 overflow-hidden bg-[#dfe8ff] ${view.mapLabels === false ? 'hide-map-labels' : ''}`}>
+    <div className="absolute inset-0 overflow-hidden bg-[#dfe8ff]">
       {/* inline style: MapLibre's stylesheet sets position: relative, which would collapse this box */}
       <div ref={host} style={{ position: 'absolute', inset: 0 }} />
       <canvas ref={rainCanvas} className="pointer-events-none absolute inset-0 h-full w-full" />

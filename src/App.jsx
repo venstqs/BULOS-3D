@@ -23,7 +23,7 @@ const hasWebGL = (() => {
 })();
 
 const PAGES = [
-  ['home', 'Home'],
+  ['home', 'Map'],
   ['overview', 'Overview'],
   ['map', 'Watershed'],
   ['flow', 'Forecast'],
