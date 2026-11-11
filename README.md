@@ -7,6 +7,8 @@ Xylem Global Student Innovation Challenge · Camarines Sur National High School.
 Pilot catchment: **Mt. Isarog west slope → Naga River system → Naga City, Camarines Sur** (57 km², 29.7 km mapped river, 336 m → 3 m).
 An alternate site (Mt. Makiling, Los Baños) is kept for comparison: `BULOS_SITE=makiling`.
 
+**Official Live Prototype:** **[https://project-bulos-3d.expo.app](https://project-bulos-3d.expo.app)** · [4D Digital Twin (`/twin/`)](https://project-bulos-3d.expo.app/twin/) · [Mobile App (`/app/`)](https://project-bulos-3d.expo.app/app/)
+
 > **Status: software prototype.** No sensor hardware has been built and no DOST or LGU data is connected. The twin runs on
 > open map, terrain and weather data, with simulated sensor readings.
 
@@ -212,14 +214,20 @@ Building, ground and sky textures in `public/textures/` are CC0 from [Poly Haven
 
 ## Public site
 
+Official showcase link: **[https://project-bulos-3d.expo.app](https://project-bulos-3d.expo.app)**
+
 The public build needs no server. `npm run build:hosted` writes it to `mobile/dist`:
 
 | Address | What it is |
 | --- | --- |
-| `/` | The landing page |
-| `/twin/` | The website. A simplified river runs in the browser, and the page says so |
-| `/app/` | The mobile app, for any phone browser. A computer shows it in a phone-sized frame |
+| [`/`](https://project-bulos-3d.expo.app/) | The landing page |
+| [`/twin/`](https://project-bulos-3d.expo.app/twin/) | The website. A simplified river runs in the browser, and the page says so |
+| [`/app/`](https://project-bulos-3d.expo.app/app/) | The mobile app, for any phone browser. A computer shows it in a phone-sized frame |
 
 Terrain, map layers and evaluation results in `public/hosted` come from the real model. Refresh them with `python scripts/export_hosted.py`. The Mapbox token is left out of this build, so it uses the free map layers.
 
 `npm run publish` builds the site, publishes it with Expo hosting, and publishes the Expo Go version (`publish:site` and `publish:expo-go` do one each). Phones that open `/twin/` are sent to `/app/`. Expo Go on iPhone only opens projects from the signed-in Expo account, so the landing page offers Expo Go to Android visitors only. To make an installable Android app, run `eas build -p android --profile preview` in `mobile/`. Its `EXPO_PUBLIC_WEB_URL` in `eas.json` must match the published address.
+
+## License
+
+Copyright (c) 2026 The Bulos 3D team. All rights reserved. See [`LICENSE`](LICENSE) — this repository is shared for competition showcase and evaluation only, not open-source redistribution.

@@ -368,21 +368,31 @@ export default function TwinMapScene({ watermark, staticData, live, hazard, view
     };
     const riverRibbon = makeRibbon(fine, { width: 22, ref: 15.3, tex: 1.7, order: -7, taper: 1, points: 1100, useField: 1, everyPoint: true });
     const pipeRibbons = Object.fromEntries((staticData.pipes ?? []).map((p) => [p.id, makeRibbon(p.coords, { width: 1.1, ref: 15.6, tex: 1.4, order: -5, frag: PIPE_FRAG, flow: 1, tint: '#4fd2ff', exact: true })]));
-    let drapeIndex = 0;
-    let frame = 0;
-    let drapesLeft = 12;                 // the ground only changes when new elevation tiles arrive
+    // Lay the river and pipes on the ground. Each height lookup costs about 0.2 ms, and the river alone
+    // has 1,100 points, so the work is spread over frames with a small time budget instead of freezing one.
+    // A new elevation tile asks for another pass once the current one ends.
+    let drapePasses = 1;
+    let drapeRibbon = 0;
+    let drapePoint = 0;
+    const DRAPE_BUDGET_MS = 2.5;
     const drapeNext = () => {
-      frame += 1;
-      if (frame % 8 || !drapesLeft) return;
-      drapesLeft -= 1;
-      const r = ribbons[drapeIndex];
-      drapeIndex = (drapeIndex + 1) % ribbons.length;
-      const P = r.geo.getAttribute('position');
-      for (let i = 0; i < r.pts.length; i += 1) {
-        const y = map.queryTerrainElevation([r.pts[i].x, r.pts[i].y]) ?? 0;
-        P.setY(i * 2, y); P.setY(i * 2 + 1, y);
+      if (!drapePasses || !ribbons.length) return;
+      const until = performance.now() + DRAPE_BUDGET_MS;
+      while (drapePasses && performance.now() < until) {
+        const r = ribbons[drapeRibbon];
+        const P = r.geo.getAttribute('position');
+        const end = Math.min(r.pts.length, drapePoint + 8);
+        for (; drapePoint < end; drapePoint += 1) {
+          const y = map.queryTerrainElevation([r.pts[drapePoint].x, r.pts[drapePoint].y]) ?? 0;
+          P.setY(drapePoint * 2, y); P.setY(drapePoint * 2 + 1, y);
+        }
+        P.needsUpdate = true;
+        if (drapePoint >= r.pts.length) {
+          drapePoint = 0;
+          drapeRibbon += 1;
+          if (drapeRibbon >= ribbons.length) { drapeRibbon = 0; drapePasses -= 1; }
+        }
       }
-      P.needsUpdate = true;
     };
 
     // The rain gauge, and the structures along each pipeline
@@ -454,7 +464,7 @@ export default function TwinMapScene({ watermark, staticData, live, hazard, view
             });
           }
           // Settle on a height and keep it, or models bob as finer terrain tiles arrive
-          if (s.y == null || drapesLeft > 0) s.y = elevation(s.lon, s.lat, s.base ?? 20);
+          if (s.y == null || drapePasses > 0) s.y = elevation(s.lon, s.lat, s.base ?? 20);
           s.root.position.y = s.y - baseAlt + 0.3;
           if (s.ring.visible) {
             const ph = (now / 1500 + s.phase) % 1;
@@ -624,7 +634,7 @@ export default function TwinMapScene({ watermark, staticData, live, hazard, view
       const k = map.getTerrain()?.exaggeration || 1;
       readout.current.textContent = `${e.lngLat.lat.toFixed(4)}, ${e.lngLat.lng.toFixed(4)}${z == null ? '' : `, ${Math.round(z / k)} m`}`;
     });
-    map.on('sourcedata', (e) => { if (e.sourceId === 'dem' && e.tile) drapesLeft = 12; });
+    map.on('sourcedata', (e) => { if (e.sourceId === 'dem' && e.tile) drapePasses = Math.min(2, drapePasses + 1); });
     const userMoved = (e) => { if (e.originalEvent) { stopTour(); } };
     map.on('dragstart', userMoved);
 

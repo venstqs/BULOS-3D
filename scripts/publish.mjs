@@ -6,7 +6,7 @@ import { execSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const SITE = 'https://bulos-3d.expo.app';
+const SITE = 'https://project-bulos-3d.expo.app';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const mobile = join(root, 'mobile');
 const what = process.argv[2] ?? 'all';

@@ -127,13 +127,17 @@ A quote or short letter from a barangay health worker, the City Health Office or
 
 Judging runs about Nov 23 – Dec 9, so judges need a link that works without your PC.
 
-1. Merge this branch and push to GitHub.
-2. **Render:** create a Blueprint from the repo (`render.yaml`). Add the variable `BULOS_NODE_KEY` so strangers cannot post fake sensor data.
-3. **Vercel:** import the repo and set `VITE_API` to your Render address, for example `https://bulos-3d-api.onrender.com`. Redeploy.
-4. **Mobile:** in Settings, enter both addresses, or set `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_WEB_URL` in `mobile/.env`.
-5. Open the site a minute before showing it. Free hosting sleeps, and the page says "Waking up" while it starts.
+The project is online at **https://project-bulos-3d.expo.app** and needs no server:
 
-Anyone with the link can press the simulated valves. That is fine for a demo, but it needs real logins before any field use.
+| Link | What it is |
+| --- | --- |
+| https://project-bulos-3d.expo.app | Landing page |
+| https://project-bulos-3d.expo.app/twin/ | The full website. Phones are sent to the app |
+| https://project-bulos-3d.expo.app/app/ | The mobile app in any phone browser |
+
+Android visitors can also open the app in Expo Go from the QR code on the landing page. Expo Go on iPhone only opens projects from the signed-in Expo account, so iPhones use the browser version.
+
+To update it after a change, run `npm run publish` (or `publish:site` / `publish:expo-go`). Readings on the public site come from the simulated twin in the browser, and it says so.
 
 ## 9. Final checklist
 

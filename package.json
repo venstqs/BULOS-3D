@@ -1,6 +1,7 @@
 {
   "name": "bulos-3d",
   "private": true,
+  "license": "UNLICENSED",
   "version": "3.0.0",
   "type": "module",
   "scripts": {

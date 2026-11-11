@@ -7,7 +7,6 @@ const lerp = (a, b, f) => a + (b - a) * f;
 const smooth = (v) => { v = clamp(v); return v * v * (3 - 2 * v); };
 const backOut = (v) => { v = clamp(v); const c = 1.9; return 1 + (c + 1) * (v - 1) ** 3 + c * (v - 1) ** 2; };
 const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const STOP = '<i class="stop"></i>';
 const fmtTime = (min) => { const m = Math.round(min); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h ${String(m % 60).padStart(2, '0')} min`; };
 
 /* ---------------- parts of the page that need no 3D ---------------- */
@@ -363,7 +362,7 @@ async function start() {
       const mm = w.hourly.precipitation.slice(i, i + 24).reduce((a, v) => a + (v ?? 0), 0);
       const button = $('#live-rain');
       button.hidden = false; button.textContent = `Use the live forecast for Naga: ${mm.toFixed(1)} mm`;
-      button.addEventListener('click', () => { rainInput.value = mm; setRain(mm); });
+      button.addEventListener('click', () => { rainGoal = null; rainInput.value = mm; setRain(mm); });
     }).catch(() => {});
 
   /* click the river: a small version of what the twin does */
@@ -461,38 +460,59 @@ async function start() {
   let hover = null; let px = 0; let py = 0; let inHero = true;
   let pointerX = 0; let pointerY = 0; let overMap = false;
   const orbit = { now: 0, goal: 0 };
-  let grab = null; let dragged = false;
-  canvas.addEventListener('pointerdown', (e) => { grab = { x: e.clientX, goal: orbit.goal }; dragged = false; });
-  addEventListener('pointermove', (e) => {
+  let grab = null; let dragged = false; let downAt = null; let readUntil = 0; let drawnNow = 0;
+  const follow = (e) => {
     px = e.clientX / innerWidth - 0.5; py = e.clientY / innerHeight - 0.5;
     mouse.set(px * 2, -py * 2);
     pointerX = e.clientX; pointerY = e.clientY; overMap = e.target === canvas;
+  };
+  canvas.addEventListener('pointerdown', (e) => {
+    grab = { x: e.clientX, goal: orbit.goal }; dragged = false;
+    downAt = { x: e.clientX, y: e.clientY, t: performance.now() };
+  });
+  addEventListener('pointerdown', follow, { passive: true });
+  addEventListener('pointermove', (e) => {
+    follow(e);
     if (!grab) return;
     const dx = e.clientX - grab.x;
     if (Math.abs(dx) > 6) dragged = true;
     orbit.goal = clamp(grab.goal - dx * 0.005, -1.25, 1.25);
   }, { passive: true });
-  addEventListener('pointerup', () => { grab = null; });
-  addEventListener('pointercancel', () => { grab = null; });
-  function pickRiver() {
-    ray.setFromCamera(mouse, camera);
-    const hit = ray.intersectObject(land, false)[0];
-    if (!hit) return null;
-    const local = watershed.worldToLocal(hit.point.clone());
-    let best = 0; let far = 1e9;
-    samples.forEach((q, i) => { const d = (q.x - local.x) ** 2 + (q.z - local.z) ** 2; if (d < far) { far = d; best = i; } });
-    return far < 2.6 ** 2 ? { frac: best / 800, point: samples[best] } : null;
+  addEventListener('pointerup', (e) => {
+    grab = null;
+    // On a touch screen the Bicol readout shows for a moment after a tap, then gets out of the way
+    if (e.pointerType !== 'mouse' && !dragged && e.target === canvas) readUntil = performance.now() + 2500;
+  });
+  addEventListener('pointercancel', () => { grab = null; downAt = null; });
+
+  // The river counts only where it is drawn on screen: a press must land within a finger's width of it
+  const onScreen = new THREE.Vector3();
+  function riverAt(x, y, reach) {
+    if (drawnNow < 0.98) return null;
+    let best = -1; let far = reach * reach;
+    for (let i = 0; i < samples.length; i += 2) {
+      onScreen.copy(samples[i]).applyMatrix4(watershed.matrixWorld).project(camera);
+      if (onScreen.z > 1) continue;
+      const d = (((onScreen.x + 1) / 2) * innerWidth - x) ** 2 + (((1 - onScreen.y) / 2) * innerHeight - y) ** 2;
+      if (d < far) { far = d; best = i; }
+    }
+    return best < 0 ? null : { frac: best / 800, point: samples[best] };
   }
   addEventListener('click', (e) => {
-    if (!inHero || dragged || e.target.closest('a, button, input, .log, .card')) return;
-    mouse.set((e.clientX / innerWidth) * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
-    const at = pickRiver();
+    // Only a deliberate tap or click on the 3D model itself: not on text, not the end of a scroll or a turn
+    if (!inHero || e.target !== canvas || dragged || !downAt) return;
+    const moved = Math.hypot(e.clientX - downAt.x, e.clientY - downAt.y);
+    const held = performance.now() - downAt.t;
+    downAt = null;
+    if (moved > 10 || held > 700) return;
+    const at = riverAt(e.clientX, e.clientY, touch ? 34 : 24);
     if (at) startSpill(at.frac);
   });
 
   /* where the camera wants to be */
   const steps = document.querySelectorAll('.step');
   let step = -1;
+  let shownStep = -2;
   const watch = new IntersectionObserver((list) => { list.forEach((en) => { if (en.isIntersecting) step = Number(en.target.dataset.step); }); }, { rootMargin: '-45% 0px -45% 0px' });
   steps.forEach((s) => watch.observe(s));
 
@@ -530,8 +550,11 @@ async function start() {
   introWait.then(() => { liftIntro(); born = performance.now(); });
   function frame(now) {
     requestAnimationFrame(frame);
-    const dt = Math.min(0.05, (now - last) / 1000); last = now;
+    const realMs = now - last;
+    const dt = Math.min(0.05, realMs / 1000); last = now;
     const vh = innerHeight;
+    // The spill clock pauses while you are away from it, so you never come back to a finished spill
+    if (spill && !spill.done && (realMs > 100 || heroEl.getBoundingClientRect().bottom <= vh * 0.55)) spill.t0 += realMs;
     const appTop = appEl.getBoundingClientRect().top;
     const visible = appTop > -vh * 0.1;
     canvas.style.opacity = clamp(appTop / (vh * 0.5));
@@ -544,7 +567,14 @@ async function start() {
     const growing = calm ? 1 : smooth((now - born - 150) / 1300);
     const drawn = calm ? 1 : smooth((now - born - 900) / 1900);
     range(water, 0, drawn);
+    drawnNow = drawn;
     const howing = !inHero && toBicol < 0.05 ? step : -1;
+    // Phones show one step's words at a time (see .step .card.on)
+    const shown = innerWidth < 900 && howing >= 0 && bTop > vh * 0.75 ? howing : -1;
+    if (shown !== shownStep) {
+      shownStep = shown;
+      steps.forEach((el, i) => el.firstElementChild.classList.toggle('on', i === shown));
+    }
     const nextStage = inHero ? 0 : toBicol > 0.5 ? 2 : 1;
     if (nextStage !== stage) { stage = nextStage; orbit.goal = 0; }
     orbit.now = lerp(orbit.now, orbit.goal, 1 - Math.exp(-dt * 7));
@@ -556,7 +586,7 @@ async function start() {
 
     const shot = toBicol > 0.5 ? null : inHero ? HERO : SHOTS[clamp(step, 0, 4)];
     const portrait = innerWidth < 900;
-    const goal = { ...(shot ?? { theta: Math.PI * 1.5, radius: portrait ? 100 : 48, height: portrait ? 112 : 56, x: 0, z: 0, shift: 0.17 }), lift: portrait ? (shot ? 0.14 : 0.2) : 0 };
+    const goal = { ...(shot ?? { theta: Math.PI * 1.5, radius: portrait ? 118 : 48, height: portrait ? 132 : 56, x: 0, z: 0, shift: 0.17 }), lift: portrait ? (shot ? 0.14 : 0.29) : 0 };
     const ease = 1 - Math.exp(-dt * (calm ? 30 : 3.2));
     Object.keys(cam).forEach((k) => { cam[k] = lerp(cam[k], goal[k], ease); });
     const fit = portrait && shot ? 1.45 : 1;
@@ -596,7 +626,8 @@ async function start() {
       tmp.copy(p.head.position); p.g.localToWorld(tmp);
       place(p.tag, tmp.clone(), drawn > p.frac * 0.9 + 0.1 && toBicol < 0.3, i % 2 ? -1 : 1);
     });
-    cities.forEach((c) => place(c.el, c.p, toBicol > 0.85));
+    // On a narrow screen Sorsogon's label would sit on top of Legazpi's
+    cities.forEach((c) => place(c.el, c.p, toBicol > 0.85 && !(portrait && c.el.textContent === 'Sorsogon')));
     place(hint, cueAt, inHero && !spill && drawn > 0.98, 1);
     if (bicol.visible) stepRain(dt);
     if (toBicol > 0.85) {
@@ -607,10 +638,10 @@ async function start() {
         if (landed) rainGoal = null;
       }
     }
-    readout.style.display = toBicol > 0.85 && readPlace() ? '' : 'none';
+    readout.style.display = toBicol > 0.85 && (!touch || now < readUntil) && readPlace() ? '' : 'none';
 
     if (inHero && !spill && matchMedia('(hover: hover)').matches) {
-      hover = pickRiver();
+      hover = overMap && !grab ? riverAt(pointerX, pointerY, 24) : null;
       marker.visible = Boolean(hover);
       if (hover) marker.position.copy(hover.point);
       document.body.style.cursor = grab ? 'grabbing' : hover ? 'crosshair' : 'grab';

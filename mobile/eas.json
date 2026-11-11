@@ -11,7 +11,7 @@
       },
       "env": {
         "EXPO_PUBLIC_HOSTED": "1",
-        "EXPO_PUBLIC_WEB_URL": "https://bulos-3d.expo.app/twin"
+        "EXPO_PUBLIC_WEB_URL": "https://project-bulos-3d.expo.app/twin"
       }
     }
   }

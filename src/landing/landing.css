@@ -50,7 +50,7 @@ main { position: relative; z-index: 2; pointer-events: none; }
 main a, main button, main input, .card, .log { pointer-events: auto; }
 
 .hero { position: relative; min-height: 100vh; padding: 0 32px 0 104px; display: flex; align-items: center; }
-.hero-text { max-width: 640px; cursor: auto; }
+.hero-text { max-width: 640px; cursor: auto; pointer-events: auto; }
 h1 { font-size: clamp(50px, 6.3vw, 100px); }
 #lead { margin-top: 24px; max-width: 460px; color: var(--ink2); font-size: 20px; }
 .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
@@ -170,7 +170,12 @@ h1 { font-size: clamp(50px, 6.3vw, 100px); }
   .actions { margin-top: 16px; }
   .log { left: 16px; right: 16px; bottom: 14px; width: auto; padding: 12px 14px; }
   .log li:nth-last-child(n + 3) { display: none; }
-  .step { padding: 0 16px; align-items: flex-start; padding-top: 86px; }
+  /* On a phone the model is the stage: each step's words stay at the top and swap as you scroll */
+  .step { min-height: 85svh; padding: 0; }
+  .step .card { position: fixed; z-index: 3; top: 70px; left: 16px; right: 16px; width: auto; opacity: 0; transform: translateY(12px); pointer-events: none; transition: opacity 0.35s, transform 0.35s cubic-bezier(0.2, 1, 0.3, 1); }
+  .step .card.on { opacity: 1; transform: none; pointer-events: auto; }
+  .no3d .step { min-height: 0; padding: 8px 16px; }
+  .no3d .step .card { position: static; opacity: 1; transform: none; }
   .card { width: 100%; padding: 18px 20px; }
   .card h2 { font-size: 34px; }
   .bicol { padding: 0 16px; }
